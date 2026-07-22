@@ -4,24 +4,29 @@ import '../models/protocol.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/protocol_card.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final protocols = [
-      const Protocol(
-        name: 'Retatrutide',
-        dose: '3 mg',
-        time: '10:00 PM',
-      ),
-      const Protocol(
-        name: 'GHK-Cu',
-        dose: '2 mg',
-        time: '10:05 PM',
-      ),
-    ];
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
 
+class _DashboardScreenState extends State<DashboardScreen> {
+  final protocols = [
+    Protocol(
+      name: 'Retatrutide',
+      dose: '3 mg',
+      time: '10:00 PM',
+    ),
+    Protocol(
+      name: 'GHK-Cu',
+      dose: '2 mg',
+      time: '10:05 PM',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: ListView(
@@ -38,7 +43,15 @@ class DashboardScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             for (final protocol in protocols) ...[
-              ProtocolCard(protocol: protocol),
+              ProtocolCard(
+                protocol: protocol,
+                isTaken: protocol.isTaken,
+                onPressed: () {
+                  setState(() {
+                    protocol.isTaken = true;
+                  });
+                },
+              ),
               const SizedBox(height: 12),
             ],
           ],

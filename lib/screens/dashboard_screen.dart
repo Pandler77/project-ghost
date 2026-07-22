@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/dashboard_header.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -6,14 +7,8 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center( 
-        child: Text(
-          'Dashboard',
-          style: TextStyle( 
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+      body: Center(
+        child: DashboardHeader(name: 'Frank'),
       ),
     );
   }

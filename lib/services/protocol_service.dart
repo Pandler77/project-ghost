@@ -5,18 +5,22 @@ class ProtocolService {
   List<Protocol> getAllProtocols() {
     return [
       Protocol(
+        id: 'reta-001',
         name: 'Retatrutide',
         dose: '3 mg',
-        schedule: const ProtocolSchedule.everyXDays(
+        schedule: ProtocolSchedule.everyXDays(
+          startDate: DateTime(2026, 7, 22),
           intervalDays: 6,
           hour: 22,
           minute: 0,
         ),
       ),
       Protocol(
+        id: 'ghk-001',
         name: 'GHK-Cu',
         dose: '2 mg',
-        schedule: const ProtocolSchedule.daily(
+        schedule: ProtocolSchedule.daily(
+          startDate: DateTime(2026, 7, 22),
           hour: 22,
           minute: 5,
         ),

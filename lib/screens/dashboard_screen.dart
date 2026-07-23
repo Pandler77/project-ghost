@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../models/dose.dart';
 import '../models/protocol.dart';
+import '../services/dose_service.dart';
 import '../services/protocol_service.dart';
 import '../widgets/dashboard_header.dart';
-import '../widgets/protocol_card.dart';
+import '../widgets/dose_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -14,13 +16,17 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final protocolService = ProtocolService();
+  final doseService = DoseService();
 
   late final List<Protocol> protocols;
+  late final List<Dose> doses;
 
   @override
   void initState() {
     super.initState();
+
     protocols = protocolService.getAllProtocols();
+    doses = doseService.getTodaysDoses(protocols);
   }
 
   @override
@@ -32,26 +38,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const DashboardHeader(name: 'Frank'),
             const SizedBox(height: 24),
-
             const Text(
-              'Today',
+              'Today\'s Doses',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 12),
-
-            for (final protocol in protocols) ...[
-              ProtocolCard(
-                protocol: protocol,
-                isTaken: protocol.isTaken,
+            for (final dose in doses) ...[
+              DoseCard(
+                dose: dose,
                 onPressed: () {
                   setState(() {
-                    protocol.completedAt = protocol.isTaken
-                        ? null
-                        : DateTime.now();
+                    dose.completedAt =
+                        dose.isCompleted ? null : DateTime.now();
                   });
                 },
               ),

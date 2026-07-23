@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../models/protocol.dart';
+import '../models/dose.dart';
 
-class ProtocolCard extends StatelessWidget {
-  const ProtocolCard({
-    required this.protocol,
-    required this.isTaken,
+class DoseCard extends StatelessWidget {
+  const DoseCard({
+    required this.dose,
     required this.onPressed,
     super.key,
   });
 
-  final Protocol protocol;
-  final bool isTaken;
+  final Dose dose;
   final VoidCallback onPressed;
 
   @override
@@ -23,7 +21,7 @@ class ProtocolCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              protocol.name,
+              dose.protocolName,
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -31,10 +29,10 @@ class ProtocolCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '${protocol.dose} • ${_formatScheduleTime()}',
+              '${dose.amount} • ${_formatScheduledTime()}',
             ),
             const SizedBox(height: 12),
-            if (!isTaken)
+            if (!dose.isCompleted)
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
@@ -52,7 +50,7 @@ class ProtocolCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Completed at ${_formatTime(protocol.completedAt!)}',
+                      'Completed at ${_formatTime(dose.completedAt!)}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.green,
@@ -84,18 +82,7 @@ class ProtocolCard extends StatelessWidget {
     return '$hour:$minute $period';
   }
 
-  String _formatScheduleTime() {
-    final hour = protocol.schedule.hour;
-
-    final displayHour = hour == 0
-        ? 12
-        : hour > 12
-            ? hour - 12
-            : hour;
-
-    final minute = protocol.schedule.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
-
-    return '$displayHour:$minute $period';
+  String _formatScheduledTime() {
+    return _formatTime(dose.scheduledFor);
   }
 }

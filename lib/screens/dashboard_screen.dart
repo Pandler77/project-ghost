@@ -48,8 +48,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 isTaken: protocol.isTaken,
                 onPressed: () {
                   setState(() {
-                    protocol.isTaken = true;
-                  });
+                    protocol.completedAt = protocol.isTaken
+                        ? null
+                        : DateTime.now();
+                    if (protocol.isTaken) {
+                      protocol.completedAt = DateTime.now();
+                    } else {
+                      protocol.completedAt = null;
+                    }
+                 });
                 },
               ),
               const SizedBox(height: 12),

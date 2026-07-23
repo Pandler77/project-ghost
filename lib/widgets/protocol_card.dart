@@ -35,9 +35,11 @@ class ProtocolCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: isTaken ? null : onPressed,
+                onPressed: onPressed,
                 child: Text(
-                  isTaken ? '✓ Taken' : 'Take Shot',
+                  isTaken
+                      ? '✓ Taken at ${_formatTime(protocol.completedAt!)}'
+                      : 'Take Shot',
                 ),
               ),
             ),
@@ -45,5 +47,13 @@ class ProtocolCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatTime(DateTime time) {
+    final hour = time.hour > 12 ? time.hour - 12 : time.hour;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.hour >= 12 ? 'PM' : 'AM';
+
+    return '$hour:$minute $period';
   }
 }

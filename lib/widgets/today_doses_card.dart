@@ -40,160 +40,184 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Today\'s Doses',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Text(
-                  '$completedCount/${widget.doses.length}',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            // Progress bar
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(value: progress, minHeight: 8),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Empty state
-            if (widget.doses.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text('Nothing scheduled today.'),
-              ),
-
-            // Finished banner
-            if (allCompleted) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primaryContainer.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      child: const Icon(Icons.check),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Finished for today',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text('All scheduled items are complete.'),
-                        ],
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Today\'s Doses',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  Text(
+                    '$completedCount/${widget.doses.length}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
+
+              const SizedBox(height: 10),
+
+              // Progress bar
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: progress),
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                builder: (context, animatedProgress, child) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: animatedProgress,
+                      minHeight: 8,
+                    ),
+                  );
+                },
+              ),
+
               const SizedBox(height: 16),
-            ],
 
-            // Pending doses
-            for (var index = 0; index < pendingDoses.length; index++) ...[
-              _PendingDoseRow(
-                dose: pendingDoses[index],
-                onPressed: () {
-                  final isLastPendingDose = pendingDoses.length == 1;
+              // Empty state
+              if (widget.doses.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('Nothing scheduled today.'),
+                ),
 
-                  widget.onDosePressed(pendingDoses[index]);
-
-                  if (isLastPendingDose) {
-                    setState(() {
-                      _showCompleted = false;
-                    });
-                  }
-                },
-              ),
-              if (index < pendingDoses.length - 1) const Divider(height: 24),
-            ],
-            // Completed section
-            if (completedDoses.isNotEmpty) ...[
-              if (pendingDoses.isNotEmpty) const Divider(height: 28),
-
-              InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () {
-                  setState(() {
-                    _showCompleted = !_showCompleted;
-                  });
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 10,
+              // Finished banner
+              if (allCompleted) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Row(
                     children: [
-                      const Expanded(
-                        child: Text(
-                          'Completed',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                      CircleAvatar(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary,
+                        child: const Icon(Icons.check),
                       ),
-                      Icon(
-                        _showCompleted
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        color: Theme.of(context).colorScheme.primary,
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Finished for today',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text('All scheduled items are complete.'),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+              ],
 
-              if (_showCompleted) ...[
-                const SizedBox(height: 6),
+              // Pending doses
+              for (var index = 0; index < pendingDoses.length; index++) ...[
+                _PendingDoseRow(
+                  dose: pendingDoses[index],
+                  onPressed: () {
+                    final isLastPendingDose = pendingDoses.length == 1;
 
-                for (var index = 0; index < completedDoses.length; index++) ...[
-                  _CompletedDoseRow(
-                    dose: completedDoses[index],
-                    onRemove: () {
-                      widget.onDosePressed(completedDoses[index]);
-                    },
+                    widget.onDosePressed(pendingDoses[index]);
+
+                    if (isLastPendingDose) {
+                      setState(() {
+                        _showCompleted = false;
+                      });
+                    }
+                  },
+                ),
+                if (index < pendingDoses.length - 1) const Divider(height: 24),
+              ],
+              // Completed section
+              if (completedDoses.isNotEmpty) ...[
+                if (pendingDoses.isNotEmpty) const Divider(height: 28),
+
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    setState(() {
+                      _showCompleted = !_showCompleted;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Completed',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          _showCompleted
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ],
+                    ),
                   ),
-                  if (index < completedDoses.length - 1)
-                    const SizedBox(height: 10),
+                ),
+
+                if (_showCompleted) ...[
+                  const SizedBox(height: 6),
+
+                  for (
+                    var index = 0;
+                    index < completedDoses.length;
+                    index++
+                  ) ...[
+                    _CompletedDoseRow(
+                      dose: completedDoses[index],
+                      onRemove: () {
+                        widget.onDosePressed(completedDoses[index]);
+                      },
+                    ),
+                    if (index < completedDoses.length - 1)
+                      const SizedBox(height: 10),
+                  ],
                 ],
               ],
             ],
-          ],
+          ),
         ),
       ),
     );

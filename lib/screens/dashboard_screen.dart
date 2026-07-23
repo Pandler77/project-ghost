@@ -7,6 +7,7 @@ import '../services/protocol_service.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/today_doses_card.dart';
 import '../widgets/weight_card.dart';
+import '../widgets/next_dose_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -21,6 +22,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   late final List<Protocol> protocols;
   late final List<Dose> doses;
+  Dose? nextDose;
 
   @override
   void initState() {
@@ -28,6 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     protocols = protocolService.getAllProtocols();
     doses = doseService.getTodaysDoses(protocols);
+    nextDose = doseService.getNextDose(protocols);
   }
 
   @override
@@ -90,6 +93,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 );
               },
             ),
+            const SizedBox(height: 20),
+
+            NextDoseCard(dose: nextDose),
           ],
         ),
       ),

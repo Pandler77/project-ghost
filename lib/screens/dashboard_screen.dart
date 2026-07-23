@@ -6,6 +6,7 @@ import '../services/dose_service.dart';
 import '../services/protocol_service.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/dose_card.dart';
+import '../widgets/today_summary_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -38,6 +39,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const DashboardHeader(name: 'Frank'),
             const SizedBox(height: 24),
+            TodaySummaryCard(doses: doses),
+            const SizedBox(height: 24),
             const Text(
               'Today\'s Doses',
               style: TextStyle(
@@ -46,18 +49,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            for (final dose in doses) ...[
-              DoseCard(
-                dose: dose,
-                onPressed: () {
-                  setState(() {
-                    dose.completedAt =
-                        dose.isCompleted ? null : DateTime.now();
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-            ],
+
+            if (doses.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'All clear for today',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Your next dose will appear here.',
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              for (final dose in doses) ...[
+                DoseCard(
+                  dose: dose,
+                  onPressed: () {
+                    setState(() {
+                      dose.completedAt =
+                          dose.isCompleted ? null : DateTime.now();
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
           ],
         ),
       ),

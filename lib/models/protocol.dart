@@ -1,15 +1,16 @@
+import 'protocol_schedule.dart';
+
 class Protocol {
   Protocol({
     required this.name,
     required this.dose,
-    required this.time,
-    this.isTaken = false,
+    required this.schedule,
     this.completedAt,
   });
 
     final String name;
     final String dose;
-    final String time;
+    final ProtocolSchedule schedule;
 
     DateTime? completedAt;
 

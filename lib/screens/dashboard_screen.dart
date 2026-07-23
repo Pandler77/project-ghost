@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/protocol.dart';
+import '../services/protocol_service.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/protocol_card.dart';
 
@@ -12,18 +13,15 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final protocols = [
-    Protocol(
-      name: 'Retatrutide',
-      dose: '3 mg',
-      time: '10:00 PM',
-    ),
-    Protocol(
-      name: 'GHK-Cu',
-      dose: '2 mg',
-      time: '10:05 PM',
-    ),
-  ];
+  final protocolService = ProtocolService();
+
+  late final List<Protocol> protocols;
+
+  @override
+  void initState() {
+    super.initState();
+    protocols = protocolService.getAllProtocols();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const DashboardHeader(name: 'Frank'),
             const SizedBox(height: 24),
+
             const Text(
               'Today',
               style: TextStyle(
@@ -41,7 +40,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+
             const SizedBox(height: 12),
+
             for (final protocol in protocols) ...[
               ProtocolCard(
                 protocol: protocol,
@@ -51,12 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     protocol.completedAt = protocol.isTaken
                         ? null
                         : DateTime.now();
-                    if (protocol.isTaken) {
-                      protocol.completedAt = DateTime.now();
-                    } else {
-                      protocol.completedAt = null;
-                    }
-                 });
+                  });
                 },
               ),
               const SizedBox(height: 12),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class WeightCard extends StatelessWidget {
   const WeightCard({
     required this.currentWeight,
@@ -20,9 +22,11 @@ class WeightCard extends StatelessWidget {
 
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -31,44 +35,66 @@ class WeightCard extends StatelessWidget {
                 const Expanded(
                   child: Text(
                     'Weight',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: AppTypography.title,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: onLogWeight,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Log Weight'),
-                ),
+                TextButton(onPressed: onLogWeight, child: const Text('Log')),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              '${currentWeight.toStringAsFixed(1)} lb',
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+
+            const SizedBox(height: AppSpacing.xs),
+
+            RichText(
+              text: TextSpan(
+                style: DefaultTextStyle.of(context).style,
+                children: [
+                  TextSpan(
+                    text: currentWeight.toStringAsFixed(1),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' lb',
+                    style: TextStyle(
+                      fontSize: AppTypography.body,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 4),
+
+            const SizedBox(height: AppSpacing.xs),
+
             Row(
               children: [
                 Icon(
                   hasLostWeight ? Icons.trending_down : Icons.trending_up,
-                  size: 20,
+                  size: AppIcon.sm,
                   color: Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.xs),
                 Text(
                   hasLostWeight
                       ? '${changeAmount.toStringAsFixed(1)} lb lost'
                       : '${changeAmount.toStringAsFixed(1)} lb gained',
                   style: TextStyle(
+                    fontSize: AppTypography.caption,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+
+            const SizedBox(height: AppSpacing.sm),
+
             const SizedBox(
-              height: 90,
+              height: 48,
               width: double.infinity,
               child: CustomPaint(painter: _WeightTrendPainter()),
             ),
@@ -86,22 +112,40 @@ class _WeightTrendPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
       ..color = Colors.deepPurple
-      ..strokeWidth = 3
+      ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
+    final pointPaint = Paint()
+      ..color = Colors.deepPurple
+      ..style = PaintingStyle.fill;
+
     final path = Path()
-      ..moveTo(0, size.height * 0.18)
-      ..lineTo(size.width * 0.18, size.height * 0.28)
-      ..lineTo(size.width * 0.35, size.height * 0.25)
-      ..lineTo(size.width * 0.52, size.height * 0.48)
-      ..lineTo(size.width * 0.68, size.height * 0.45)
-      ..lineTo(size.width * 0.84, size.height * 0.72)
-      ..lineTo(size.width, size.height * 0.82);
+      ..moveTo(0, size.height * .18)
+      ..quadraticBezierTo(
+        size.width * .15,
+        size.height * .28,
+        size.width * .30,
+        size.height * .24,
+      )
+      ..quadraticBezierTo(
+        size.width * .45,
+        size.height * .42,
+        size.width * .60,
+        size.height * .46,
+      )
+      ..quadraticBezierTo(
+        size.width * .80,
+        size.height * .72,
+        size.width,
+        size.height * .80,
+      );
 
     canvas.drawPath(path, linePaint);
+
+    canvas.drawCircle(Offset(size.width, size.height * .80), 4, pointPaint);
   }
 
   @override
-  bool shouldRepaint(_WeightTrendPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/dose.dart';
+import '../theme/app_theme.dart';
 
 class TodayDosesCard extends StatefulWidget {
   const TodayDosesCard({
@@ -39,24 +40,25 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
 
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
       child: AnimatedSize(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
         alignment: Alignment.topCenter,
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(
                 children: [
                   const Expanded(
                     child: Text(
                       'Today\'s Doses',
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: AppTypography.title,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -71,77 +73,64 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                 ],
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm),
 
-              // Progress bar
               TweenAnimationBuilder<double>(
                 tween: Tween<double>(begin: 0, end: progress),
                 duration: const Duration(milliseconds: 350),
                 curve: Curves.easeOutCubic,
                 builder: (context, animatedProgress, child) {
                   return ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                     child: LinearProgressIndicator(
                       value: animatedProgress,
-                      minHeight: 8,
+                      minHeight: 6,
                     ),
                   );
                 },
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
 
-              // Empty state
               if (widget.doses.isEmpty)
                 const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   child: Text('Nothing scheduled today.'),
                 ),
 
-              // Finished banner
               if (allCompleted) ...[
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
                     color: Theme.of(
                       context,
-                    ).colorScheme.primaryContainer.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(18),
+                    ).colorScheme.primaryContainer.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(AppRadius.button),
                   ),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onPrimary,
-                        child: const Icon(Icons.check),
+                      Icon(
+                        Icons.check_circle,
+                        size: AppIcon.md,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: AppSpacing.sm),
                       const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Finished for today',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(height: 3),
-                            Text('All scheduled items are complete.'),
-                          ],
+                        child: Text(
+                          'Finished for today',
+                          style: TextStyle(
+                            fontSize: AppTypography.body,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
               ],
 
-              // Pending doses
               for (var index = 0; index < pendingDoses.length; index++) ...[
                 _PendingDoseRow(
                   dose: pendingDoses[index],
@@ -157,14 +146,16 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                     }
                   },
                 ),
-                if (index < pendingDoses.length - 1) const Divider(height: 24),
+                if (index < pendingDoses.length - 1)
+                  const Divider(height: AppSpacing.lg),
               ],
-              // Completed section
+
               if (completedDoses.isNotEmpty) ...[
-                if (pendingDoses.isNotEmpty) const Divider(height: 28),
+                if (pendingDoses.isNotEmpty)
+                  const Divider(height: AppSpacing.lg),
 
                 InkWell(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.button),
                   onTap: () {
                     setState(() {
                       _showCompleted = !_showCompleted;
@@ -172,8 +163,8 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 10,
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.sm,
                     ),
                     child: Row(
                       children: [
@@ -181,8 +172,8 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                           child: Text(
                             'Completed',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -198,7 +189,7 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                 ),
 
                 if (_showCompleted) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.xs),
 
                   for (
                     var index = 0;
@@ -212,7 +203,7 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                       },
                     ),
                     if (index < completedDoses.length - 1)
-                      const SizedBox(height: 10),
+                      const SizedBox(height: AppSpacing.sm),
                   ],
                 ],
               ],
@@ -233,18 +224,21 @@ class _PendingDoseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppRadius.button),
       onTap: onPressed,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.sm,
+        ),
         child: Row(
           children: [
             Icon(
               Icons.radio_button_unchecked,
               color: Theme.of(context).colorScheme.outline,
-              size: 30,
+              size: AppIcon.md,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,16 +246,16 @@ class _PendingDoseRow extends StatelessWidget {
                   Text(
                     dose.protocolName,
                     style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     '${dose.amount} • ${_formatTime(dose.scheduledFor)}',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 15,
+                      fontSize: AppTypography.caption,
                     ),
                   ),
                 ],
@@ -283,22 +277,21 @@ class _CompletedDoseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.primaryContainer.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(18),
+        ).colorScheme.primaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(AppRadius.button),
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            child: const Icon(Icons.check, size: 20),
+          Icon(
+            Icons.check_circle,
+            size: AppIcon.md,
+            color: Theme.of(context).colorScheme.primary,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,21 +299,22 @@ class _CompletedDoseRow extends StatelessWidget {
                 Text(
                   dose.protocolName,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   '${dose.amount} • Taken',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: AppTypography.caption,
                   ),
                 ),
               ],
             ),
           ),
-          TextButton(onPressed: onRemove, child: const Text('Remove')),
+          TextButton(onPressed: onRemove, child: const Text('Undo')),
         ],
       ),
     );
@@ -335,6 +329,7 @@ String _formatTime(DateTime time) {
       : time.hour;
 
   final minute = time.minute.toString().padLeft(2, '0');
+
   final period = time.hour >= 12 ? 'PM' : 'AM';
 
   return '$hour:$minute $period';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/dose.dart';
+import '../theme/app_theme.dart';
 
 class NextDoseCard extends StatelessWidget {
   const NextDoseCard({required this.dose, super.key});
@@ -15,9 +16,11 @@ class NextDoseCard extends StatelessWidget {
 
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -27,13 +30,16 @@ class NextDoseCard extends StatelessWidget {
                 const Expanded(
                   child: Text(
                     'Next Dose',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: AppTypography.title,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 Text(
                   _formatTime(dose!.scheduledFor),
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: AppTypography.caption,
                     fontWeight: FontWeight.w600,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -41,31 +47,31 @@ class NextDoseCard extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.sm),
 
             Text(
               _formatRelativeTime(dose!.scheduledFor),
               style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
+                fontSize: AppTypography.primary,
+                fontWeight: FontWeight.w600,
                 color: Theme.of(context).colorScheme.primary,
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
 
             Text(
               dose!.protocolName,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
 
-            const SizedBox(height: 6),
+            const SizedBox(height: 2),
 
             Text(
               dose!.amount,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 16,
+                fontSize: AppTypography.caption,
               ),
             ),
           ],

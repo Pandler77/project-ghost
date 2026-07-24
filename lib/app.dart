@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/dashboard_screen.dart';
+import 'screens/main_screen.dart';
 
 class ProjectGhostApp extends StatelessWidget {
   const ProjectGhostApp({super.key});
@@ -12,7 +12,7 @@ class ProjectGhostApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
       ),
-      home: const DashboardScreen(),
+      home: const MainScreen(),
     );
   }
 }

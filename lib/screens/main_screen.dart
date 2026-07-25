@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../models/protocol.dart';
+import '../services/app_data_service.dart';
 import 'calendar_screen.dart';
 import 'dashboard_screen.dart';
-import 'tools_screen.dart';
 import 'protocols_screen.dart';
-
+import 'tools_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -14,19 +15,50 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  final AppDataService _appDataService = AppDataService();
+
   int _selectedIndex = 0;
 
-  static const List<Widget> _screens = [
-    DashboardScreen(),
-    ProtocolsScreen(),
-    CalendarScreen(),
-    ToolsScreen(),
-  ];
+  late final List<Protocol> _protocols;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _protocols = _appDataService.getInitialProtocols();
+  }
+
+  void _addProtocol(Protocol protocol) {
+    setState(() {
+      _protocols.add(protocol);
+    });
+  }
+
+  void _refreshProtocols() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
+    final screens = <Widget>[
+      DashboardScreen(
+        protocols: _protocols,
+        onProtocolAdded: _addProtocol,
+        displayName: _appDataService.displayName,
+        currentWeight: _appDataService.currentWeight,
+        startingWeight: _appDataService.startingWeight,
+      ),
+      ProtocolsScreen(
+        protocols: _protocols,
+        onProtocolsChanged: _refreshProtocols,
+        onProtocolAdded: _addProtocol,
+      ),
+      const CalendarScreen(),
+      const ToolsScreen(),
+    ];
+
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _screens),
+      body: IndexedStack(index: _selectedIndex, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {

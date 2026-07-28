@@ -12,12 +12,14 @@ class ProtocolsScreen extends StatefulWidget {
     required this.protocols,
     required this.onProtocolsChanged,
     required this.onProtocolAdded,
+    required this.onProtocolUpdated,
     super.key,
   });
 
   final List<Protocol> protocols;
   final VoidCallback onProtocolsChanged;
-  final ValueChanged<Protocol> onProtocolAdded;
+  final Future<void> Function(Protocol protocol) onProtocolAdded;
+  final Future<void> Function(Protocol protocol) onProtocolUpdated;
 
   @override
   State<ProtocolsScreen> createState() => _ProtocolsScreenState();
@@ -27,23 +29,41 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
   Future<void> _openAddProtocol() async {
     final protocol = await Navigator.push<Protocol>(
       context,
-      MaterialPageRoute(builder: (_) => const AddProtocolScreen()),
+      MaterialPageRoute(
+        builder: (_) => const AddProtocolScreen(),
+      ),
     );
 
     if (protocol == null || !mounted) {
       return;
     }
 
-    widget.onProtocolAdded(protocol);
+    await widget.onProtocolAdded(protocol);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
   }
 
-  Future<void> _openProtocolDetails(Protocol protocol) async {
+  Future<void> _openProtocolDetails(
+    Protocol protocol,
+  ) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ProtocolDetailsScreen(protocol: protocol),
+        builder: (_) => ProtocolDetailsScreen(
+          protocol: protocol,
+        ),
       ),
     );
+
+    if (!mounted) {
+      return;
+    }
+
+    await widget.onProtocolUpdated(protocol);
 
     if (!mounted) {
       return;
@@ -84,14 +104,21 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
+
           if (widget.protocols.isEmpty)
             const _EmptyProtocolsState()
           else
-            for (var index = 0; index < widget.protocols.length; index++) ...[
+            for (
+              var index = 0;
+              index < widget.protocols.length;
+              index++
+            ) ...[
               _ProtocolRow(
                 protocol: widget.protocols[index],
                 onPressed: () {
-                  _openProtocolDetails(widget.protocols[index]);
+                  _openProtocolDetails(
+                    widget.protocols[index],
+                  );
                 },
               ),
               if (index < widget.protocols.length - 1)
@@ -104,7 +131,10 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
 }
 
 class _ProtocolRow extends StatelessWidget {
-  const _ProtocolRow({required this.protocol, required this.onPressed});
+  const _ProtocolRow({
+    required this.protocol,
+    required this.onPressed,
+  });
 
   final Protocol protocol;
   final VoidCallback onPressed;
@@ -114,26 +144,32 @@ class _ProtocolRow extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     final background = switch (protocol.status) {
-      ProtocolStatus.active => colorScheme.primary.withValues(alpha: 0.08),
-      ProtocolStatus.paused => Colors.amber.withValues(alpha: 0.12),
-      ProtocolStatus.archived => colorScheme.surfaceContainerHighest.withValues(
-        alpha: 0.65,
-      ),
+      ProtocolStatus.active =>
+        colorScheme.primary.withValues(alpha: 0.08),
+      ProtocolStatus.paused =>
+        Colors.amber.withValues(alpha: 0.12),
+      ProtocolStatus.archived =>
+        colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.65,
+        ),
     };
 
-    final contentOpacity = protocol.status == ProtocolStatus.archived
-        ? 0.65
-        : 1.0;
+    final contentOpacity =
+        protocol.status == ProtocolStatus.archived ? 0.65 : 1.0;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.button),
+        borderRadius: BorderRadius.circular(
+          AppRadius.button,
+        ),
         onTap: onPressed,
         child: Ink(
           decoration: BoxDecoration(
             color: background,
-            borderRadius: BorderRadius.circular(AppRadius.button),
+            borderRadius: BorderRadius.circular(
+              AppRadius.button,
+            ),
           ),
           child: Opacity(
             opacity: contentOpacity,
@@ -146,7 +182,8 @@ class _ProtocolRow extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
                       children: [
                         Text(
                           protocol.name,
@@ -155,7 +192,9 @@ class _ProtocolRow extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.xs),
+                        const SizedBox(
+                          height: AppSpacing.xs,
+                        ),
                         Text(
                           protocol.dose,
                           style: TextStyle(
@@ -174,7 +213,10 @@ class _ProtocolRow extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right, color: colorScheme.outline),
+                  Icon(
+                    Icons.chevron_right,
+                    color: colorScheme.outline,
+                  ),
                 ],
               ),
             ),
@@ -186,8 +228,10 @@ class _ProtocolRow extends StatelessWidget {
 
   String _formatSchedule(Protocol protocol) {
     final schedule = protocol.schedule;
-
-    final time = _formatTime(schedule.hour, schedule.minute);
+    final time = _formatTime(
+      schedule.hour,
+      schedule.minute,
+    );
 
     switch (schedule.type) {
       case ScheduleType.daily:
@@ -200,7 +244,8 @@ class _ProtocolRow extends StatelessWidget {
         return 'Every ${schedule.intervalDays} days • $time';
 
       case ScheduleType.specificDays:
-        final days = schedule.specificWeekdays.toList()..sort();
+        final days = schedule.specificWeekdays.toList()
+          ..sort();
 
         return '${days.map(_shortWeekdayName).join(' • ')} • $time';
 
@@ -255,10 +300,11 @@ class _ProtocolRow extends StatelessWidget {
     final displayHour = hour == 0
         ? 12
         : hour > 12
-        ? hour - 12
-        : hour;
+            ? hour - 12
+            : hour;
 
-    final formattedMinute = minute.toString().padLeft(2, '0');
+    final formattedMinute =
+        minute.toString().padLeft(2, '0');
 
     final period = hour >= 12 ? 'PM' : 'AM';
 
@@ -272,7 +318,9 @@ class _EmptyProtocolsState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.lg,
+      ),
       child: Column(
         children: [
           Icon(
@@ -294,7 +342,9 @@ class _EmptyProtocolsState extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: AppTypography.caption,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurfaceVariant,
             ),
           ),
         ],

@@ -72,9 +72,7 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                   ),
                 ],
               ),
-
               const SizedBox(height: AppSpacing.sm),
-
               TweenAnimationBuilder<double>(
                 tween: Tween<double>(begin: 0, end: progress),
                 duration: const Duration(milliseconds: 350),
@@ -89,7 +87,6 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                   );
                 },
               ),
-
               const SizedBox(height: AppSpacing.md),
 
               if (widget.doses.isEmpty)
@@ -190,7 +187,6 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
 
                 if (_showCompleted) ...[
                   const SizedBox(height: AppSpacing.xs),
-
                   for (
                     var index = 0;
                     index < completedDoses.length;
@@ -252,7 +248,8 @@ class _PendingDoseRow extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    '${dose.amount} • ${_formatTime(dose.scheduledFor)}',
+                    '${dose.amount} • '
+                    '${_formatTime(dose.scheduledFor)}',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: AppTypography.caption,
@@ -276,6 +273,12 @@ class _CompletedDoseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final completedAt = dose.completedAt;
+
+    final completionText = completedAt == null
+        ? 'Taken'
+        : 'Taken at ${_formatTime(completedAt)}';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -305,7 +308,7 @@ class _CompletedDoseRow extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  '${dose.amount} • Taken',
+                  '${dose.amount} • $completionText',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: AppTypography.caption,

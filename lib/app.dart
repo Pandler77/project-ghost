@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'screens/main_screen.dart';
 
 class ProjectGhostApp extends StatelessWidget {

@@ -6,6 +6,7 @@ import '../models/protocol_preset.dart';
 import '../models/protocol_schedule.dart';
 import '../services/protocol_preset_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/protocol_colors.dart';
 
 enum ScheduleOption { daily, weekly, everyXDays, specificDays, monthly }
 
@@ -58,6 +59,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   TimeOfDay _selectedTime = const TimeOfDay(hour: 20, minute: 0);
 
   DateTime _selectedStartDate = DateTime.now();
+  int _selectedColorValue = Protocol.defaultColorValue;
 
   @override
   void dispose() {
@@ -785,6 +787,39 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
+        const Text(
+          'Protocol color',
+          style: TextStyle(
+            fontSize: AppTypography.body,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Used for Calendar and schedule markers. Colors may be reused.',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            for (final colorValue in ProtocolColors.available)
+              _ProtocolColorChoice(
+                colorValue: colorValue,
+                isSelected: _selectedColorValue == colorValue,
+                onTap: () {
+                  setState(() {
+                    _selectedColorValue = colorValue;
+                  });
+                },
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
         Text(
           'You can pause or edit this protocol later from the Protocols tab.',
           style: TextStyle(
@@ -836,6 +871,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       name: _nameController.text.trim(),
       dose: _formattedDose,
       schedule: _createSchedule(),
+      colorValue: _selectedColorValue,
     );
   }
 
@@ -1507,6 +1543,54 @@ class _CustomNameMessage extends StatelessWidget {
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProtocolColorChoice extends StatelessWidget {
+  const _ProtocolColorChoice({
+    required this.colorValue,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final int colorValue;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Color(colorValue);
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: 'Select protocol color',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 42,
+          height: 42,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isSelected
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: Container(
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            child: isSelected
+                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                : null,
           ),
         ),
       ),

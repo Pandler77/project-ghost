@@ -135,8 +135,8 @@ class _MainScreenState extends State<MainScreen> {
         onProtocolAdded: _addProtocol,
         onProtocolUpdated: _updateProtocol,
       ),
-      const CalendarScreen(),
-      const ToolsScreen(),
+      CalendarScreen(dataService: _appDataService, protocols: _protocols),
+      ToolsScreen(dataService: _appDataService, protocols: _protocols),
     ];
 
     return Scaffold(

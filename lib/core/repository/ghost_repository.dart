@@ -58,8 +58,55 @@ class GhostRepository {
   }
 
   // ------------------------
-  // Dose Records
+  // Dose records
   // ------------------------
+
+  Future<List<DoseRecord>> getAllDoseRecords() async {
+    final db = await _appDatabase.database;
+
+    final rows = await db.query(
+      AppDatabase.doseRecordsTable,
+      orderBy: 'scheduled_for DESC',
+    );
+
+    return rows.map(DoseRecord.fromMap).toList();
+  }
+
+  Future<List<DoseRecord>> getDoseRecordsBetween(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final db = await _appDatabase.database;
+
+    final normalizedStart = DateTime(start.year, start.month, start.day);
+
+    final normalizedEnd = DateTime(end.year, end.month, end.day);
+
+    final rows = await db.query(
+      AppDatabase.doseRecordsTable,
+      where: 'scheduled_for >= ? AND scheduled_for < ?',
+      whereArgs: [
+        normalizedStart.toIso8601String(),
+        normalizedEnd.toIso8601String(),
+      ],
+      orderBy: 'scheduled_for ASC',
+    );
+
+    return rows.map(DoseRecord.fromMap).toList();
+  }
+
+  Future<List<DoseRecord>> getDoseRecordsForProtocol(String protocolId) async {
+    final db = await _appDatabase.database;
+
+    final rows = await db.query(
+      AppDatabase.doseRecordsTable,
+      where: 'protocol_id = ?',
+      whereArgs: [protocolId],
+      orderBy: 'scheduled_for DESC',
+    );
+
+    return rows.map(DoseRecord.fromMap).toList();
+  }
 
   Future<List<DoseRecord>> getDoseRecordsForDate(DateTime date) async {
     final db = await _appDatabase.database;
@@ -72,6 +119,7 @@ class GhostRepository {
       AppDatabase.doseRecordsTable,
       where: 'scheduled_for >= ? AND scheduled_for < ?',
       whereArgs: [start.toIso8601String(), end.toIso8601String()],
+      orderBy: 'scheduled_for ASC',
     );
 
     return rows.map(DoseRecord.fromMap).toList();
@@ -101,7 +149,7 @@ class GhostRepository {
   }
 
   // ------------------------
-  // Weight Records
+  // Weight records
   // ------------------------
 
   Future<void> saveWeightRecord(WeightRecord record) async {

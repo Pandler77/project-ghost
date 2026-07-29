@@ -7,7 +7,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String databaseName = 'ghost.db';
-  static const int databaseVersion = 3;
+  static const int databaseVersion = 4;
 
   static const String protocolsTable = 'protocols';
   static const String doseRecordsTable = 'dose_records';
@@ -33,9 +33,14 @@ class AppDatabase {
     return openDatabase(
       databasePath,
       version: databaseVersion,
+      onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onConfigure(Database database) async {
+    await database.execute('PRAGMA foreign_keys = ON');
   }
 
   Future<void> _onCreate(Database database, int version) async {
@@ -56,6 +61,14 @@ class AppDatabase {
     if (oldVersion < 3) {
       await _createWeightRecordsTable(database);
     }
+
+    if (oldVersion < 4) {
+      await database.execute('''
+        ALTER TABLE $protocolsTable
+        ADD COLUMN color_value INTEGER NOT NULL
+        DEFAULT 4284960932
+        ''');
+    }
   }
 
   Future<void> _createProtocolsTable(Database database) async {
@@ -65,6 +78,7 @@ class AppDatabase {
         name TEXT NOT NULL,
         dose TEXT NOT NULL,
         status TEXT NOT NULL,
+        color_value INTEGER NOT NULL DEFAULT 4284960932,
         schedule_type TEXT NOT NULL,
         start_date TEXT NOT NULL,
         hour INTEGER NOT NULL,

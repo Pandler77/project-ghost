@@ -27,6 +27,18 @@ class AppDataService {
     return _repository.deleteProtocol(protocolId);
   }
 
+  Future<List<DoseRecord>> getAllDoseRecords() {
+    return _repository.getAllDoseRecords();
+  }
+
+  Future<List<DoseRecord>> getDoseRecordsBetween(DateTime start, DateTime end) {
+    return _repository.getDoseRecordsBetween(start, end);
+  }
+
+  Future<List<DoseRecord>> getDoseRecordsForProtocol(String protocolId) {
+    return _repository.getDoseRecordsForProtocol(protocolId);
+  }
+
   Future<List<DoseRecord>> getDoseRecordsForDate(DateTime date) {
     return _repository.getDoseRecordsForDate(date);
   }

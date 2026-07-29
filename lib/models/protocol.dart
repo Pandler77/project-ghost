@@ -9,7 +9,10 @@ class Protocol {
     required this.dose,
     required this.schedule,
     this.status = ProtocolStatus.active,
+    this.colorValue = defaultColorValue,
   }) : id = id ?? name;
+
+  static const int defaultColorValue = 0xFF6750A4;
 
   final String id;
   final String name;
@@ -17,6 +20,7 @@ class Protocol {
   final ProtocolSchedule schedule;
 
   ProtocolStatus status;
+  int colorValue;
 
   Map<String, Object?> toMap() {
     return {
@@ -24,6 +28,7 @@ class Protocol {
       'name': name,
       'dose': dose,
       'status': status.name,
+      'color_value': colorValue,
       'schedule_type': schedule.type.name,
       'start_date': schedule.startDate.toIso8601String(),
       'hour': schedule.hour,
@@ -84,6 +89,7 @@ class Protocol {
       name: map['name'] as String,
       dose: map['dose'] as String,
       status: ProtocolStatus.values.byName(map['status'] as String),
+      colorValue: (map['color_value'] as int?) ?? defaultColorValue,
       schedule: schedule,
     );
   }

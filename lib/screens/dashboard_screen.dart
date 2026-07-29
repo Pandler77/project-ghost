@@ -8,12 +8,14 @@ import '../models/protocol.dart';
 import '../models/weight_record.dart';
 import '../services/app_data_service.dart';
 import '../services/dose_service.dart';
+import '../services/protocol_schedule_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/dashboard_header.dart';
-import '../widgets/next_dose_card.dart';
 import '../widgets/today_doses_card.dart';
+import '../widgets/weekly_preview_card.dart';
 import '../widgets/weight_card.dart';
 import 'add_protocol_screen.dart';
+import 'calendar/widgets/day_schedule_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -36,10 +38,12 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final DoseService _doseService = DoseService();
 
+  final ProtocolScheduleService _scheduleService =
+      const ProtocolScheduleService();
+
   List<Dose> _doses = [];
   List<WeightRecord> _weightRecords = [];
 
-  Dose? _nextDose;
   Timer? _refreshTimer;
 
   bool _isLoadingWeight = true;
@@ -58,7 +62,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void didUpdateWidget(covariant DashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadDoseData();
+
+    if (oldWidget.protocols != widget.protocols) {
+      _loadDoseData();
+    }
   }
 
   @override
@@ -92,15 +99,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    final nextDose = _doseService.getNextDose(widget.protocols);
-
     if (!mounted) {
       return;
     }
 
     setState(() {
       _doses = refreshedDoses;
-      _nextDose = nextDose;
     });
   }
 
@@ -160,6 +164,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  Future<void> _openWeeklyDay(DateTime date) async {
+    try {
+      final records = await widget.dataService.getDoseRecordsForDate(date);
+
+      if (!mounted) {
+        return;
+      }
+
+      final recordsByDose = <String, DoseRecord>{
+        for (final record in records)
+          _doseKey(record.protocolId, record.scheduledFor): record,
+      };
+
+      final scheduledProtocols = _scheduleService.protocolsForDate(
+        widget.protocols,
+        date,
+      );
+
+      final items = <ScheduledDoseItem>[];
+
+      for (final protocol in scheduledProtocols) {
+        final scheduledFor = _scheduleService.scheduledDateTime(protocol, date);
+
+        items.add(
+          ScheduledDoseItem(
+            protocol: protocol,
+            scheduledFor: scheduledFor,
+            record: recordsByDose[_doseKey(protocol.id, scheduledFor)],
+          ),
+        );
+      }
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => DayScheduleSheet(date: date, items: items),
+      );
+
+      await _loadDoseData();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load this date: $error')),
+      );
+    }
+  }
+
   Future<void> _openAddProtocol() async {
     final protocol = await Navigator.push<Protocol>(
       context,
@@ -212,7 +267,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _doseKey(String protocolId, DateTime scheduledFor) {
-    return '$protocolId|${scheduledFor.toIso8601String()}';
+    return '$protocolId|'
+        '${scheduledFor.toIso8601String()}';
   }
 
   @override
@@ -232,14 +288,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             DashboardHeader(name: widget.displayName),
-            const SizedBox(height: 24),
+
+            const SizedBox(height: AppSpacing.lg),
 
             TodayDosesCard(doses: _doses, onDosePressed: _toggleDose),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.lg),
+
+            WeeklyPreviewCard(
+              protocols: widget.protocols,
+              onDayTapped: _openWeeklyDay,
+            ),
+
+            const SizedBox(height: AppSpacing.lg),
 
             if (_isLoadingWeight)
               const Card(
@@ -257,10 +321,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 weightRecords: _weightRecords,
                 onLogWeight: _openWeightDialog,
               ),
-
-            const SizedBox(height: 20),
-
-            NextDoseCard(dose: _nextDose),
           ],
         ),
       ),
@@ -375,7 +435,9 @@ class _WeightEntryDialogState extends State<_WeightEntryDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            Navigator.pop(context);
+          },
           child: const Text('Cancel'),
         ),
         FilledButton(onPressed: _save, child: const Text('Save')),

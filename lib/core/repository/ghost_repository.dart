@@ -198,4 +198,26 @@ class GhostRepository {
       whereArgs: [id],
     );
   }
+
+  Future<WeightRecord?> getWeightRecordForDate(DateTime date) async {
+    final db = await _appDatabase.database;
+
+    final start = DateTime(date.year, date.month, date.day);
+
+    final end = start.add(const Duration(days: 1));
+
+    final rows = await db.query(
+      AppDatabase.weightRecordsTable,
+      where: 'recorded_at >= ? AND recorded_at < ?',
+      whereArgs: [start.toIso8601String(), end.toIso8601String()],
+      orderBy: 'recorded_at DESC',
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    return WeightRecord.fromMap(rows.first);
+  }
 }

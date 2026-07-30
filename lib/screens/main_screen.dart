@@ -18,6 +18,7 @@ class _MainScreenState extends State<MainScreen> {
   final AppDataService _appDataService = AppDataService();
 
   int _selectedIndex = 0;
+  int _dataRevision = 0;
 
   List<Protocol> _protocols = [];
 
@@ -64,6 +65,7 @@ class _MainScreenState extends State<MainScreen> {
 
     setState(() {
       _protocols.add(protocol);
+      _dataRevision++;
     });
   }
 
@@ -74,7 +76,21 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
 
-    setState(() {});
+    final index = _protocols.indexWhere((item) => item.id == protocol.id);
+
+    setState(() {
+      if (index != -1) {
+        _protocols[index] = protocol;
+      }
+
+      _dataRevision++;
+    });
+  }
+
+  void _notifyDataChanged() {
+    setState(() {
+      _dataRevision++;
+    });
   }
 
   @override
@@ -95,7 +111,7 @@ class _MainScreenState extends State<MainScreen> {
                   const Icon(Icons.error_outline, size: 42),
                   const SizedBox(height: 16),
                   const Text(
-                    'Could not load Ghost data.',
+                    'Could not load app data.',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
@@ -126,16 +142,19 @@ class _MainScreenState extends State<MainScreen> {
         onProtocolAdded: _addProtocol,
         dataService: _appDataService,
         displayName: _appDataService.displayName,
+        dataRevision: _dataRevision,
       ),
       ProtocolsScreen(
         protocols: _protocols,
-        onProtocolsChanged: () {
-          setState(() {});
-        },
+        onProtocolsChanged: _notifyDataChanged,
         onProtocolAdded: _addProtocol,
         onProtocolUpdated: _updateProtocol,
       ),
-      CalendarScreen(dataService: _appDataService, protocols: _protocols),
+      CalendarScreen(
+        dataService: _appDataService,
+        protocols: _protocols,
+        onDataChanged: _notifyDataChanged,
+      ),
       ToolsScreen(dataService: _appDataService, protocols: _protocols),
     ];
 

@@ -11,12 +11,12 @@ import '../services/dose_service.dart';
 import '../services/protocol_schedule_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/dashboard_header.dart';
+import '../widgets/onboarding_card.dart';
 import '../widgets/today_doses_card.dart';
 import '../widgets/weekly_preview_card.dart';
 import '../widgets/weight_card.dart';
 import 'add_protocol_screen.dart';
 import 'calendar/widgets/day_schedule_sheet.dart';
-import '../widgets/onboarding_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -24,6 +24,7 @@ class DashboardScreen extends StatefulWidget {
     required this.onProtocolAdded,
     required this.dataService,
     required this.displayName,
+    required this.dataRevision,
     super.key,
   });
 
@@ -31,6 +32,7 @@ class DashboardScreen extends StatefulWidget {
   final Future<void> Function(Protocol protocol) onProtocolAdded;
   final AppDataService dataService;
   final String displayName;
+  final int dataRevision;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -66,6 +68,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (oldWidget.protocols != widget.protocols) {
       _loadDoseData();
+    }
+
+    if (oldWidget.dataRevision != widget.dataRevision) {
+      _loadDashboardData();
     }
   }
 
@@ -275,6 +281,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final hasProtocols = widget.protocols.isNotEmpty;
+
     final hasWeight = _weightRecords.isNotEmpty;
 
     final currentWeight = hasWeight ? _weightRecords.first.weight : null;

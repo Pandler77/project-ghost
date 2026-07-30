@@ -65,6 +65,10 @@ class AppDataService {
     return _repository.getWeightRecords();
   }
 
+  Future<WeightRecord?> getWeightRecordForDate(DateTime date) {
+    return _repository.getWeightRecordForDate(date);
+  }
+
   Future<WeightRecord?> getLatestWeight() {
     return _repository.getLatestWeight();
   }

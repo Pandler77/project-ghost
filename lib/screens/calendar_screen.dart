@@ -7,19 +7,21 @@ import '../services/app_data_service.dart';
 import '../services/protocol_schedule_service.dart';
 import '../theme/app_theme.dart';
 import 'calendar/calendar_helpers.dart';
-import 'calendar/widgets/day_schedule_sheet.dart';
 import 'calendar/widgets/month_calendar.dart';
 import 'calendar/widgets/month_year_picker_dialog.dart';
+import 'daily_timeline_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({
     required this.dataService,
     required this.protocols,
+    required this.onDataChanged,
     super.key,
   });
 
   final AppDataService dataService;
   final List<Protocol> protocols;
+  final VoidCallback onDataChanged;
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -140,32 +142,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _selectedDate = DateTime(date.year, date.month, date.day);
     });
 
-    try {
-      final records = await widget.dataService.getDoseRecordsForDate(date);
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DailyTimelineScreen(
+          date: date,
+          protocols: widget.protocols,
+          dataService: widget.dataService,
+          onDataChanged: widget.onDataChanged,
+        ),
+      ),
+    );
 
-      if (!mounted) {
-        return;
-      }
-
-      final scheduledItems = _scheduledDosesForDate(date, records);
-
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => DayScheduleSheet(date: date, items: scheduledItems),
-      );
-
-      await _loadDisplayedMonth();
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not load this date: $error')),
-      );
+    if (!mounted) {
+      return;
     }
+
+    await _loadDisplayedMonth();
   }
 
   List<Protocol> _protocolsForDate(DateTime date) {
@@ -187,36 +180,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       protocols: protocols,
       records: records,
     );
-  }
-
-  List<ScheduledDoseItem> _scheduledDosesForDate(
-    DateTime date,
-    List<DoseRecord> records,
-  ) {
-    final recordsByDose = <String, DoseRecord>{
-      for (final record in records)
-        _doseKey(record.protocolId, record.scheduledFor): record,
-    };
-
-    final items = <ScheduledDoseItem>[];
-
-    for (final protocol in _protocolsForDate(date)) {
-      final scheduledFor = _scheduleService.scheduledDateTime(protocol, date);
-
-      items.add(
-        ScheduledDoseItem(
-          protocol: protocol,
-          scheduledFor: scheduledFor,
-          record: recordsByDose[_doseKey(protocol.id, scheduledFor)],
-        ),
-      );
-    }
-
-    return items;
-  }
-
-  String _doseKey(String protocolId, DateTime scheduledFor) {
-    return '$protocolId|${scheduledFor.toIso8601String()}';
   }
 
   @override

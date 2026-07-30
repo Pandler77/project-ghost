@@ -1,17 +1,87 @@
-# project_ghost
+# Project_Ghost
 
-A new Flutter project.
+> An all-in-one medication, peptide, and health tracking application built with Flutter.
 
-## Getting Started
+**Status:** Alpha (v0.3.0-alpha)
 
-This project is a starting point for a Flutter application.
+Ghost is designed to replace multiple health tracking apps by bringing protocols, weight tracking, calendar history, progress photos, inventory, and reminders into a single experience.
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Features
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Current
+
+- Protocol management
+  - Create, edit, pause, resume, and archive protocols
+  - Daily, weekly, monthly, interval, and custom schedules
+
+- Dashboard
+  - Adaptive onboarding
+  - Today's doses
+  - Weekly preview
+  - Weight tracking
+
+- Calendar
+  - Protocol schedule visualization
+  - Dose completion history
+
+- Weight
+  - Persistent weight logging
+  - Progress tracking
+
+---
+
+## Planned
+
+- Timeline view
+- Progress photos
+- Injection site rotation
+- Cycle tracking
+- Inventory management
+- Notifications
+- Dark mode & themes
+- Cloud backup
+- Apple Health / Google Fit integration
+
+---
+
+## Screenshots
+
+> Coming soon
+
+---
+
+## Tech Stack
+
+- Flutter
+- Dart
+- SQLite
+- Material 3
+
+---
+
+## Development Status
+
+| Version | Status |
+|---------|--------|
+| v0.1 Alpha | Complete |
+| v0.2 Alpha | Complete |
+| v0.3 Alpha | Current |
+| v1.0 | Planned |
+
+---
+
+## Roadmap
+
+See:
+
+- docs/ROADMAP.md
+- docs/BACKLOG.md
+- docs/UX_NOTES.md
+
+---
+
+## License
+
+Currently private.

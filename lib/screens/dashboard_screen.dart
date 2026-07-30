@@ -16,6 +16,7 @@ import '../widgets/weekly_preview_card.dart';
 import '../widgets/weight_card.dart';
 import 'add_protocol_screen.dart';
 import 'calendar/widgets/day_schedule_sheet.dart';
+import '../widgets/onboarding_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -273,54 +274,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentWeight = _weightRecords.isEmpty
-        ? null
-        : _weightRecords.first.weight;
+    final hasProtocols = widget.protocols.isNotEmpty;
+    final hasWeight = _weightRecords.isNotEmpty;
 
-    final startingWeight = _weightRecords.isEmpty
-        ? null
-        : _weightRecords.last.weight;
+    final currentWeight = hasWeight ? _weightRecords.first.weight : null;
+
+    final startingWeight = hasWeight ? _weightRecords.last.weight : null;
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAddProtocol,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: hasProtocols
+          ? FloatingActionButton(
+              onPressed: _openAddProtocol,
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            110,
+          ),
           children: [
             DashboardHeader(name: widget.displayName),
 
             const SizedBox(height: AppSpacing.lg),
 
-            TodayDosesCard(doses: _doses, onDosePressed: _toggleDose),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            WeeklyPreviewCard(
-              protocols: widget.protocols,
-              onDayTapped: _openWeeklyDay,
-            ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            if (_isLoadingWeight)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(AppSpacing.md),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              )
-            else if (currentWeight == null || startingWeight == null)
-              _EmptyWeightCard(onLogWeight: _openWeightDialog)
-            else
-              WeightCard(
-                currentWeight: currentWeight,
-                startingWeight: startingWeight,
-                weightRecords: _weightRecords,
+            if (!hasProtocols) ...[
+              OnboardingCard(
+                hasWeight: hasWeight,
+                onAddProtocol: _openAddProtocol,
                 onLogWeight: _openWeightDialog,
               ),
+
+              if (hasWeight) ...[
+                const SizedBox(height: AppSpacing.lg),
+
+                WeightCard(
+                  currentWeight: currentWeight!,
+                  startingWeight: startingWeight!,
+                  weightRecords: _weightRecords,
+                  onLogWeight: _openWeightDialog,
+                ),
+              ],
+            ] else ...[
+              TodayDosesCard(doses: _doses, onDosePressed: _toggleDose),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              WeeklyPreviewCard(
+                protocols: widget.protocols,
+                onDayTapped: _openWeeklyDay,
+              ),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              if (_isLoadingWeight)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(AppSpacing.md),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                )
+              else if (!hasWeight)
+                _EmptyWeightCard(onLogWeight: _openWeightDialog)
+              else
+                WeightCard(
+                  currentWeight: currentWeight!,
+                  startingWeight: startingWeight!,
+                  weightRecords: _weightRecords,
+                  onLogWeight: _openWeightDialog,
+                ),
+            ],
           ],
         ),
       ),

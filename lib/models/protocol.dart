@@ -22,6 +22,24 @@ class Protocol {
   ProtocolStatus status;
   int colorValue;
 
+  Protocol copyWith({
+    String? id,
+    String? name,
+    String? dose,
+    ProtocolSchedule? schedule,
+    ProtocolStatus? status,
+    int? colorValue,
+  }) {
+    return Protocol(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      dose: dose ?? this.dose,
+      schedule: schedule ?? this.schedule,
+      status: status ?? this.status,
+      colorValue: colorValue ?? this.colorValue,
+    );
+  }
+
   Map<String, Object?> toMap() {
     return {
       'id': id,

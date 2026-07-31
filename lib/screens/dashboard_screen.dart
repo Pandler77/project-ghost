@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../models/dose.dart';
 import '../models/dose_record.dart';
+import '../models/home_layout.dart';
+import '../models/home_section.dart';
 import '../models/protocol.dart';
 import '../models/weight_record.dart';
 import '../services/app_data_service.dart';
@@ -11,7 +13,7 @@ import '../services/dose_service.dart';
 import '../services/protocol_schedule_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/dashboard_header.dart';
-import '../widgets/onboarding_card.dart';
+import '../widgets/empty_today_card.dart';
 import '../widgets/today_doses_card.dart';
 import '../widgets/weekly_preview_card.dart';
 import '../widgets/weight_card.dart';
@@ -25,6 +27,7 @@ class DashboardScreen extends StatefulWidget {
     required this.dataService,
     required this.displayName,
     required this.dataRevision,
+    required this.homeLayout,
     super.key,
   });
 
@@ -33,6 +36,7 @@ class DashboardScreen extends StatefulWidget {
   final AppDataService dataService;
   final String displayName;
   final int dataRevision;
+  final HomeLayout homeLayout;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -278,6 +282,107 @@ class _DashboardScreenState extends State<DashboardScreen> {
         '${scheduledFor.toIso8601String()}';
   }
 
+  List<Widget> _buildConfiguredSections({
+    required bool hasProtocols,
+    required bool hasWeight,
+    required double? currentWeight,
+    required double? startingWeight,
+  }) {
+    if (!hasProtocols) {
+      return [_buildTodaySection(hasProtocols: false, hasWeight: hasWeight)!];
+    }
+    final sections = <Widget>[];
+
+    for (final section in widget.homeLayout.visibleSections) {
+      final widgetForSection = switch (section) {
+        HomeSection.today => _buildTodaySection(
+          hasProtocols: hasProtocols,
+          hasWeight: hasWeight,
+        ),
+        HomeSection.weight => _buildWeightSection(
+          hasWeight: hasWeight,
+          currentWeight: currentWeight,
+          startingWeight: startingWeight,
+        ),
+        HomeSection.upcoming => _buildUpcomingSection(
+          hasProtocols: hasProtocols,
+        ),
+        HomeSection.recentActivity => _buildRecentActivitySection(),
+      };
+
+      if (widgetForSection == null) {
+        continue;
+      }
+
+      if (sections.isNotEmpty) {
+        sections.add(const SizedBox(height: AppSpacing.lg));
+      }
+
+      sections.add(widgetForSection);
+    }
+
+    return sections;
+  }
+
+  Widget? _buildTodaySection({
+    required bool hasProtocols,
+    required bool hasWeight,
+  }) {
+    if (!hasProtocols) {
+      return EmptyTodayCard(
+        onAddProtocol: _openAddProtocol,
+        onOpenTutorial: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Interactive tutorial coming soon.')),
+          );
+        },
+      );
+    }
+
+    return TodayDosesCard(doses: _doses, onDosePressed: _toggleDose);
+  }
+
+  Widget _buildWeightSection({
+    required bool hasWeight,
+    required double? currentWeight,
+    required double? startingWeight,
+  }) {
+    if (_isLoadingWeight) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.md),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (!hasWeight) {
+      return _EmptyWeightCard(onLogWeight: _openWeightDialog);
+    }
+
+    return WeightCard(
+      currentWeight: currentWeight!,
+      startingWeight: startingWeight!,
+      weightRecords: _weightRecords,
+      onLogWeight: _openWeightDialog,
+    );
+  }
+
+  Widget? _buildUpcomingSection({required bool hasProtocols}) {
+    if (!hasProtocols) {
+      return null;
+    }
+
+    return WeeklyPreviewCard(
+      protocols: widget.protocols,
+      onDayTapped: _openWeeklyDay,
+    );
+  }
+
+  Widget _buildRecentActivitySection() {
+    return const _RecentActivityPlaceholder();
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasProtocols = widget.protocols.isNotEmpty;
@@ -287,6 +392,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final currentWeight = hasWeight ? _weightRecords.first.weight : null;
 
     final startingWeight = hasWeight ? _weightRecords.last.weight : null;
+
+    final configuredSections = _buildConfiguredSections(
+      hasProtocols: hasProtocols,
+      hasWeight: hasWeight,
+      currentWeight: currentWeight,
+      startingWeight: startingWeight,
+    );
 
     return Scaffold(
       floatingActionButton: hasProtocols
@@ -304,56 +416,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
             110,
           ),
           children: [
-            DashboardHeader(name: widget.displayName),
+            DashboardHeader(
+              name: widget.displayName,
+              remainingDoses: _doses.where((dose) => !dose.isCompleted).length,
+              totalDoses: _doses.length,
+            ),
 
-            const SizedBox(height: AppSpacing.lg),
-
-            if (!hasProtocols) ...[
-              OnboardingCard(
-                hasWeight: hasWeight,
-                onAddProtocol: _openAddProtocol,
-                onLogWeight: _openWeightDialog,
-              ),
-
-              if (hasWeight) ...[
-                const SizedBox(height: AppSpacing.lg),
-
-                WeightCard(
-                  currentWeight: currentWeight!,
-                  startingWeight: startingWeight!,
-                  weightRecords: _weightRecords,
-                  onLogWeight: _openWeightDialog,
-                ),
-              ],
-            ] else ...[
-              TodayDosesCard(doses: _doses, onDosePressed: _toggleDose),
-
+            if (configuredSections.isNotEmpty)
               const SizedBox(height: AppSpacing.lg),
 
-              WeeklyPreviewCard(
-                protocols: widget.protocols,
-                onDayTapped: _openWeeklyDay,
+            ...configuredSections,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentActivityPlaceholder extends StatelessWidget {
+  const _RecentActivityPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Recent Activity',
+              style: TextStyle(
+                fontSize: AppTypography.title,
+                fontWeight: FontWeight.bold,
               ),
-
-              const SizedBox(height: AppSpacing.lg),
-
-              if (_isLoadingWeight)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(AppSpacing.md),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                )
-              else if (!hasWeight)
-                _EmptyWeightCard(onLogWeight: _openWeightDialog)
-              else
-                WeightCard(
-                  currentWeight: currentWeight!,
-                  startingWeight: startingWeight!,
-                  weightRecords: _weightRecords,
-                  onLogWeight: _openWeightDialog,
-                ),
-            ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Your latest dose and weight activity will appear here.',
+              style: TextStyle(
+                fontSize: AppTypography.caption,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),
@@ -387,7 +492,7 @@ class _EmptyWeightCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'No weight entries yet.',
+              'Start tracking your weight to see your progress.',
               style: TextStyle(
                 fontSize: AppTypography.caption,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -399,7 +504,7 @@ class _EmptyWeightCard extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: onLogWeight,
                 icon: const Icon(Icons.add),
-                label: const Text('Set Starting Weight'),
+                label: const Text('Log First Weight'),
               ),
             ),
           ],

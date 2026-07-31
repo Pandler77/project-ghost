@@ -8,6 +8,7 @@ class CalendarDay extends StatelessWidget {
     required this.summary,
     required this.isSelected,
     required this.isToday,
+    required this.isOutsideMonth,
     required this.onTap,
     super.key,
   });
@@ -15,6 +16,7 @@ class CalendarDay extends StatelessWidget {
   final CalendarDaySummary summary;
   final bool isSelected;
   final bool isToday;
+  final bool isOutsideMonth;
   final VoidCallback onTap;
 
   static const Color _completionColor = Color(0xFF34C759);
@@ -23,78 +25,96 @@ class CalendarDay extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    final visibleProtocols = summary.protocols.take(2).toList();
-
+    final visibleProtocols = summary.protocols.take(3).toList();
     final remainingCount = summary.protocols.length - visibleProtocols.length;
 
     final completionOpacity = switch (summary.completionRatio) {
       <= 0 => 0.0,
-      < 1 => 0.16,
-      _ => 0.38,
+      < 1 => 0.14,
+      _ => 0.32,
     };
 
     final backgroundColor = completionOpacity > 0
         ? _completionColor.withValues(alpha: completionOpacity)
-        : Colors.transparent;
+        : colorScheme.surface;
+
+    final normalBorder = colorScheme.outline.withValues(alpha: 0.55);
 
     final borderColor = isSelected
         ? colorScheme.primary
         : isToday
-        ? colorScheme.primary.withValues(alpha: 0.65)
-        : Colors.transparent;
+        ? colorScheme.primary.withValues(alpha: 0.75)
+        : normalBorder;
 
     final borderWidth = isSelected
         ? 2.0
         : isToday
-        ? 1.25
-        : 0.0;
+        ? 1.5
+        : 1.0;
 
-    return Padding(
-      padding: const EdgeInsets.all(2),
+    return Opacity(
+      opacity: isOutsideMonth ? 0.38 : 1,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.button),
+          borderRadius: BorderRadius.circular(14),
           onTap: onTap,
           child: Ink(
             decoration: BoxDecoration(
               color: backgroundColor,
-              borderRadius: BorderRadius.circular(AppRadius.button),
-              border: borderWidth == 0
-                  ? null
-                  : Border.all(color: borderColor, width: borderWidth),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: borderColor, width: borderWidth),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withValues(
+                    alpha: isSelected ? 0.12 : 0.05,
+                  ),
+                  blurRadius: isSelected ? 6 : 3,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '${summary.date.day}',
-                    style: TextStyle(
-                      fontSize: AppTypography.caption,
-                      fontWeight: isSelected || isToday
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                  Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isToday ? colorScheme.primary : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${summary.date.day}',
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        fontWeight: isSelected || isToday
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                        color: isToday
+                            ? colorScheme.onPrimary
+                            : colorScheme.onSurface,
+                      ),
                     ),
                   ),
-                  const Spacer(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  const SizedBox(height: AppSpacing.xs),
+                  Wrap(
+                    spacing: 3,
+                    runSpacing: 3,
                     children: [
                       for (final protocol in visibleProtocols)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 1.5),
-                          child: Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              color: Color(protocol.colorValue),
-                              shape: BoxShape.circle,
-                            ),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Color(protocol.colorValue),
+                            shape: BoxShape.circle,
                           ),
                         ),
-                      if (remainingCount > 0) ...[
-                        const SizedBox(width: 3),
+                      if (remainingCount > 0)
                         Text(
                           '+$remainingCount',
                           style: TextStyle(
@@ -103,7 +123,6 @@ class CalendarDay extends StatelessWidget {
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],

@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../models/app_theme_mode.dart';
 import '../models/protocol.dart';
 import '../services/app_data_service.dart';
 import 'calendar_screen.dart';
 import 'dashboard_screen.dart';
 import 'protocols_screen.dart';
+import 'settings_screen.dart';
 import 'tools_screen.dart';
+import '../models/home_layout.dart';
+import '../services/settings_service.dart';
+import 'edit_home_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  const MainScreen({
+    required this.themeMode,
+    required this.onThemeModeChanged,
+    super.key,
+  });
+
+  final AppThemeMode themeMode;
+  final ValueChanged<AppThemeMode> onThemeModeChanged;
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -16,9 +28,11 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   final AppDataService _appDataService = AppDataService();
+  final SettingsService _settingsService = SettingsService();
 
   int _selectedIndex = 0;
   int _dataRevision = 0;
+  HomeLayout _homeLayout = HomeLayout.defaultLayout;
 
   List<Protocol> _protocols = [];
 
@@ -28,7 +42,9 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+
     _loadProtocols();
+    _loadHomeLayout();
   }
 
   Future<void> _loadProtocols() async {
@@ -54,6 +70,45 @@ class _MainScreenState extends State<MainScreen> {
         _loadError = error.toString();
       });
     }
+  }
+
+  Future<void> _loadHomeLayout() async {
+    final layout = await _settingsService.getHomeLayout();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _homeLayout = layout;
+    });
+  }
+
+  Future<void> _openEditHome() async {
+    final updatedLayout = await Navigator.push<HomeLayout>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditHomeScreen(initialLayout: _homeLayout),
+      ),
+    );
+
+    if (updatedLayout == null || !mounted) {
+      return;
+    }
+
+    await _settingsService.saveHomeLayout(updatedLayout);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _homeLayout = updatedLayout;
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Home layout saved.')));
   }
 
   Future<void> _addProtocol(Protocol protocol) async {
@@ -91,6 +146,18 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _dataRevision++;
     });
+  }
+
+  Future<void> _openSettings() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(
+          themeMode: widget.themeMode,
+          onThemeModeChanged: widget.onThemeModeChanged,
+        ),
+      ),
+    );
   }
 
   @override
@@ -143,6 +210,7 @@ class _MainScreenState extends State<MainScreen> {
         dataService: _appDataService,
         displayName: _appDataService.displayName,
         dataRevision: _dataRevision,
+        homeLayout: _homeLayout,
       ),
       ProtocolsScreen(
         protocols: _protocols,
@@ -159,6 +227,30 @@ class _MainScreenState extends State<MainScreen> {
     ];
 
     return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        toolbarHeight: 52,
+        leading: _selectedIndex == 0
+            ? IconButton(
+                onPressed: _openEditHome,
+                tooltip: 'Edit Home',
+                icon: const Icon(Icons.tune),
+              )
+            : null,
+        title: _selectedIndex == 0
+            ? null
+            : Text(
+                _pageTitle(_selectedIndex),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+        actions: [
+          IconButton(
+            onPressed: _openSettings,
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+          ),
+        ],
+      ),
       body: IndexedStack(index: _selectedIndex, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -191,5 +283,15 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
     );
+  }
+
+  String _pageTitle(int index) {
+    return switch (index) {
+      0 => 'Home',
+      1 => 'Protocols',
+      2 => 'Calendar',
+      3 => 'Tools',
+      _ => '',
+    };
   }
 }

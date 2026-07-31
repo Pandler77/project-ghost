@@ -31,181 +31,186 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
         .toList();
 
     final completedCount = completedDoses.length;
+    final totalCount = widget.doses.length;
 
-    final progress = widget.doses.isEmpty
-        ? 0.0
-        : completedCount / widget.doses.length;
+    final progress = totalCount == 0 ? 0.0 : completedCount / totalCount;
 
-    final allCompleted = widget.doses.isNotEmpty && pendingDoses.isEmpty;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(
+            completedCount: completedCount,
+            totalCount: totalCount,
+          ),
 
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.card),
-      ),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.topCenter,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Today\'s Doses',
-                      style: TextStyle(
-                        fontSize: AppTypography.title,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '$completedCount/${widget.doses.length}',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 0, end: progress),
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.easeOutCubic,
-                builder: (context, animatedProgress, child) {
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    child: LinearProgressIndicator(
-                      value: animatedProgress,
-                      minHeight: 6,
-                    ),
-                  );
+          const SizedBox(height: AppSpacing.sm),
+
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: progress),
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
+              builder: (context, animatedProgress, child) {
+                return LinearProgressIndicator(
+                  value: animatedProgress,
+                  minHeight: 5,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest,
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          if (widget.doses.isEmpty)
+            const _EmptyTodayState()
+          else ...[
+            for (var index = 0; index < pendingDoses.length; index++) ...[
+              _PendingDoseRow(
+                dose: pendingDoses[index],
+                onPressed: () {
+                  final isLastPending = pendingDoses.length == 1;
+
+                  widget.onDosePressed(pendingDoses[index]);
+
+                  if (isLastPending) {
+                    setState(() {
+                      _showCompleted = false;
+                    });
+                  }
                 },
               ),
-              const SizedBox(height: AppSpacing.md),
+              if (index < pendingDoses.length - 1)
+                const Divider(height: AppSpacing.lg),
+            ],
 
-              if (widget.doses.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  child: Text('Nothing scheduled today.'),
-                ),
+            if (pendingDoses.isEmpty) const _FinishedTodayBanner(),
 
-              if (allCompleted) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(AppRadius.button),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        size: AppIcon.md,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      const Expanded(
-                        child: Text(
-                          'Finished for today',
-                          style: TextStyle(
-                            fontSize: AppTypography.body,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            if (completedDoses.isNotEmpty) ...[
+              if (pendingDoses.isNotEmpty)
                 const SizedBox(height: AppSpacing.md),
-              ],
 
-              for (var index = 0; index < pendingDoses.length; index++) ...[
-                _PendingDoseRow(
-                  dose: pendingDoses[index],
-                  onPressed: () {
-                    final isLastPendingDose = pendingDoses.length == 1;
+              _CompletedHeader(
+                count: completedDoses.length,
+                isExpanded: _showCompleted,
+                onPressed: () {
+                  setState(() {
+                    _showCompleted = !_showCompleted;
+                  });
+                },
+              ),
 
-                    widget.onDosePressed(pendingDoses[index]);
-
-                    if (isLastPendingDose) {
-                      setState(() {
-                        _showCompleted = false;
-                      });
-                    }
-                  },
-                ),
-                if (index < pendingDoses.length - 1)
-                  const Divider(height: AppSpacing.lg),
-              ],
-
-              if (completedDoses.isNotEmpty) ...[
-                if (pendingDoses.isNotEmpty)
-                  const Divider(height: AppSpacing.lg),
-
-                InkWell(
-                  borderRadius: BorderRadius.circular(AppRadius.button),
-                  onTap: () {
-                    setState(() {
-                      _showCompleted = !_showCompleted;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Completed',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          _showCompleted
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ],
-                    ),
+              if (_showCompleted) ...[
+                const SizedBox(height: AppSpacing.sm),
+                for (var index = 0; index < completedDoses.length; index++) ...[
+                  _CompletedDoseRow(
+                    dose: completedDoses[index],
+                    onRemove: () {
+                      widget.onDosePressed(completedDoses[index]);
+                    },
                   ),
-                ),
-
-                if (_showCompleted) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  for (
-                    var index = 0;
-                    index < completedDoses.length;
-                    index++
-                  ) ...[
-                    _CompletedDoseRow(
-                      dose: completedDoses[index],
-                      onRemove: () {
-                        widget.onDosePressed(completedDoses[index]);
-                      },
-                    ),
-                    if (index < completedDoses.length - 1)
-                      const SizedBox(height: AppSpacing.sm),
-                  ],
+                  if (index < completedDoses.length - 1)
+                    const SizedBox(height: AppSpacing.sm),
                 ],
               ],
             ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.completedCount,
+    required this.totalCount,
+  });
+
+  final int completedCount;
+  final int totalCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final remainingCount = totalCount - completedCount;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        const Expanded(
+          child: Text(
+            'TODAY',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.1,
+            ),
           ),
         ),
+        Text(
+          totalCount == 0
+              ? 'Nothing due'
+              : remainingCount == 0
+              ? 'Complete'
+              : '$remainingCount remaining',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyTodayState extends StatelessWidget {
+  const _EmptyTodayState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Text(
+        'Nothing is scheduled for today.',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+    );
+  }
+}
+
+class _FinishedTodayBanner extends StatelessWidget {
+  const _FinishedTodayBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(AppRadius.button),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, color: colorScheme.primary),
+          const SizedBox(width: AppSpacing.sm),
+          const Expanded(
+            child: Text(
+              'Everything is complete for today.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -219,44 +224,92 @@ class _PendingDoseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.radio_button_unchecked,
+                  color: colorScheme.outline,
+                  size: 23,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      dose.protocolName,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${dose.amount}  •  '
+                      '${_formatTime(dose.scheduledFor)}',
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: colorScheme.outline),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompletedHeader extends StatelessWidget {
+  const _CompletedHeader({
+    required this.count,
+    required this.isExpanded,
+    required this.onPressed,
+  });
+
+  final int count;
+  final bool isExpanded;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(AppRadius.button),
       onTap: onPressed,
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xs,
-          vertical: AppSpacing.sm,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
         child: Row(
           children: [
-            Icon(
-              Icons.radio_button_unchecked,
-              color: Theme.of(context).colorScheme.outline,
-              size: AppIcon.md,
-            ),
-            const SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    dose.protocolName,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    '${dose.amount} • '
-                    '${_formatTime(dose.scheduledFor)}',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: AppTypography.caption,
-                    ),
-                  ),
-                ],
+              child: Text(
+                'Completed ($count)',
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
+            ),
+            Icon(
+              isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
             ),
           ],
         ),
@@ -273,27 +326,25 @@ class _CompletedDoseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final completedAt = dose.completedAt;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    final completionText = completedAt == null
+    final completionText = dose.completedAt == null
         ? 'Taken'
-        : 'Taken at ${_formatTime(completedAt)}';
+        : 'Taken at '
+              '${_formatTime(dose.completedAt!)}';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
-        color: Theme.of(
-          context,
-        ).colorScheme.primaryContainer.withValues(alpha: 0.3),
+        color: colorScheme.primaryContainer.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(AppRadius.button),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.check_circle,
-            size: AppIcon.md,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+          Icon(Icons.check_circle, color: colorScheme.primary),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
@@ -301,17 +352,15 @@ class _CompletedDoseRow extends StatelessWidget {
               children: [
                 Text(
                   dose.protocolName,
-                  style: const TextStyle(
-                    fontSize: AppTypography.body,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: AppSpacing.xs),
+                const SizedBox(height: 2),
                 Text(
-                  '${dose.amount} • $completionText',
+                  '${dose.amount}  •  '
+                  '$completionText',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: AppTypography.caption,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],

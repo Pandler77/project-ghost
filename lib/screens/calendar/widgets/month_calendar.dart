@@ -27,26 +27,33 @@ class MonthCalendar extends StatelessWidget {
   final VoidCallback onMonthPressed;
   final ValueChanged<DateTime> onDateSelected;
 
-  List<DateTime?> _buildCalendarCells() {
-    final firstDay = DateTime(displayedMonth.year, displayedMonth.month, 1);
+  List<DateTime> _buildCalendarCells() {
+    final firstDayOfMonth = DateTime(
+      displayedMonth.year,
+      displayedMonth.month,
+      1,
+    );
 
-    final daysInMonth = DateTime(
+    final lastDayOfMonth = DateTime(
       displayedMonth.year,
       displayedMonth.month + 1,
       0,
-    ).day;
+    );
 
-    final leadingEmptyCells = firstDay.weekday - 1;
+    final leadingDays = firstDayOfMonth.weekday - DateTime.monday;
 
-    return List<DateTime?>.generate(42, (index) {
-      final dayNumber = index - leadingEmptyCells + 1;
+    final trailingDays = DateTime.sunday - lastDayOfMonth.weekday;
 
-      if (dayNumber < 1 || dayNumber > daysInMonth) {
-        return null;
-      }
+    final firstVisibleDate = firstDayOfMonth.subtract(
+      Duration(days: leadingDays),
+    );
 
-      return DateTime(displayedMonth.year, displayedMonth.month, dayNumber);
-    });
+    final totalCells = leadingDays + lastDayOfMonth.day + trailingDays;
+
+    return List<DateTime>.generate(
+      totalCells,
+      (index) => firstVisibleDate.add(Duration(days: index)),
+    );
   }
 
   @override
@@ -90,7 +97,9 @@ class MonthCalendar extends StatelessWidget {
             ),
           ],
         ),
+
         const SizedBox(height: AppSpacing.sm),
+
         const Row(
           children: [
             _WeekdayLabel('M'),
@@ -102,43 +111,53 @@ class MonthCalendar extends StatelessWidget {
             _WeekdayLabel('S'),
           ],
         ),
+
         const SizedBox(height: AppSpacing.sm),
+
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final rowHeight = constraints.maxHeight / 6;
+              const columns = 7;
+              const spacing = 5.0;
 
-              return Table(
-                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                children: [
-                  for (var week = 0; week < 6; week++)
-                    TableRow(
-                      children: [
-                        for (var day = 0; day < 7; day++)
-                          SizedBox(
-                            height: rowHeight,
-                            child: Builder(
-                              builder: (context) {
-                                final date = cells[(week * 7) + day];
+              final rowCount = (cells.length / columns).ceil();
 
-                                if (date == null) {
-                                  return const SizedBox.shrink();
-                                }
+              final cellWidth =
+                  (constraints.maxWidth - (spacing * (columns - 1))) / columns;
 
-                                return CalendarDay(
-                                  summary: summaryForDate(date),
-                                  isSelected: isSameDay(date, selectedDate),
-                                  isToday: isSameDay(date, DateTime.now()),
-                                  onTap: () {
-                                    onDateSelected(date);
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
-                ],
+              final cellHeight =
+                  (constraints.maxHeight - (spacing * (rowCount - 1))) /
+                  rowCount;
+
+              final aspectRatio = cellWidth / cellHeight;
+
+              return GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                itemCount: cells.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: spacing,
+                  mainAxisSpacing: spacing,
+                  childAspectRatio: aspectRatio,
+                ),
+                itemBuilder: (context, index) {
+                  final date = cells[index];
+
+                  final isOutsideMonth =
+                      date.month != displayedMonth.month ||
+                      date.year != displayedMonth.year;
+
+                  return CalendarDay(
+                    summary: summaryForDate(date),
+                    isSelected: isSameDay(date, selectedDate),
+                    isToday: isSameDay(date, DateTime.now()),
+                    isOutsideMonth: isOutsideMonth,
+                    onTap: () {
+                      onDateSelected(date);
+                    },
+                  );
+                },
               );
             },
           ),

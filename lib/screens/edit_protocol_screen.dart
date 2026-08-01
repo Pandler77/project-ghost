@@ -6,6 +6,7 @@ import '../models/protocol_status.dart';
 import '../models/schedule_type.dart';
 import '../theme/app_theme.dart';
 import '../theme/protocol_colors.dart';
+import '../widgets/ios_time_picker.dart';
 
 class EditProtocolScreen extends StatefulWidget {
   const EditProtocolScreen({required this.protocol, super.key});
@@ -91,7 +92,7 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
   }
 
   Future<void> _selectTime() async {
-    final selectedTime = await showTimePicker(
+    final selectedTime = await showIosTimePicker(
       context: context,
       initialTime: _selectedTime,
     );

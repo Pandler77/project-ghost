@@ -1,12 +1,19 @@
 import '../models/protocol.dart';
 import '../models/protocol_status.dart';
 import '../models/schedule_type.dart';
+import 'cycle_service.dart';
 
 class ProtocolScheduleService {
   const ProtocolScheduleService();
 
+  static const CycleService _cycleService = CycleService();
+
   bool isScheduledOnDate(Protocol protocol, DateTime date) {
     if (protocol.status != ProtocolStatus.active) {
+      return false;
+    }
+
+    if (!_cycleService.isProtocolActive(protocol, date)) {
       return false;
     }
 

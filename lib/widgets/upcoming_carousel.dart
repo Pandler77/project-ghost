@@ -72,6 +72,10 @@ class _UpcomingCarouselState extends State<UpcomingCarousel> {
   Widget build(BuildContext context) {
     final upcomingDays = _buildUpcomingDays();
 
+    if (_selectedPage >= upcomingDays.length && upcomingDays.isNotEmpty) {
+      _selectedPage = upcomingDays.length - 1;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -83,14 +87,12 @@ class _UpcomingCarouselState extends State<UpcomingCarousel> {
             letterSpacing: 1.1,
           ),
         ),
-
         const SizedBox(height: AppSpacing.md),
-
         if (upcomingDays.isEmpty)
           const _EmptyUpcomingState()
         else ...[
           SizedBox(
-            height: 172,
+            height: 190,
             child: PageView.builder(
               controller: _pageController,
               padEnds: false,
@@ -117,10 +119,8 @@ class _UpcomingCarouselState extends State<UpcomingCarousel> {
               },
             ),
           ),
-
           if (upcomingDays.length > 1) ...[
             const SizedBox(height: AppSpacing.sm),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -155,9 +155,7 @@ class _UpcomingDayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    final visibleProtocols = day.protocols.take(3).toList();
-
+    final visibleProtocols = day.protocols.take(2).toList();
     final remainingCount = day.protocols.length - visibleProtocols.length;
 
     return Material(
@@ -190,6 +188,8 @@ class _UpcomingDayCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         _dateLabel(day.date),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: AppTypography.body,
                           fontWeight: FontWeight.w700,
@@ -217,37 +217,30 @@ class _UpcomingDayCard extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: AppSpacing.md),
-
-                Expanded(
-                  child: Column(
-                    children: [
-                      for (
-                        var index = 0;
-                        index < visibleProtocols.length;
-                        index++
-                      ) ...[
-                        _ProtocolPreviewRow(
-                          protocol: visibleProtocols[index],
-                          date: day.date,
-                        ),
-                        if (index < visibleProtocols.length - 1)
-                          const SizedBox(height: AppSpacing.sm),
-                      ],
-                    ],
+                for (
+                  var index = 0;
+                  index < visibleProtocols.length;
+                  index++
+                ) ...[
+                  _ProtocolPreviewRow(
+                    protocol: visibleProtocols[index],
+                    date: day.date,
                   ),
-                ),
-
-                if (remainingCount > 0)
+                  if (index < visibleProtocols.length - 1)
+                    const SizedBox(height: AppSpacing.sm),
+                ],
+                if (remainingCount > 0) ...[
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     '+$remainingCount more',
                     style: TextStyle(
                       fontSize: AppTypography.caption,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: colorScheme.primary,
                     ),
                   ),
+                ],
               ],
             ),
           ),
@@ -272,44 +265,38 @@ class _ProtocolPreviewRow extends StatelessWidget {
 
     final scheduledFor = _scheduleService.scheduledDateTime(protocol, date);
 
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 32,
-          decoration: BoxDecoration(
-            color: Color(protocol.colorValue),
-            borderRadius: BorderRadius.circular(AppRadius.pill),
+    return SizedBox(
+      height: 30,
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 26,
+            decoration: BoxDecoration(
+              color: Color(protocol.colorValue),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
           ),
-        ),
-
-        const SizedBox(width: AppSpacing.sm),
-
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                protocol.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${protocol.dose} • '
-                '${_formatTime(scheduledFor)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: AppTypography.caption,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              protocol.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            '${protocol.dose} • ${_formatTime(scheduledFor)}',
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

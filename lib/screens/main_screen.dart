@@ -11,6 +11,7 @@ import 'tools_screen.dart';
 import '../models/home_layout.dart';
 import '../services/settings_service.dart';
 import 'edit_home_screen.dart';
+import '../models/tracking_preferences.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({
@@ -33,6 +34,7 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   int _dataRevision = 0;
   HomeLayout _homeLayout = HomeLayout.defaultLayout;
+  TrackingPreferences _trackingPreferences = TrackingPreferences.defaults;
 
   List<Protocol> _protocols = [];
 
@@ -45,6 +47,19 @@ class _MainScreenState extends State<MainScreen> {
 
     _loadProtocols();
     _loadHomeLayout();
+    _loadTrackingPreferences();
+  }
+
+  Future<void> _loadTrackingPreferences() async {
+    final preferences = await _settingsService.getTrackingPreferences();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _trackingPreferences = preferences;
+    });
   }
 
   Future<void> _loadProtocols() async {
@@ -88,7 +103,10 @@ class _MainScreenState extends State<MainScreen> {
     final updatedLayout = await Navigator.push<HomeLayout>(
       context,
       MaterialPageRoute(
-        builder: (_) => EditHomeScreen(initialLayout: _homeLayout),
+        builder: (_) => EditHomeScreen(
+          initialLayout: _homeLayout,
+          trackingPreferences: _trackingPreferences,
+        ),
       ),
     );
 
@@ -158,6 +176,12 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
     );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadTrackingPreferences();
   }
 
   @override
@@ -211,6 +235,8 @@ class _MainScreenState extends State<MainScreen> {
         displayName: _appDataService.displayName,
         dataRevision: _dataRevision,
         homeLayout: _homeLayout,
+        trackingPreferences: _trackingPreferences,
+        onDataChanged: _notifyDataChanged,
       ),
       ProtocolsScreen(
         protocols: _protocols,

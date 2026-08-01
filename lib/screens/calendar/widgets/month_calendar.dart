@@ -10,9 +10,6 @@ class MonthCalendar extends StatelessWidget {
     required this.displayedMonth,
     required this.selectedDate,
     required this.summaryForDate,
-    required this.onPreviousMonth,
-    required this.onNextMonth,
-    required this.onMonthPressed,
     required this.onDateSelected,
     super.key,
   });
@@ -21,10 +18,6 @@ class MonthCalendar extends StatelessWidget {
   final DateTime selectedDate;
 
   final CalendarDaySummary Function(DateTime date) summaryForDate;
-
-  final VoidCallback onPreviousMonth;
-  final VoidCallback onNextMonth;
-  final VoidCallback onMonthPressed;
   final ValueChanged<DateTime> onDateSelected;
 
   List<DateTime> _buildCalendarCells() {
@@ -40,9 +33,9 @@ class MonthCalendar extends StatelessWidget {
       0,
     );
 
-    final leadingDays = firstDayOfMonth.weekday - DateTime.monday;
+    final leadingDays = firstDayOfMonth.weekday % 7;
 
-    final trailingDays = DateTime.sunday - lastDayOfMonth.weekday;
+    final trailingDays = (6 - (lastDayOfMonth.weekday % 7));
 
     final firstVisibleDate = firstDayOfMonth.subtract(
       Duration(days: leadingDays),
@@ -60,109 +53,69 @@ class MonthCalendar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cells = _buildCalendarCells();
 
-    return Column(
-      children: [
-        Row(
-          children: [
-            IconButton(
-              onPressed: onPreviousMonth,
-              icon: const Icon(Icons.chevron_left),
-            ),
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(AppRadius.button),
-                onTap: onMonthPressed,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        formatMonthYear(displayedMonth),
-                        style: const TextStyle(
-                          fontSize: AppTypography.body,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_drop_down),
-                    ],
-                  ),
-                ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            child: Text(
+              formatMonthYear(displayedMonth),
+              style: const TextStyle(
+                fontSize: AppTypography.title,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            IconButton(
-              onPressed: onNextMonth,
-              icon: const Icon(Icons.chevron_right),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          const Row(
+            children: [
+              _WeekdayLabel('S'),
+              _WeekdayLabel('M'),
+              _WeekdayLabel('T'),
+              _WeekdayLabel('W'),
+              _WeekdayLabel('T'),
+              _WeekdayLabel('F'),
+              _WeekdayLabel('S'),
+            ],
+          ),
+
+          const SizedBox(height: AppSpacing.sm),
+
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            itemCount: cells.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              crossAxisSpacing: 5,
+              mainAxisSpacing: 5,
+              mainAxisExtent: 74,
             ),
-          ],
-        ),
+            itemBuilder: (context, index) {
+              final date = cells[index];
 
-        const SizedBox(height: AppSpacing.sm),
+              final isOutsideMonth =
+                  date.month != displayedMonth.month ||
+                  date.year != displayedMonth.year;
 
-        const Row(
-          children: [
-            _WeekdayLabel('M'),
-            _WeekdayLabel('T'),
-            _WeekdayLabel('W'),
-            _WeekdayLabel('T'),
-            _WeekdayLabel('F'),
-            _WeekdayLabel('S'),
-            _WeekdayLabel('S'),
-          ],
-        ),
-
-        const SizedBox(height: AppSpacing.sm),
-
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              const columns = 7;
-              const spacing = 5.0;
-
-              final rowCount = (cells.length / columns).ceil();
-
-              final cellWidth =
-                  (constraints.maxWidth - (spacing * (columns - 1))) / columns;
-
-              final cellHeight =
-                  (constraints.maxHeight - (spacing * (rowCount - 1))) /
-                  rowCount;
-
-              final aspectRatio = cellWidth / cellHeight;
-
-              return GridView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                itemCount: cells.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns,
-                  crossAxisSpacing: spacing,
-                  mainAxisSpacing: spacing,
-                  childAspectRatio: aspectRatio,
-                ),
-                itemBuilder: (context, index) {
-                  final date = cells[index];
-
-                  final isOutsideMonth =
-                      date.month != displayedMonth.month ||
-                      date.year != displayedMonth.year;
-
-                  return CalendarDay(
-                    summary: summaryForDate(date),
-                    isSelected: isSameDay(date, selectedDate),
-                    isToday: isSameDay(date, DateTime.now()),
-                    isOutsideMonth: isOutsideMonth,
-                    onTap: () {
-                      onDateSelected(date);
-                    },
-                  );
+              return CalendarDay(
+                summary: summaryForDate(date),
+                isSelected: isSameDay(date, selectedDate),
+                isToday: isSameDay(date, DateTime.now()),
+                isOutsideMonth: isOutsideMonth,
+                onTap: () {
+                  onDateSelected(date);
                 },
               );
             },
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

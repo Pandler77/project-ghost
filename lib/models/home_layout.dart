@@ -8,9 +8,8 @@ class HomeLayout {
   static const HomeLayout defaultLayout = HomeLayout(
     visibleSections: [
       HomeSection.today,
-      HomeSection.weight,
       HomeSection.upcoming,
-      HomeSection.recentActivity,
+      HomeSection.weight,
     ],
   );
 

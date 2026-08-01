@@ -20,10 +20,6 @@ class ToolsScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Text(
-            'Tools',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-          ),
           const SizedBox(height: 24),
 
           _ToolTile(
@@ -63,12 +59,6 @@ class ToolsScreen extends StatelessWidget {
           _ToolTile(
             icon: Icons.photo_library_outlined,
             title: 'Progress Photos',
-            onTap: () {},
-          ),
-
-          _ToolTile(
-            icon: Icons.settings_outlined,
-            title: 'Settings',
             onTap: () {},
           ),
         ],

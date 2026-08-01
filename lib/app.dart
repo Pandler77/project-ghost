@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'models/app_theme_mode.dart';
+import 'models/tracking_preferences.dart';
 import 'screens/main_screen.dart';
+import 'screens/onboarding_setup_screen.dart';
+import 'screens/welcome_screen.dart';
 import 'services/settings_service.dart';
 
 class ProjectGhostApp extends StatefulWidget {
@@ -15,7 +18,10 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
   final SettingsService _settingsService = SettingsService();
 
   AppThemeMode _themeMode = AppThemeMode.system;
+
   bool _isLoadingSettings = true;
+  bool _isOnboardingComplete = false;
+  bool _isShowingSetup = false;
 
   @override
   void initState() {
@@ -24,14 +30,18 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
   }
 
   Future<void> _loadSettings() async {
-    final themeMode = await _settingsService.getThemeMode();
+    final results = await Future.wait([
+      _settingsService.getThemeMode(),
+      _settingsService.getOnboardingComplete(),
+    ]);
 
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _themeMode = themeMode;
+      _themeMode = results[0] as AppThemeMode;
+      _isOnboardingComplete = results[1] as bool;
       _isLoadingSettings = false;
     });
   }
@@ -48,12 +58,48 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
     });
   }
 
+  void _startOnboarding() {
+    setState(() {
+      _isShowingSetup = true;
+    });
+  }
+
+  Future<void> _completeOnboarding(TrackingPreferences preferences) async {
+    await _settingsService.saveTrackingPreferences(preferences);
+
+    await _settingsService.saveOnboardingComplete(true);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isOnboardingComplete = true;
+      _isShowingSetup = false;
+    });
+  }
+
   ThemeMode get _materialThemeMode {
     return switch (_themeMode) {
       AppThemeMode.system => ThemeMode.system,
       AppThemeMode.light => ThemeMode.light,
       AppThemeMode.dark => ThemeMode.dark,
     };
+  }
+
+  Widget _buildHome() {
+    if (_isOnboardingComplete) {
+      return MainScreen(
+        themeMode: _themeMode,
+        onThemeModeChanged: _changeThemeMode,
+      );
+    }
+
+    if (_isShowingSetup) {
+      return OnboardingSetupScreen(onComplete: _completeOnboarding);
+    }
+
+    return WelcomeScreen(onGetStarted: _startOnboarding);
   }
 
   @override
@@ -74,10 +120,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
       themeMode: _materialThemeMode,
-      home: MainScreen(
-        themeMode: _themeMode,
-        onThemeModeChanged: _changeThemeMode,
-      ),
+      home: _buildHome(),
     );
   }
 

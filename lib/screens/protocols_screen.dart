@@ -83,13 +83,6 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
-          const Text(
-            'Protocols',
-            style: TextStyle(
-              fontSize: AppTypography.title,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             'Manage what you are currently tracking.',
@@ -314,7 +307,7 @@ class _EmptyProtocolsState extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Use Add Protocol above or tap + on Home.',
+            'Use Add Protocol',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: AppTypography.caption,

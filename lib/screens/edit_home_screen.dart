@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../models/home_layout.dart';
 import '../models/home_section.dart';
+import '../models/tracking_preferences.dart';
 import '../theme/app_theme.dart';
 
 class EditHomeScreen extends StatefulWidget {
-  const EditHomeScreen({required this.initialLayout, super.key});
+  const EditHomeScreen({
+    required this.initialLayout,
+    required this.trackingPreferences,
+    super.key,
+  });
 
   final HomeLayout initialLayout;
+  final TrackingPreferences trackingPreferences;
 
   @override
   State<EditHomeScreen> createState() => _EditHomeScreenState();
@@ -21,16 +27,27 @@ class _EditHomeScreenState extends State<EditHomeScreen> {
   void initState() {
     super.initState();
 
-    _visibleSections = widget.initialLayout.visibleSections.toSet();
+    _visibleSections = widget.initialLayout.visibleSections
+        .where(_isSectionAvailable)
+        .toSet();
 
-    final hiddenSections = HomeSection.values.where(
+    final availableSections = HomeSection.values.where(_isSectionAvailable);
+
+    final hiddenSections = availableSections.where(
       (section) => !_visibleSections.contains(section),
     );
 
     _orderedSections = [
-      ...widget.initialLayout.visibleSections,
+      ...widget.initialLayout.visibleSections.where(_isSectionAvailable),
       ...hiddenSections,
     ];
+  }
+
+  bool _isSectionAvailable(HomeSection section) {
+    return switch (section) {
+      HomeSection.weight => widget.trackingPreferences.trackWeight,
+      _ => true,
+    };
   }
 
   void _toggleSection(HomeSection section, bool isVisible) {

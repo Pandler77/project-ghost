@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_theme_mode.dart';
+import '../models/tracking_preferences.dart';
+import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
+import 'tracking_preferences_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     required this.themeMode,
     required this.onThemeModeChanged,
@@ -14,6 +17,90 @@ class SettingsScreen extends StatelessWidget {
   final ValueChanged<AppThemeMode> onThemeModeChanged;
 
   @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final SettingsService _settingsService = SettingsService();
+
+  TrackingPreferences _trackingPreferences = TrackingPreferences.defaults;
+
+  bool _isLoadingTrackingPreferences = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrackingPreferences();
+  }
+
+  Future<void> _loadTrackingPreferences() async {
+    final preferences = await _settingsService.getTrackingPreferences();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _trackingPreferences = preferences;
+      _isLoadingTrackingPreferences = false;
+    });
+  }
+
+  Future<void> _openTrackingPreferences() async {
+    if (_isLoadingTrackingPreferences) {
+      return;
+    }
+
+    final updatedPreferences = await Navigator.push<TrackingPreferences>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            TrackingPreferencesScreen(initialPreferences: _trackingPreferences),
+      ),
+    );
+
+    if (updatedPreferences == null || !mounted) {
+      return;
+    }
+
+    await _settingsService.saveTrackingPreferences(updatedPreferences);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _trackingPreferences = updatedPreferences;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Tracking preferences saved.')),
+    );
+  }
+
+  String _trackingSummary() {
+    final enabled = <String>[];
+
+    if (_trackingPreferences.trackWeight) {
+      enabled.add('Weight');
+    }
+
+    if (_trackingPreferences.trackPhotos) {
+      enabled.add('Photos');
+    }
+
+    if (_trackingPreferences.trackNotes) {
+      enabled.add('Notes');
+    }
+
+    if (enabled.isEmpty) {
+      return 'Protocols only';
+    }
+
+    return enabled.join(', ');
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -22,18 +109,16 @@ class SettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
             const _SettingsSectionHeader(title: 'Appearance'),
-
             const SizedBox(height: AppSpacing.sm),
-
             Card(
               child: RadioGroup<AppThemeMode>(
-                groupValue: themeMode,
+                groupValue: widget.themeMode,
                 onChanged: (value) {
                   if (value == null) {
                     return;
                   }
 
-                  onThemeModeChanged(value);
+                  widget.onThemeModeChanged(value);
                 },
                 child: const Column(
                   children: [
@@ -59,22 +144,36 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: AppSpacing.lg),
-
-            const _SettingsSectionHeader(title: 'Coming Soon'),
-
+            const _SettingsSectionHeader(title: 'Tracking'),
             const SizedBox(height: AppSpacing.sm),
-
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.tune_outlined),
+                title: const Text('Tracking Preferences'),
+                subtitle: Text(
+                  _isLoadingTrackingPreferences
+                      ? 'Loading preferences...'
+                      : _trackingSummary(),
+                ),
+                trailing: _isLoadingTrackingPreferences
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.chevron_right),
+                onTap: _isLoadingTrackingPreferences
+                    ? null
+                    : _openTrackingPreferences,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            const _SettingsSectionHeader(title: 'Coming Soon'),
+            const SizedBox(height: AppSpacing.sm),
             const Card(
               child: Column(
                 children: [
-                  _DisabledSettingsTile(
-                    icon: Icons.tune_outlined,
-                    title: 'Tracking Preferences',
-                    subtitle: 'Choose weight, photos, notes, and reminders.',
-                  ),
-                  Divider(height: 1),
                   _DisabledSettingsTile(
                     icon: Icons.notifications_outlined,
                     title: 'Notifications',

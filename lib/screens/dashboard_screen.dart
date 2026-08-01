@@ -10,15 +10,15 @@ import '../models/protocol.dart';
 import '../models/weight_record.dart';
 import '../services/app_data_service.dart';
 import '../services/dose_service.dart';
-import '../services/protocol_schedule_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/empty_today_card.dart';
 import '../widgets/today_doses_card.dart';
-import '../widgets/weekly_preview_card.dart';
+import '../widgets/upcoming_carousel.dart';
 import '../widgets/weight_card.dart';
 import 'add_protocol_screen.dart';
-import 'calendar/widgets/day_schedule_sheet.dart';
+import 'daily_timeline_screen.dart';
+import '../models/tracking_preferences.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -28,6 +28,8 @@ class DashboardScreen extends StatefulWidget {
     required this.displayName,
     required this.dataRevision,
     required this.homeLayout,
+    required this.onDataChanged,
+    required this.trackingPreferences,
     super.key,
   });
 
@@ -37,6 +39,8 @@ class DashboardScreen extends StatefulWidget {
   final String displayName;
   final int dataRevision;
   final HomeLayout homeLayout;
+  final VoidCallback onDataChanged;
+  final TrackingPreferences trackingPreferences;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -44,9 +48,6 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final DoseService _doseService = DoseService();
-
-  final ProtocolScheduleService _scheduleService =
-      const ProtocolScheduleService();
 
   List<Dose> _doses = [];
   List<WeightRecord> _weightRecords = [];
@@ -147,6 +148,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         dose.completedAt = null;
       });
 
+      widget.onDataChanged();
       return;
     }
 
@@ -173,57 +175,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       dose.completedAt = completedAt;
     });
-  }
 
-  Future<void> _openWeeklyDay(DateTime date) async {
-    try {
-      final records = await widget.dataService.getDoseRecordsForDate(date);
-
-      if (!mounted) {
-        return;
-      }
-
-      final recordsByDose = <String, DoseRecord>{
-        for (final record in records)
-          _doseKey(record.protocolId, record.scheduledFor): record,
-      };
-
-      final scheduledProtocols = _scheduleService.protocolsForDate(
-        widget.protocols,
-        date,
-      );
-
-      final items = <ScheduledDoseItem>[];
-
-      for (final protocol in scheduledProtocols) {
-        final scheduledFor = _scheduleService.scheduledDateTime(protocol, date);
-
-        items.add(
-          ScheduledDoseItem(
-            protocol: protocol,
-            scheduledFor: scheduledFor,
-            record: recordsByDose[_doseKey(protocol.id, scheduledFor)],
-          ),
-        );
-      }
-
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => DayScheduleSheet(date: date, items: items),
-      );
-
-      await _loadDoseData();
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not load this date: $error')),
-      );
-    }
+    widget.onDataChanged();
   }
 
   Future<void> _openAddProtocol() async {
@@ -243,6 +196,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     await _loadDoseData();
+  }
+
+  Future<void> _openUpcomingDay(DateTime date) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DailyTimelineScreen(
+          date: date,
+          protocols: widget.protocols,
+          dataService: widget.dataService,
+          onDataChanged: widget.onDataChanged,
+        ),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadDashboardData();
   }
 
   Future<void> _openWeightDialog() async {
@@ -275,6 +248,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     await _loadWeightData();
+
+    if (!mounted) {
+      return;
+    }
+
+    widget.onDataChanged();
   }
 
   String _doseKey(String protocolId, DateTime scheduledFor) {
@@ -289,57 +268,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required double? startingWeight,
   }) {
     if (!hasProtocols) {
-      return [_buildTodaySection(hasProtocols: false, hasWeight: hasWeight)!];
+      return [EmptyTodayCard(onAddProtocol: _openAddProtocol)];
     }
+
     final sections = <Widget>[];
 
     for (final section in widget.homeLayout.visibleSections) {
-      final widgetForSection = switch (section) {
-        HomeSection.today => _buildTodaySection(
-          hasProtocols: hasProtocols,
-          hasWeight: hasWeight,
-        ),
+      if (section == HomeSection.weight &&
+          !widget.trackingPreferences.trackWeight) {
+        continue;
+      }
+      final Widget sectionWidget = switch (section) {
+        HomeSection.today => _buildTodaySection(),
+        HomeSection.upcoming => _buildUpcomingSection(),
         HomeSection.weight => _buildWeightSection(
           hasWeight: hasWeight,
           currentWeight: currentWeight,
           startingWeight: startingWeight,
         ),
-        HomeSection.upcoming => _buildUpcomingSection(
-          hasProtocols: hasProtocols,
-        ),
         HomeSection.recentActivity => _buildRecentActivitySection(),
       };
-
-      if (widgetForSection == null) {
-        continue;
-      }
 
       if (sections.isNotEmpty) {
         sections.add(const SizedBox(height: AppSpacing.lg));
       }
 
-      sections.add(widgetForSection);
+      sections.add(sectionWidget);
     }
 
     return sections;
   }
 
-  Widget? _buildTodaySection({
-    required bool hasProtocols,
-    required bool hasWeight,
-  }) {
-    if (!hasProtocols) {
-      return EmptyTodayCard(
-        onAddProtocol: _openAddProtocol,
-        onOpenTutorial: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Interactive tutorial coming soon.')),
-          );
-        },
-      );
-    }
-
+  Widget _buildTodaySection() {
     return TodayDosesCard(doses: _doses, onDosePressed: _toggleDose);
+  }
+
+  Widget _buildUpcomingSection() {
+    return UpcomingCarousel(
+      protocols: widget.protocols,
+      onDayTapped: _openUpcomingDay,
+    );
   }
 
   Widget _buildWeightSection({
@@ -368,17 +336,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget? _buildUpcomingSection({required bool hasProtocols}) {
-    if (!hasProtocols) {
-      return null;
-    }
-
-    return WeeklyPreviewCard(
-      protocols: widget.protocols,
-      onDayTapped: _openWeeklyDay,
-    );
-  }
-
   Widget _buildRecentActivitySection() {
     return const _RecentActivityPlaceholder();
   }
@@ -393,6 +350,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final startingWeight = hasWeight ? _weightRecords.last.weight : null;
 
+    final remainingDoses = _doses.where((dose) => !dose.isCompleted).length;
+
     final configuredSections = _buildConfiguredSections(
       hasProtocols: hasProtocols,
       hasWeight: hasWeight,
@@ -401,12 +360,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     return Scaffold(
-      floatingActionButton: hasProtocols
-          ? FloatingActionButton(
-              onPressed: _openAddProtocol,
-              child: const Icon(Icons.add),
-            )
-          : null,
+      floatingActionButton: null,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
@@ -418,13 +372,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             DashboardHeader(
               name: widget.displayName,
-              remainingDoses: _doses.where((dose) => !dose.isCompleted).length,
+              remainingDoses: remainingDoses,
               totalDoses: _doses.length,
             ),
-
             if (configuredSections.isNotEmpty)
               const SizedBox(height: AppSpacing.lg),
-
             ...configuredSections,
           ],
         ),

@@ -7,7 +7,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String databaseName = 'ghost.db';
-  static const int databaseVersion = 5;
+  static const int databaseVersion = 6;
 
   static const String protocolsTable = 'protocols';
   static const String doseRecordsTable = 'dose_records';
@@ -27,7 +27,6 @@ class AppDatabase {
 
   Future<Database> _initDatabase() async {
     final databasesPath = await getDatabasesPath();
-
     final databasePath = join(databasesPath, databaseName);
 
     return openDatabase(
@@ -67,11 +66,15 @@ class AppDatabase {
         ALTER TABLE $protocolsTable
         ADD COLUMN color_value INTEGER NOT NULL
         DEFAULT 4284960932
-        ''');
+      ''');
     }
 
     if (oldVersion < 5) {
       await _addCycleColumns(database);
+    }
+
+    if (oldVersion < 6) {
+      await _addReminderColumns(database);
     }
   }
 
@@ -80,42 +83,68 @@ class AppDatabase {
       ALTER TABLE $protocolsTable
       ADD COLUMN use_cycle INTEGER NOT NULL
       DEFAULT 0
-      ''');
+    ''');
 
     await database.execute('''
       ALTER TABLE $protocolsTable
       ADD COLUMN cycle_start_date TEXT
-      ''');
+    ''');
 
     await database.execute('''
       ALTER TABLE $protocolsTable
       ADD COLUMN cycle_on_duration INTEGER NOT NULL
       DEFAULT 1
-      ''');
+    ''');
 
     await database.execute('''
       ALTER TABLE $protocolsTable
       ADD COLUMN cycle_on_unit TEXT NOT NULL
       DEFAULT 'weeks'
-      ''');
+    ''');
 
     await database.execute('''
       ALTER TABLE $protocolsTable
       ADD COLUMN cycle_off_duration INTEGER NOT NULL
       DEFAULT 0
-      ''');
+    ''');
 
     await database.execute('''
       ALTER TABLE $protocolsTable
       ADD COLUMN cycle_off_unit TEXT NOT NULL
       DEFAULT 'weeks'
-      ''');
+    ''');
 
     await database.execute('''
       ALTER TABLE $protocolsTable
       ADD COLUMN repeat_cycle INTEGER NOT NULL
       DEFAULT 0
-      ''');
+    ''');
+  }
+
+  Future<void> _addReminderColumns(Database database) async {
+    await database.execute('''
+      ALTER TABLE $protocolsTable
+      ADD COLUMN reminder_enabled INTEGER NOT NULL
+      DEFAULT 0
+    ''');
+
+    await database.execute('''
+      ALTER TABLE $protocolsTable
+      ADD COLUMN reminder_minutes_before INTEGER NOT NULL
+      DEFAULT 0
+    ''');
+
+    await database.execute('''
+      ALTER TABLE $protocolsTable
+      ADD COLUMN missed_dose_reminder_enabled INTEGER NOT NULL
+      DEFAULT 0
+    ''');
+
+    await database.execute('''
+      ALTER TABLE $protocolsTable
+      ADD COLUMN missed_dose_reminder_minutes_after INTEGER NOT NULL
+      DEFAULT 60
+    ''');
   }
 
   Future<void> _createProtocolsTable(Database database) async {
@@ -127,6 +156,7 @@ class AppDatabase {
         status TEXT NOT NULL,
         color_value INTEGER NOT NULL
           DEFAULT 4284960932,
+
         schedule_type TEXT NOT NULL,
         start_date TEXT NOT NULL,
         hour INTEGER NOT NULL,
@@ -148,9 +178,18 @@ class AppDatabase {
         cycle_off_unit TEXT NOT NULL
           DEFAULT 'weeks',
         repeat_cycle INTEGER NOT NULL
-          DEFAULT 0
+          DEFAULT 0,
+
+        reminder_enabled INTEGER NOT NULL
+          DEFAULT 0,
+        reminder_minutes_before INTEGER NOT NULL
+          DEFAULT 0,
+        missed_dose_reminder_enabled INTEGER NOT NULL
+          DEFAULT 0,
+        missed_dose_reminder_minutes_after INTEGER NOT NULL
+          DEFAULT 60
       )
-      ''');
+    ''');
   }
 
   Future<void> _createDoseRecordsTable(Database database) async {
@@ -167,7 +206,7 @@ class AppDatabase {
           REFERENCES $protocolsTable (id)
           ON DELETE CASCADE
       )
-      ''');
+    ''');
 
     await database.execute('''
       CREATE UNIQUE INDEX
@@ -176,7 +215,7 @@ class AppDatabase {
         protocol_id,
         scheduled_for
       )
-      ''');
+    ''');
   }
 
   Future<void> _createWeightRecordsTable(Database database) async {
@@ -186,7 +225,7 @@ class AppDatabase {
         weight REAL NOT NULL,
         recorded_at TEXT NOT NULL
       )
-      ''');
+    ''');
 
     await database.execute('''
       CREATE INDEX
@@ -194,7 +233,7 @@ class AppDatabase {
       ON $weightRecordsTable (
         recorded_at
       )
-      ''');
+    ''');
   }
 
   Future<void> close() async {

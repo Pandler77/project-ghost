@@ -77,6 +77,11 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   CycleUnit _cycleOffUnit = CycleUnit.weeks;
   bool _repeatCycle = true;
 
+  bool? _reminderEnabled;
+  int _reminderMinutesBefore = 0;
+  bool? _missedDoseReminderEnabled;
+  int _missedDoseReminderMinutesAfter = 60;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -106,8 +111,8 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
             children: [
               WizardStepIndicator(
                 currentStep: _currentStep,
-                totalSteps: 7,
-                label: 'Step ${_currentStep + 1} of 7',
+                totalSteps: 8,
+                label: 'Step ${_currentStep + 1} of 8',
               ),
               const SizedBox(height: AppSpacing.lg),
               Expanded(
@@ -118,7 +123,8 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
                   3 => _buildScheduleStep(context),
                   4 => _buildTimeStep(context),
                   5 => _buildCycleStep(context),
-                  6 => _buildReviewStep(context),
+                  6 => _buildReminderStep(context),
+                  7 => _buildReviewStep(context),
                   _ => const SizedBox.shrink(),
                 },
               ),
@@ -130,7 +136,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
                   child: Text(
                     _currentStep == 0
                         ? 'Continue'
-                        : _currentStep == 6
+                        : _currentStep == 7
                         ? 'Save Protocol'
                         : 'Next',
                   ),
@@ -155,7 +161,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   }
 
   void _handleContinue() {
-    if (_currentStep < 6) {
+    if (_currentStep < 7) {
       setState(() {
         _currentStep++;
       });
@@ -224,6 +230,17 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
             offDuration >= 0;
 
       case 6:
+        if (_reminderEnabled == null) {
+          return false;
+        }
+
+        if (_reminderEnabled == true) {
+          return _missedDoseReminderEnabled != null;
+        }
+
+        return true;
+
+      case 7:
         return true;
 
       default:
@@ -838,6 +855,243 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     );
   }
 
+  Widget _buildReminderStep(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListView(
+      children: [
+        const Text(
+          'Dose reminders',
+          style: TextStyle(
+            fontSize: AppTypography.title,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Would you like to receive reminders for this protocol?',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        const Text(
+          'Enable dose reminders?',
+          style: TextStyle(
+            fontSize: AppTypography.body,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: _BinaryChoiceTile(
+                label: 'Yes',
+                isSelected: _reminderEnabled == true,
+                onTap: () {
+                  setState(() {
+                    _reminderEnabled = true;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _BinaryChoiceTile(
+                label: 'No',
+                isSelected: _reminderEnabled == false,
+                onTap: () {
+                  setState(() {
+                    _reminderEnabled = false;
+                    _missedDoseReminderEnabled = null;
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+        if (_reminderEnabled == true) ...[
+          const SizedBox(height: AppSpacing.lg),
+          const Text(
+            'Notify me',
+            style: TextStyle(
+              fontSize: AppTypography.body,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Choose when Ghost should notify you.',
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              _ReminderChoiceChip(
+                label: 'At time',
+                isSelected: _reminderMinutesBefore == 0,
+                onTap: () {
+                  setState(() {
+                    _reminderMinutesBefore = 0;
+                  });
+                },
+              ),
+              _ReminderChoiceChip(
+                label: '5m before',
+                isSelected: _reminderMinutesBefore == 5,
+                onTap: () {
+                  setState(() {
+                    _reminderMinutesBefore = 5;
+                  });
+                },
+              ),
+              _ReminderChoiceChip(
+                label: '10m before',
+                isSelected: _reminderMinutesBefore == 10,
+                onTap: () {
+                  setState(() {
+                    _reminderMinutesBefore = 10;
+                  });
+                },
+              ),
+              _ReminderChoiceChip(
+                label: '15m before',
+                isSelected: _reminderMinutesBefore == 15,
+                onTap: () {
+                  setState(() {
+                    _reminderMinutesBefore = 15;
+                  });
+                },
+              ),
+              _ReminderChoiceChip(
+                label: '30m before',
+                isSelected: _reminderMinutesBefore == 30,
+                onTap: () {
+                  setState(() {
+                    _reminderMinutesBefore = 30;
+                  });
+                },
+              ),
+              _ReminderChoiceChip(
+                label: '1h before',
+                isSelected: _reminderMinutesBefore == 60,
+                onTap: () {
+                  setState(() {
+                    _reminderMinutesBefore = 60;
+                  });
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          const Text(
+            'Follow-up Reminder',
+            style: TextStyle(
+              fontSize: AppTypography.body,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            "If this dose isn't marked as taken, would you like another reminder?",
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _BinaryChoiceTile(
+                  label: 'Yes',
+                  isSelected: _missedDoseReminderEnabled == true,
+                  onTap: () {
+                    setState(() {
+                      _missedDoseReminderEnabled = true;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _BinaryChoiceTile(
+                  label: 'No',
+                  isSelected: _missedDoseReminderEnabled == false,
+                  onTap: () {
+                    setState(() {
+                      _missedDoseReminderEnabled = false;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          if (_missedDoseReminderEnabled == true) ...[
+            const SizedBox(height: AppSpacing.md),
+            const Text(
+              'Follow-up timing',
+              style: TextStyle(
+                fontSize: AppTypography.body,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                _ReminderChoiceChip(
+                  label: '15m later',
+                  isSelected: _missedDoseReminderMinutesAfter == 15,
+                  onTap: () {
+                    setState(() {
+                      _missedDoseReminderMinutesAfter = 15;
+                    });
+                  },
+                ),
+                _ReminderChoiceChip(
+                  label: '30m later',
+                  isSelected: _missedDoseReminderMinutesAfter == 30,
+                  onTap: () {
+                    setState(() {
+                      _missedDoseReminderMinutesAfter = 30;
+                    });
+                  },
+                ),
+                _ReminderChoiceChip(
+                  label: '1h later',
+                  isSelected: _missedDoseReminderMinutesAfter == 60,
+                  onTap: () {
+                    setState(() {
+                      _missedDoseReminderMinutesAfter = 60;
+                    });
+                  },
+                ),
+                _ReminderChoiceChip(
+                  label: '2h later',
+                  isSelected: _missedDoseReminderMinutesAfter == 120,
+                  onTap: () {
+                    setState(() {
+                      _missedDoseReminderMinutesAfter = 120;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
   Widget _buildReviewStep(BuildContext context) {
     return ListView(
       children: [
@@ -869,6 +1123,12 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
               value: _formatDate(_selectedStartDate),
             ),
             _ReviewRowData(label: 'Cycle', value: _cycleReviewSummary()),
+            _ReviewRowData(label: 'Reminder', value: _reminderReviewSummary()),
+            if (_reminderEnabled == true && _missedDoseReminderEnabled == true)
+              _ReviewRowData(
+                label: 'Follow-up',
+                value: _missedReminderReviewSummary(),
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.md),
@@ -974,6 +1234,15 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           : 0,
       cycleOffUnit: _cycleOffUnit,
       repeatCycle: _useCycle && _repeatCycle,
+      reminderEnabled: _reminderEnabled == true,
+      reminderMinutesBefore: _reminderEnabled == true
+          ? _reminderMinutesBefore
+          : 0,
+      missedDoseReminderEnabled:
+          _reminderEnabled == true && _missedDoseReminderEnabled == true,
+      missedDoseReminderMinutesAfter: _missedDoseReminderEnabled == true
+          ? _missedDoseReminderMinutesAfter
+          : 60,
     );
   }
 
@@ -1180,6 +1449,34 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
     return '$onDuration ${_unitLabel(_cycleOnUnit, onDuration)} on • '
         '$offDuration ${_unitLabel(_cycleOffUnit, offDuration)} off • Repeats';
+  }
+
+  String _reminderReviewSummary() {
+    if (_reminderEnabled != true) {
+      return 'No';
+    }
+
+    if (_reminderMinutesBefore == 0) {
+      return 'Yes • At scheduled time';
+    }
+
+    if (_reminderMinutesBefore == 60) {
+      return 'Yes • 1 hour before';
+    }
+
+    return 'Yes • $_reminderMinutesBefore minutes before';
+  }
+
+  String _missedReminderReviewSummary() {
+    if (_missedDoseReminderMinutesAfter == 60) {
+      return '1 hour after if not taken';
+    }
+
+    if (_missedDoseReminderMinutesAfter == 120) {
+      return '2 hours after if not taken';
+    }
+
+    return '$_missedDoseReminderMinutesAfter minutes after if not taken';
   }
 
   String _unitLabel(CycleUnit unit, String durationText) {
@@ -1564,6 +1861,92 @@ class _DateChoiceTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BinaryChoiceTile extends StatelessWidget {
+  const _BinaryChoiceTile({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: 14,
+          ),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.primary.withValues(alpha: 0.10)
+                : colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            border: Border.all(
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: AppTypography.body,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurface,
+                ),
+              ),
+              if (isSelected) ...[
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  Icons.check_circle,
+                  size: AppIcon.sm,
+                  color: colorScheme.primary,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderChoiceChip extends StatelessWidget {
+  const _ReminderChoiceChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => onTap(),
     );
   }
 }

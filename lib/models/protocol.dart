@@ -18,6 +18,10 @@ class Protocol {
     this.cycleOffDuration = 0,
     this.cycleOffUnit = CycleUnit.weeks,
     this.repeatCycle = false,
+    this.reminderEnabled = false,
+    this.reminderMinutesBefore = 0,
+    this.missedDoseReminderEnabled = false,
+    this.missedDoseReminderMinutesAfter = 60,
   }) : id = id ?? name;
 
   static const int defaultColorValue = 0xFF6750A4;
@@ -40,6 +44,11 @@ class Protocol {
   final CycleUnit cycleOffUnit;
   final bool repeatCycle;
 
+  final bool reminderEnabled;
+  final int reminderMinutesBefore;
+  final bool missedDoseReminderEnabled;
+  final int missedDoseReminderMinutesAfter;
+
   Protocol copyWith({
     String? id,
     String? name,
@@ -54,6 +63,10 @@ class Protocol {
     int? cycleOffDuration,
     CycleUnit? cycleOffUnit,
     bool? repeatCycle,
+    bool? reminderEnabled,
+    int? reminderMinutesBefore,
+    bool? missedDoseReminderEnabled,
+    int? missedDoseReminderMinutesAfter,
   }) {
     return Protocol(
       id: id ?? this.id,
@@ -71,6 +84,13 @@ class Protocol {
       cycleOffDuration: cycleOffDuration ?? this.cycleOffDuration,
       cycleOffUnit: cycleOffUnit ?? this.cycleOffUnit,
       repeatCycle: repeatCycle ?? this.repeatCycle,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderMinutesBefore:
+          reminderMinutesBefore ?? this.reminderMinutesBefore,
+      missedDoseReminderEnabled:
+          missedDoseReminderEnabled ?? this.missedDoseReminderEnabled,
+      missedDoseReminderMinutesAfter:
+          missedDoseReminderMinutesAfter ?? this.missedDoseReminderMinutesAfter,
     );
   }
 
@@ -100,6 +120,12 @@ class Protocol {
       'cycle_off_duration': cycleOffDuration,
       'cycle_off_unit': cycleOffUnit.storageValue,
       'repeat_cycle': repeatCycle ? 1 : 0,
+
+      // Reminder settings
+      'reminder_enabled': reminderEnabled ? 1 : 0,
+      'reminder_minutes_before': reminderMinutesBefore,
+      'missed_dose_reminder_enabled': missedDoseReminderEnabled ? 1 : 0,
+      'missed_dose_reminder_minutes_after': missedDoseReminderMinutesAfter,
     };
   }
 
@@ -169,6 +195,15 @@ class Protocol {
         fallback: CycleUnit.weeks,
       ),
       repeatCycle: (map['repeat_cycle'] as num?)?.toInt() == 1,
+
+      // Safe defaults preserve older saved protocols.
+      reminderEnabled: (map['reminder_enabled'] as num?)?.toInt() == 1,
+      reminderMinutesBefore:
+          (map['reminder_minutes_before'] as num?)?.toInt() ?? 0,
+      missedDoseReminderEnabled:
+          (map['missed_dose_reminder_enabled'] as num?)?.toInt() == 1,
+      missedDoseReminderMinutesAfter:
+          (map['missed_dose_reminder_minutes_after'] as num?)?.toInt() ?? 60,
     );
   }
 

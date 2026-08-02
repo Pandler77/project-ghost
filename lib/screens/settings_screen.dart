@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/app_theme_mode.dart';
 import '../models/display_preferences.dart';
 import '../models/tracking_preferences.dart';
+import '../services/notification_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 import 'display_preferences_screen.dart';
@@ -26,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsService _settingsService = SettingsService();
 
   TrackingPreferences _trackingPreferences = TrackingPreferences.defaults;
+
   DisplayPreferences _displayPreferences = const DisplayPreferences();
 
   bool _isLoadingTrackingPreferences = true;
@@ -272,22 +274,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: AppSpacing.lg),
             const _SettingsSectionHeader(title: 'Coming Soon'),
             const SizedBox(height: AppSpacing.sm),
-            const Card(
+            Card(
               child: Column(
                 children: [
-                  _DisabledSettingsTile(
+                  const _DisabledSettingsTile(
                     icon: Icons.notifications_outlined,
                     title: 'Notifications',
                     subtitle: 'Manage protocol and progress reminders.',
                   ),
-                  Divider(height: 1),
-                  _DisabledSettingsTile(
+                  const Divider(height: 1),
+                  const _DisabledSettingsTile(
                     icon: Icons.storage_outlined,
                     title: 'Data & Backup',
                     subtitle: 'Manage backups, exports, and stored data.',
                   ),
-                  Divider(height: 1),
-                  _DisabledSettingsTile(
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.notifications_active_outlined),
+                    title: const Text('Test Notification'),
+                    subtitle: const Text('Verify notification setup.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () async {
+                      await NotificationService.instance.showTestNotification();
+                    },
+                  ),
+                  const Divider(height: 1),
+                  const _DisabledSettingsTile(
                     icon: Icons.info_outline,
                     title: 'About',
                     subtitle: 'Version, support, and application information.',

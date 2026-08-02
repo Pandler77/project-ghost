@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../models/cycle_unit.dart';
 import '../models/protocol.dart';
-import '../models/protocol_schedule.dart';
 import '../models/protocol_status.dart';
 import '../models/schedule_type.dart';
 import '../theme/app_theme.dart';
-import '../theme/protocol_colors.dart';
-import '../widgets/ios_time_picker.dart';
-import '../widgets/protocol_editor/protocol_editor.dart';
+
+import 'editors/edit_appearance_status_screen.dart';
+import 'editors/edit_cycle_screen.dart';
+import 'editors/edit_protocol_details_screen.dart';
+import 'editors/edit_reminder_screen.dart';
+import 'editors/edit_schedule_screen.dart';
 
 class EditProtocolScreen extends StatefulWidget {
   const EditProtocolScreen({required this.protocol, super.key});
@@ -20,253 +22,23 @@ class EditProtocolScreen extends StatefulWidget {
 }
 
 class _EditProtocolScreenState extends State<EditProtocolScreen> {
-  late final TextEditingController _nameController;
-  late final TextEditingController _doseController;
-  late final TextEditingController _intervalController;
-  late final TextEditingController _monthlyDayController;
-  late final TextEditingController _cycleOnDurationController;
-  late final TextEditingController _cycleOffDurationController;
-
-  late int _selectedColorValue;
-  late ProtocolStatus _selectedStatus;
-  late ScheduleType _selectedScheduleType;
-  late DateTime _selectedStartDate;
-  late TimeOfDay _selectedTime;
-  late int _selectedWeekday;
-  late Set<int> _selectedWeekdays;
-
-  late bool _useCycle;
-  late DateTime _cycleStartDate;
-  late CycleUnit _cycleOnUnit;
-  late CycleUnit _cycleOffUnit;
-  late bool _repeatCycle;
+  late Protocol _draft;
 
   @override
   void initState() {
     super.initState();
-
-    final schedule = widget.protocol.schedule;
-
-    _nameController = TextEditingController(text: widget.protocol.name);
-
-    _doseController = TextEditingController(text: widget.protocol.dose);
-
-    _intervalController = TextEditingController(
-      text: schedule.intervalDays?.toString() ?? '7',
-    );
-
-    _monthlyDayController = TextEditingController(
-      text: schedule.monthlyDay?.toString() ?? '1',
-    );
-
-    _cycleOnDurationController = TextEditingController(
-      text: widget.protocol.cycleOnDuration.toString(),
-    );
-
-    _cycleOffDurationController = TextEditingController(
-      text: widget.protocol.cycleOffDuration.toString(),
-    );
-
-    _selectedColorValue = widget.protocol.colorValue;
-    _selectedStatus = widget.protocol.status;
-    _selectedScheduleType = schedule.type;
-    _selectedStartDate = schedule.startDate;
-
-    _selectedTime = TimeOfDay(hour: schedule.hour, minute: schedule.minute);
-
-    _selectedWeekday = schedule.weekday ?? schedule.startDate.weekday;
-
-    _selectedWeekdays = Set<int>.from(schedule.specificWeekdays);
-
-    _useCycle = widget.protocol.useCycle;
-    _cycleStartDate = widget.protocol.cycleStartDate ?? schedule.startDate;
-    _cycleOnUnit = widget.protocol.cycleOnUnit;
-    _cycleOffUnit = widget.protocol.cycleOffUnit;
-    _repeatCycle = widget.protocol.repeatCycle;
-
-    if (_selectedWeekdays.isEmpty) {
-      _selectedWeekdays.add(schedule.startDate.weekday);
-    }
+    _draft = widget.protocol;
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _doseController.dispose();
-    _intervalController.dispose();
-    _monthlyDayController.dispose();
-    _cycleOnDurationController.dispose();
-    _cycleOffDurationController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _selectStartDate() async {
-    final selectedDate = await showDatePicker(
-      context: context,
-      initialDate: _selectedStartDate,
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now().add(const Duration(days: 3650)),
-    );
-
-    if (selectedDate == null || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _selectedStartDate = selectedDate;
-    });
-  }
-
-  Future<void> _selectTime() async {
-    final selectedTime = await showIosTimePicker(
-      context: context,
-      initialTime: _selectedTime,
-    );
-
-    if (selectedTime == null || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _selectedTime = selectedTime;
-    });
-  }
-
-  void _toggleSpecificWeekday(int weekday) {
-    setState(() {
-      if (_selectedWeekdays.contains(weekday)) {
-        if (_selectedWeekdays.length > 1) {
-          _selectedWeekdays.remove(weekday);
-        }
-      } else {
-        _selectedWeekdays.add(weekday);
-      }
-    });
-  }
-
-  ProtocolSchedule? _createSchedule() {
-    switch (_selectedScheduleType) {
-      case ScheduleType.daily:
-        return ProtocolSchedule.daily(
-          startDate: _selectedStartDate,
-          hour: _selectedTime.hour,
-          minute: _selectedTime.minute,
-        );
-
-      case ScheduleType.weekly:
-        return ProtocolSchedule.weekly(
-          startDate: _selectedStartDate,
-          hour: _selectedTime.hour,
-          minute: _selectedTime.minute,
-          weekday: _selectedWeekday,
-        );
-
-      case ScheduleType.everyXDays:
-        final intervalDays = int.tryParse(_intervalController.text.trim());
-
-        if (intervalDays == null || intervalDays < 1) {
-          _showValidationMessage('Enter a valid interval of at least 1 day.');
-
-          return null;
-        }
-
-        return ProtocolSchedule.everyXDays(
-          startDate: _selectedStartDate,
-          hour: _selectedTime.hour,
-          minute: _selectedTime.minute,
-          intervalDays: intervalDays,
-        );
-
-      case ScheduleType.specificDays:
-        if (_selectedWeekdays.isEmpty) {
-          _showValidationMessage('Select at least one weekday.');
-
-          return null;
-        }
-
-        return ProtocolSchedule.specificDays(
-          startDate: _selectedStartDate,
-          hour: _selectedTime.hour,
-          minute: _selectedTime.minute,
-          weekdays: _selectedWeekdays,
-        );
-
-      case ScheduleType.monthly:
-        final monthlyDay = int.tryParse(_monthlyDayController.text.trim());
-
-        if (monthlyDay == null || monthlyDay < 1 || monthlyDay > 31) {
-          _showValidationMessage('Enter a monthly day between 1 and 31.');
-
-          return null;
-        }
-
-        return ProtocolSchedule.monthly(
-          startDate: _selectedStartDate,
-          hour: _selectedTime.hour,
-          minute: _selectedTime.minute,
-          day: monthlyDay,
-        );
-    }
-  }
-
-  void _showValidationMessage(String message) {
-    ScaffoldMessenger.of(
+  Future<void> _openEditor(Widget screen) async {
+    final updated = await Navigator.push<Protocol>(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  void _save() {
-    final name = _nameController.text.trim();
-    final dose = _doseController.text.trim();
-
-    if (name.isEmpty || dose.isEmpty) {
-      _showValidationMessage('Name and dose are required.');
-
-      return;
-    }
-
-    final schedule = _createSchedule();
-
-    if (schedule == null) {
-      return;
-    }
-
-    final onDuration = int.tryParse(_cycleOnDurationController.text.trim());
-
-    final offDuration = int.tryParse(_cycleOffDurationController.text.trim());
-
-    if (_useCycle && (onDuration == null || onDuration <= 0)) {
-      _showValidationMessage('Enter a valid on-cycle duration.');
-      return;
-    }
-
-    if (_useCycle && (offDuration == null || offDuration < 0)) {
-      _showValidationMessage('Enter a valid off-cycle duration.');
-      return;
-    }
-
-    final updatedProtocol = widget.protocol.copyWith(
-      name: name,
-      dose: dose,
-      colorValue: _selectedColorValue,
-      status: _selectedStatus,
-      schedule: schedule,
-      useCycle: _useCycle,
-      cycleStartDate: _useCycle
-          ? DateTime(
-              _cycleStartDate.year,
-              _cycleStartDate.month,
-              _cycleStartDate.day,
-            )
-          : null,
-      cycleOnDuration: _useCycle ? onDuration! : 1,
-      cycleOnUnit: _cycleOnUnit,
-      cycleOffDuration: _useCycle ? offDuration! : 0,
-      cycleOffUnit: _cycleOffUnit,
-      repeatCycle: _useCycle && _repeatCycle,
+      MaterialPageRoute(builder: (_) => screen),
     );
 
-    Navigator.pop(context, updatedProtocol);
+    if (updated == null || !mounted) return;
+
+    setState(() => _draft = updated);
   }
 
   @override
@@ -277,369 +49,166 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
-            const _SectionTitle('Protocol'),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Protocol name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-
-            const SizedBox(height: AppSpacing.md),
-
-            TextField(
-              controller: _doseController,
-              decoration: const InputDecoration(
-                labelText: 'Dose',
-                hintText: '3 mg',
-                border: OutlineInputBorder(),
-              ),
-            ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            const _SectionTitle('Schedule'),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            DropdownButtonFormField<ScheduleType>(
-              initialValue: _selectedScheduleType,
-              decoration: const InputDecoration(
-                labelText: 'Schedule type',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: ScheduleType.daily,
-                  child: Text('Daily'),
-                ),
-                DropdownMenuItem(
-                  value: ScheduleType.weekly,
-                  child: Text('Weekly'),
-                ),
-                DropdownMenuItem(
-                  value: ScheduleType.everyXDays,
-                  child: Text('Every X days'),
-                ),
-                DropdownMenuItem(
-                  value: ScheduleType.specificDays,
-                  child: Text('Specific weekdays'),
-                ),
-                DropdownMenuItem(
-                  value: ScheduleType.monthly,
-                  child: Text('Monthly'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-
-                setState(() {
-                  _selectedScheduleType = value;
-                });
-              },
-            ),
-
-            const SizedBox(height: AppSpacing.md),
-
-            if (_selectedScheduleType == ScheduleType.weekly)
-              DropdownButtonFormField<int>(
-                initialValue: _selectedWeekday,
-                decoration: const InputDecoration(
-                  labelText: 'Weekday',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: DateTime.monday,
-                    child: Text('Monday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.tuesday,
-                    child: Text('Tuesday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.wednesday,
-                    child: Text('Wednesday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.thursday,
-                    child: Text('Thursday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.friday,
-                    child: Text('Friday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.saturday,
-                    child: Text('Saturday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.sunday,
-                    child: Text('Sunday'),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-
-                  setState(() {
-                    _selectedWeekday = value;
-                  });
-                },
-              ),
-
-            if (_selectedScheduleType == ScheduleType.everyXDays)
-              TextField(
-                controller: _intervalController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Interval',
-                  suffixText: 'days',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-            if (_selectedScheduleType == ScheduleType.specificDays)
-              _SpecificWeekdaySelector(
-                selectedWeekdays: _selectedWeekdays,
-                onWeekdayPressed: _toggleSpecificWeekday,
-              ),
-
-            if (_selectedScheduleType == ScheduleType.monthly)
-              TextField(
-                controller: _monthlyDayController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Day of month',
-                  helperText: 'For shorter months, Ghost uses the final day.',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-            if (_selectedScheduleType != ScheduleType.daily)
-              const SizedBox(height: AppSpacing.md),
-
-            _SelectionTile(
-              label: 'Start date',
-              value: _formatDate(_selectedStartDate),
-              icon: Icons.calendar_today_outlined,
-              onTap: _selectStartDate,
-            ),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            _SelectionTile(
-              label: 'Dose time',
-              value: _formatTime(_selectedTime),
-              icon: Icons.schedule_outlined,
-              onTap: _selectTime,
-            ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            const _SectionTitle('Cycle'),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            ProtocolCycleEditor(
-              useCycle: _useCycle,
-              cycleStartDate: _cycleStartDate,
-              onDurationController: _cycleOnDurationController,
-              onUnit: _cycleOnUnit,
-              offDurationController: _cycleOffDurationController,
-              offUnit: _cycleOffUnit,
-              repeatCycle: _repeatCycle,
-              onUseCycleChanged: (value) {
-                setState(() {
-                  _useCycle = value;
-
-                  if (value && widget.protocol.cycleStartDate == null) {
-                    _cycleStartDate = _selectedStartDate;
-                  }
-                });
-              },
-              onCycleStartDateChanged: (date) {
-                setState(() {
-                  _cycleStartDate = date;
-                });
-              },
-              onOnUnitChanged: (unit) {
-                setState(() {
-                  _cycleOnUnit = unit;
-                });
-              },
-              onOffUnitChanged: (unit) {
-                setState(() {
-                  _cycleOffUnit = unit;
-                });
-              },
-              onRepeatCycleChanged: (value) {
-                setState(() {
-                  _repeatCycle = value;
-                });
-              },
-              onValuesChanged: () {
-                setState(() {});
-              },
-            ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            const _SectionTitle('Protocol color'),
-
-            const SizedBox(height: AppSpacing.xs),
-
             Text(
-              'This color identifies the protocol throughout Ghost.',
+              'Update one section at a time.',
               style: TextStyle(
                 fontSize: AppTypography.caption,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-
-            const SizedBox(height: AppSpacing.md),
-
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                for (final colorValue in ProtocolColors.available)
-                  _ProtocolColorChoice(
-                    colorValue: colorValue,
-                    isSelected: _selectedColorValue == colorValue,
-                    onTap: () {
-                      setState(() {
-                        _selectedColorValue = colorValue;
-                      });
-                    },
-                  ),
-              ],
-            ),
-
             const SizedBox(height: AppSpacing.lg),
-
-            const _SectionTitle('Status'),
-
+            _EditSectionTile(
+              icon: Icons.medication_outlined,
+              title: 'Protocol',
+              subtitle: '${_draft.name} • ${_draft.dose}',
+              onTap: () =>
+                  _openEditor(EditProtocolDetailsScreen(protocol: _draft)),
+            ),
             const SizedBox(height: AppSpacing.sm),
-
-            DropdownButtonFormField<ProtocolStatus>(
-              initialValue: _selectedStatus,
-              decoration: const InputDecoration(
-                labelText: 'Protocol status',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: ProtocolStatus.active,
-                  child: Text('Active'),
-                ),
-                DropdownMenuItem(
-                  value: ProtocolStatus.paused,
-                  child: Text('Paused'),
-                ),
-                DropdownMenuItem(
-                  value: ProtocolStatus.archived,
-                  child: Text('Archived'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-
-                setState(() {
-                  _selectedStatus = value;
-                });
-              },
+            _EditSectionTile(
+              icon: Icons.schedule_outlined,
+              title: 'Schedule',
+              subtitle: _scheduleSummary(_draft),
+              onTap: () => _openEditor(EditScheduleScreen(protocol: _draft)),
             ),
-
+            const SizedBox(height: AppSpacing.sm),
+            _EditSectionTile(
+              icon: Icons.autorenew_outlined,
+              title: 'Cycle',
+              subtitle: _cycleSummary(_draft),
+              onTap: () => _openEditor(EditCycleScreen(protocol: _draft)),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _EditSectionTile(
+              icon: Icons.notifications_outlined,
+              title: 'Dose Reminder',
+              subtitle: _reminderSummary(_draft),
+              onTap: () => _openEditor(EditReminderScreen(protocol: _draft)),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _EditSectionTile(
+              icon: Icons.palette_outlined,
+              title: 'Appearance & Status',
+              subtitle: _statusLabel(_draft.status),
+              onTap: () =>
+                  _openEditor(EditAppearanceStatusScreen(protocol: _draft)),
+            ),
             const SizedBox(height: AppSpacing.lg),
-
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _save,
+                onPressed: () => Navigator.pop(context, _draft),
                 child: const Text('Save Changes'),
               ),
             ),
-
-            const SizedBox(height: AppSpacing.md),
           ],
         ),
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
+  String _scheduleSummary(Protocol protocol) {
+    final schedule = protocol.schedule;
+    final time = _formatTime(
+      TimeOfDay(hour: schedule.hour, minute: schedule.minute),
+    );
 
-    return '${months[date.month - 1]} '
-        '${date.day}, ${date.year}';
+    return switch (schedule.type) {
+      ScheduleType.daily => 'Daily • $time',
+      ScheduleType.weekly =>
+        'Weekly on ${_weekdayName(schedule.weekday!)} • $time',
+      ScheduleType.everyXDays => 'Every ${schedule.intervalDays} days • $time',
+      ScheduleType.specificDays =>
+        '${(schedule.specificWeekdays.toList()..sort()).map(_shortWeekdayName).join(' • ')} • $time',
+      ScheduleType.monthly => 'Monthly on day ${schedule.monthlyDay} • $time',
+    };
   }
+
+  String _cycleSummary(Protocol protocol) {
+    if (!protocol.useCycle) return 'No cycle';
+
+    final onText =
+        '${protocol.cycleOnDuration} ${protocol.cycleOnUnit.label.toLowerCase()} on';
+
+    if (!protocol.repeatCycle) return onText;
+
+    return '$onText • ${protocol.cycleOffDuration} '
+        '${protocol.cycleOffUnit.label.toLowerCase()} off';
+  }
+
+  String _reminderSummary(Protocol protocol) {
+    if (!protocol.reminderEnabled) return 'Off';
+
+    final primary = protocol.reminderMinutesBefore == 0
+        ? 'At scheduled time'
+        : protocol.reminderMinutesBefore == 60
+        ? '1 hour before'
+        : '${protocol.reminderMinutesBefore} minutes before';
+
+    if (!protocol.missedDoseReminderEnabled) return primary;
+
+    final followUp = protocol.missedDoseReminderMinutesAfter == 60
+        ? '1 hour follow-up'
+        : protocol.missedDoseReminderMinutesAfter == 120
+        ? '2 hour follow-up'
+        : '${protocol.missedDoseReminderMinutesAfter} minute follow-up';
+
+    return '$primary • $followUp';
+  }
+
+  String _statusLabel(ProtocolStatus status) => switch (status) {
+    ProtocolStatus.active => 'Active',
+    ProtocolStatus.paused => 'Paused',
+    ProtocolStatus.archived => 'Archived',
+  };
 
   String _formatTime(TimeOfDay time) {
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
-
     final minute = time.minute.toString().padLeft(2, '0');
-
     final period = time.period == DayPeriod.am ? 'AM' : 'PM';
-
     return '$hour:$minute $period';
   }
+
+  String _weekdayName(int weekday) => switch (weekday) {
+    DateTime.monday => 'Monday',
+    DateTime.tuesday => 'Tuesday',
+    DateTime.wednesday => 'Wednesday',
+    DateTime.thursday => 'Thursday',
+    DateTime.friday => 'Friday',
+    DateTime.saturday => 'Saturday',
+    DateTime.sunday => 'Sunday',
+    _ => '',
+  };
+
+  String _shortWeekdayName(int weekday) => switch (weekday) {
+    DateTime.monday => 'Mon',
+    DateTime.tuesday => 'Tue',
+    DateTime.wednesday => 'Wed',
+    DateTime.thursday => 'Thu',
+    DateTime.friday => 'Fri',
+    DateTime.saturday => 'Sat',
+    DateTime.sunday => 'Sun',
+    _ => '',
+  };
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: AppTypography.body,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-}
-
-class _SelectionTile extends StatelessWidget {
-  const _SelectionTile({
-    required this.label,
-    required this.value,
+class _EditSectionTile extends StatelessWidget {
+  const _EditSectionTile({
     required this.icon,
+    required this.title,
+    required this.subtitle,
     required this.onTap,
   });
 
-  final String label;
-  final String value;
   final IconData icon;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -648,128 +217,38 @@ class _SelectionTile extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
+            color: colors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(AppRadius.button),
+            border: Border.all(color: colors.outlineVariant),
           ),
           child: Row(
             children: [
-              Icon(icon),
-
+              Icon(icon, color: colors.primary),
               const SizedBox(width: AppSpacing.md),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: AppTypography.caption,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      value,
+                      title,
                       style: const TextStyle(
                         fontSize: AppTypography.body,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-
               const Icon(Icons.chevron_right),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SpecificWeekdaySelector extends StatelessWidget {
-  const _SpecificWeekdaySelector({
-    required this.selectedWeekdays,
-    required this.onWeekdayPressed,
-  });
-
-  final Set<int> selectedWeekdays;
-  final ValueChanged<int> onWeekdayPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    const weekdays = [
-      (DateTime.monday, 'Mon'),
-      (DateTime.tuesday, 'Tue'),
-      (DateTime.wednesday, 'Wed'),
-      (DateTime.thursday, 'Thu'),
-      (DateTime.friday, 'Fri'),
-      (DateTime.saturday, 'Sat'),
-      (DateTime.sunday, 'Sun'),
-    ];
-
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
-      children: [
-        for (final weekday in weekdays)
-          FilterChip(
-            label: Text(weekday.$2),
-            selected: selectedWeekdays.contains(weekday.$1),
-            onSelected: (_) {
-              onWeekdayPressed(weekday.$1);
-            },
-          ),
-      ],
-    );
-  }
-}
-
-class _ProtocolColorChoice extends StatelessWidget {
-  const _ProtocolColorChoice({
-    required this.colorValue,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final int colorValue;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Color(colorValue);
-
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      label: 'Select protocol color',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          width: 42,
-          height: 42,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isSelected
-                  ? Theme.of(context).colorScheme.onSurface
-                  : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            child: isSelected
-                ? const Icon(Icons.check, color: Colors.white, size: 20)
-                : null,
           ),
         ),
       ),

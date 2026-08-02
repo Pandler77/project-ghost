@@ -17,10 +17,7 @@ class _CounterDemoState extends State<CounterDemo> {
       children: [
         Text(
           '$count',
-          style: const TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 20),
         ElevatedButton(

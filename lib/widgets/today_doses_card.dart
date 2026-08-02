@@ -88,7 +88,7 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                 },
               ),
               if (index < pendingDoses.length - 1)
-                const Divider(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.sm),
             ],
 
             if (pendingDoses.isEmpty) const _FinishedTodayBanner(),
@@ -225,56 +225,92 @@ class _PendingDoseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final protocolColor = Color(dose.protocolColorValue);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.button),
         onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  shape: BoxShape.circle,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: protocolColor.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            border: Border.all(
+              color: protocolColor.withValues(alpha: 0.45),
+              width: 1.25,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.radio_button_unchecked,
+                    color: colorScheme.outline,
+                    size: 23,
+                  ),
                 ),
-                child: Icon(
-                  Icons.radio_button_unchecked,
-                  color: colorScheme.outline,
-                  size: 23,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      dose.protocolName,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dose.protocolName,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${dose.amount}  •  '
-                      '${_formatTime(dose.scheduledFor)}',
-                      style: TextStyle(
-                        fontSize: AppTypography.caption,
-                        color: colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 3),
+                      Text(
+                        '${dose.amount} • ${_formatTime(dose.scheduledFor)}',
+                        style: TextStyle(
+                          fontSize: AppTypography.caption,
+                          fontWeight: FontWeight.w500,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
-                    ),
-                  ],
+                      if (dose.hasCycleStatus) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'Cycle: '
+                          '${dose.cyclePrimaryLabel!}',
+                          style: TextStyle(
+                            fontSize: AppTypography.caption,
+                            fontWeight: FontWeight.w700,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        if (dose.cycleSecondaryLabel != null &&
+                            dose.cycleSecondaryLabel!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            dose.cycleSecondaryLabel!,
+                            style: TextStyle(
+                              fontSize: AppTypography.caption,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              Icon(Icons.chevron_right, color: colorScheme.outline),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -327,11 +363,11 @@ class _CompletedDoseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final protocolColor = Color(dose.protocolColorValue);
 
     final completionText = dose.completedAt == null
         ? 'Taken'
-        : 'Taken at '
-              '${_formatTime(dose.completedAt!)}';
+        : 'Taken at ${_formatTime(dose.completedAt!)}';
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -339,12 +375,16 @@ class _CompletedDoseRow extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+        color: protocolColor.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(AppRadius.button),
+        border: Border.all(
+          color: protocolColor.withValues(alpha: 0.45),
+          width: 1.25,
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.check_circle, color: colorScheme.primary),
+          Icon(Icons.check_circle, color: protocolColor),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
@@ -352,15 +392,17 @@ class _CompletedDoseRow extends StatelessWidget {
               children: [
                 Text(
                   dose.protocolName,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${dose.amount}  •  '
-                  '$completionText',
+                  '${dose.amount} • $completionText',
                   style: TextStyle(
                     fontSize: AppTypography.caption,
-                    color: colorScheme.onSurfaceVariant,
+                    color: colorScheme.onSurface,
                   ),
                 ),
               ],

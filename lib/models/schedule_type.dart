@@ -1,7 +1,1 @@
-enum ScheduleType {
-  daily,
-  weekly,
-  everyXDays,
-  specificDays,
-  monthly,
-}
+enum ScheduleType { daily, weekly, everyXDays, specificDays, monthly }

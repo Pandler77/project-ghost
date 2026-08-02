@@ -9,10 +9,7 @@ class InventoryScreen extends StatelessWidget {
       child: Center(
         child: Text(
           'Inventory',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
       ),
     );

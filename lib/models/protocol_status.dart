@@ -1,5 +1,1 @@
-enum ProtocolStatus {
-  active,
-  paused,
-  archived,
-}
+enum ProtocolStatus { active, paused, archived }

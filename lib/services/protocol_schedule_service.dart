@@ -98,4 +98,46 @@ class ProtocolScheduleService {
       protocol.schedule.minute,
     );
   }
+
+  DateTime? nextScheduledDate(
+    Protocol protocol, {
+    required DateTime after,
+    int searchLimitDays = 730,
+  }) {
+    if (protocol.status != ProtocolStatus.active) {
+      return null;
+    }
+
+    if (searchLimitDays < 0) {
+      return null;
+    }
+
+    final firstDay = DateTime(after.year, after.month, after.day);
+
+    for (var dayOffset = 0; dayOffset <= searchLimitDays; dayOffset++) {
+      final candidateDay = firstDay.add(Duration(days: dayOffset));
+
+      if (!isScheduledOnDate(protocol, candidateDay)) {
+        continue;
+      }
+
+      final candidateDateTime = scheduledDateTime(protocol, candidateDay);
+
+      if (candidateDateTime.isAfter(after)) {
+        return candidateDateTime;
+      }
+    }
+
+    return null;
+  }
+
+  DateTime? scheduledDateForToday(Protocol protocol, {DateTime? now}) {
+    final currentTime = now ?? DateTime.now();
+
+    if (!isScheduledOnDate(protocol, currentTime)) {
+      return null;
+    }
+
+    return scheduledDateTime(protocol, currentTime);
+  }
 }

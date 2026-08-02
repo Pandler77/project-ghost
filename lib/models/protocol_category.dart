@@ -1,7 +1,1 @@
-enum ProtocolCategory {
-  peptide,
-  prescription,
-  supplement,
-  vitamin,
-  custom,
-}
+enum ProtocolCategory { peptide, prescription, supplement, vitamin, custom }

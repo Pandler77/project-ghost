@@ -9,6 +9,7 @@ import '../services/protocol_preset_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/protocol_colors.dart';
 import '../widgets/ios_time_picker.dart';
+import '../widgets/protocol_editor/protocol_editor.dart';
 import '../widgets/wizard_step_indicator.dart';
 
 enum ScheduleOption { daily, weekly, everyXDays, specificDays, monthly }
@@ -790,133 +791,49 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   }
 
   Widget _buildCycleStep(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return ListView(
       children: [
-        const Text(
-          'Will you be cycling?',
-          style: TextStyle(
-            fontSize: AppTypography.title,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Choose whether this protocol runs continuously or uses on and off periods.',
-          style: TextStyle(
-            fontSize: AppTypography.caption,
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        _SelectionTile(
-          title: 'No',
-          subtitle: 'Run this protocol continuously',
-          icon: Icons.all_inclusive,
-          isSelected: !_useCycle,
-          onTap: () {
+        ProtocolCycleEditor(
+          useCycle: _useCycle,
+          cycleStartDate: _cycleStartDate,
+          onDurationController: _cycleOnDurationController,
+          onUnit: _cycleOnUnit,
+          offDurationController: _cycleOffDurationController,
+          offUnit: _cycleOffUnit,
+          repeatCycle: _repeatCycle,
+          onUseCycleChanged: (value) {
             setState(() {
-              _useCycle = false;
+              _useCycle = value;
+
+              if (value) {
+                _cycleStartDate = _selectedStartDate;
+              }
             });
           },
-        ),
-        _SelectionTile(
-          title: 'Yes',
-          subtitle: 'Use scheduled on and off periods',
-          icon: Icons.loop,
-          isSelected: _useCycle,
-          onTap: () {
+          onCycleStartDateChanged: (date) {
             setState(() {
-              _useCycle = true;
-              _cycleStartDate = _selectedStartDate;
+              _cycleStartDate = date;
             });
           },
+          onOnUnitChanged: (unit) {
+            setState(() {
+              _cycleOnUnit = unit;
+            });
+          },
+          onOffUnitChanged: (unit) {
+            setState(() {
+              _cycleOffUnit = unit;
+            });
+          },
+          onRepeatCycleChanged: (value) {
+            setState(() {
+              _repeatCycle = value;
+            });
+          },
+          onValuesChanged: () {
+            setState(() {});
+          },
         ),
-        if (_useCycle) ...[
-          const SizedBox(height: AppSpacing.lg),
-          const Text(
-            'Cycle starts',
-            style: TextStyle(
-              fontSize: AppTypography.body,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(
-            onPressed: _chooseCycleStartDate,
-            icon: const Icon(Icons.calendar_month_outlined),
-            label: Text(_formatDate(_cycleStartDate)),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _CycleDurationEditor(
-            title: 'On cycle',
-            controller: _cycleOnDurationController,
-            selectedUnit: _cycleOnUnit,
-            onUnitChanged: (unit) {
-              setState(() {
-                _cycleOnUnit = unit;
-              });
-            },
-            onChanged: () {
-              setState(() {});
-            },
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _CycleDurationEditor(
-            title: 'Off cycle',
-            controller: _cycleOffDurationController,
-            selectedUnit: _cycleOffUnit,
-            onUnitChanged: (unit) {
-              setState(() {
-                _cycleOffUnit = unit;
-              });
-            },
-            onChanged: () {
-              setState(() {});
-            },
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Card(
-            child: SwitchListTile(
-              secondary: const Icon(Icons.repeat),
-              title: const Text('Repeat cycle'),
-              subtitle: const Text(
-                'Restart the on period after the off period ends.',
-              ),
-              value: _repeatCycle,
-              onChanged: (value) {
-                setState(() {
-                  _repeatCycle = value;
-                });
-              },
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(AppRadius.card),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.event_repeat_outlined, color: colorScheme.primary),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Text(
-                    _cycleSummary(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -1030,25 +947,6 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
     setState(() {
       _selectedStartDate = selected;
-    });
-  }
-
-  Future<void> _chooseCycleStartDate() async {
-    final today = DateTime.now();
-
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _cycleStartDate,
-      firstDate: DateTime(today.year - 10, today.month, today.day),
-      lastDate: DateTime(today.year + 20, today.month, today.day),
-    );
-
-    if (selected == null || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _cycleStartDate = selected;
     });
   }
 
@@ -1268,24 +1166,6 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     }
   }
 
-  String _cycleSummary() {
-    if (!_useCycle) {
-      return 'Continuous';
-    }
-
-    final onDuration = _cycleOnDurationController.text.trim();
-    final offDuration = _cycleOffDurationController.text.trim();
-
-    if (!_repeatCycle) {
-      return '$onDuration ${_unitLabel(_cycleOnUnit, onDuration)} on.\n'
-          'Ends after the first on period.';
-    }
-
-    return '$onDuration ${_unitLabel(_cycleOnUnit, onDuration)} on, '
-        '$offDuration ${_unitLabel(_cycleOffUnit, offDuration)} off.\n'
-        'Repeats after each off period.';
-  }
-
   String _cycleReviewSummary() {
     if (!_useCycle) {
       return 'Continuous';
@@ -1371,78 +1251,6 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     return first.year == second.year &&
         first.month == second.month &&
         first.day == second.day;
-  }
-}
-
-class _CycleDurationEditor extends StatelessWidget {
-  const _CycleDurationEditor({
-    required this.title,
-    required this.controller,
-    required this.selectedUnit,
-    required this.onUnitChanged,
-    required this.onChanged,
-  });
-
-  final String title;
-  final TextEditingController controller;
-  final CycleUnit selectedUnit;
-  final ValueChanged<CycleUnit> onUnitChanged;
-  final VoidCallback onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: AppTypography.body,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => onChanged(),
-                    decoration: const InputDecoration(
-                      labelText: 'Duration',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: DropdownButtonFormField<CycleUnit>(
-                    initialValue: selectedUnit,
-                    decoration: const InputDecoration(
-                      labelText: 'Unit',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      for (final unit in CycleUnit.values)
-                        DropdownMenuItem(value: unit, child: Text(unit.label)),
-                    ],
-                    onChanged: (unit) {
-                      if (unit != null) {
-                        onUnitChanged(unit);
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

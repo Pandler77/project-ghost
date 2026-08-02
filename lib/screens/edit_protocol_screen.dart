@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/cycle_unit.dart';
 import '../models/protocol.dart';
 import '../models/protocol_schedule.dart';
 import '../models/protocol_status.dart';
@@ -7,6 +8,7 @@ import '../models/schedule_type.dart';
 import '../theme/app_theme.dart';
 import '../theme/protocol_colors.dart';
 import '../widgets/ios_time_picker.dart';
+import '../widgets/protocol_editor/protocol_editor.dart';
 
 class EditProtocolScreen extends StatefulWidget {
   const EditProtocolScreen({required this.protocol, super.key});
@@ -22,6 +24,8 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
   late final TextEditingController _doseController;
   late final TextEditingController _intervalController;
   late final TextEditingController _monthlyDayController;
+  late final TextEditingController _cycleOnDurationController;
+  late final TextEditingController _cycleOffDurationController;
 
   late int _selectedColorValue;
   late ProtocolStatus _selectedStatus;
@@ -30,6 +34,12 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
   late TimeOfDay _selectedTime;
   late int _selectedWeekday;
   late Set<int> _selectedWeekdays;
+
+  late bool _useCycle;
+  late DateTime _cycleStartDate;
+  late CycleUnit _cycleOnUnit;
+  late CycleUnit _cycleOffUnit;
+  late bool _repeatCycle;
 
   @override
   void initState() {
@@ -49,6 +59,14 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
       text: schedule.monthlyDay?.toString() ?? '1',
     );
 
+    _cycleOnDurationController = TextEditingController(
+      text: widget.protocol.cycleOnDuration.toString(),
+    );
+
+    _cycleOffDurationController = TextEditingController(
+      text: widget.protocol.cycleOffDuration.toString(),
+    );
+
     _selectedColorValue = widget.protocol.colorValue;
     _selectedStatus = widget.protocol.status;
     _selectedScheduleType = schedule.type;
@@ -59,6 +77,12 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
     _selectedWeekday = schedule.weekday ?? schedule.startDate.weekday;
 
     _selectedWeekdays = Set<int>.from(schedule.specificWeekdays);
+
+    _useCycle = widget.protocol.useCycle;
+    _cycleStartDate = widget.protocol.cycleStartDate ?? schedule.startDate;
+    _cycleOnUnit = widget.protocol.cycleOnUnit;
+    _cycleOffUnit = widget.protocol.cycleOffUnit;
+    _repeatCycle = widget.protocol.repeatCycle;
 
     if (_selectedWeekdays.isEmpty) {
       _selectedWeekdays.add(schedule.startDate.weekday);
@@ -71,6 +95,8 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
     _doseController.dispose();
     _intervalController.dispose();
     _monthlyDayController.dispose();
+    _cycleOnDurationController.dispose();
+    _cycleOffDurationController.dispose();
     super.dispose();
   }
 
@@ -205,12 +231,39 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
       return;
     }
 
+    final onDuration = int.tryParse(_cycleOnDurationController.text.trim());
+
+    final offDuration = int.tryParse(_cycleOffDurationController.text.trim());
+
+    if (_useCycle && (onDuration == null || onDuration <= 0)) {
+      _showValidationMessage('Enter a valid on-cycle duration.');
+      return;
+    }
+
+    if (_useCycle && (offDuration == null || offDuration < 0)) {
+      _showValidationMessage('Enter a valid off-cycle duration.');
+      return;
+    }
+
     final updatedProtocol = widget.protocol.copyWith(
       name: name,
       dose: dose,
       colorValue: _selectedColorValue,
       status: _selectedStatus,
       schedule: schedule,
+      useCycle: _useCycle,
+      cycleStartDate: _useCycle
+          ? DateTime(
+              _cycleStartDate.year,
+              _cycleStartDate.month,
+              _cycleStartDate.day,
+            )
+          : null,
+      cycleOnDuration: _useCycle ? onDuration! : 1,
+      cycleOnUnit: _cycleOnUnit,
+      cycleOffDuration: _useCycle ? offDuration! : 0,
+      cycleOffUnit: _cycleOffUnit,
+      repeatCycle: _useCycle && _repeatCycle,
     );
 
     Navigator.pop(context, updatedProtocol);
@@ -387,6 +440,54 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
               value: _formatTime(_selectedTime),
               icon: Icons.schedule_outlined,
               onTap: _selectTime,
+            ),
+
+            const SizedBox(height: AppSpacing.lg),
+
+            const _SectionTitle('Cycle'),
+
+            const SizedBox(height: AppSpacing.sm),
+
+            ProtocolCycleEditor(
+              useCycle: _useCycle,
+              cycleStartDate: _cycleStartDate,
+              onDurationController: _cycleOnDurationController,
+              onUnit: _cycleOnUnit,
+              offDurationController: _cycleOffDurationController,
+              offUnit: _cycleOffUnit,
+              repeatCycle: _repeatCycle,
+              onUseCycleChanged: (value) {
+                setState(() {
+                  _useCycle = value;
+
+                  if (value && widget.protocol.cycleStartDate == null) {
+                    _cycleStartDate = _selectedStartDate;
+                  }
+                });
+              },
+              onCycleStartDateChanged: (date) {
+                setState(() {
+                  _cycleStartDate = date;
+                });
+              },
+              onOnUnitChanged: (unit) {
+                setState(() {
+                  _cycleOnUnit = unit;
+                });
+              },
+              onOffUnitChanged: (unit) {
+                setState(() {
+                  _cycleOffUnit = unit;
+                });
+              },
+              onRepeatCycleChanged: (value) {
+                setState(() {
+                  _repeatCycle = value;
+                });
+              },
+              onValuesChanged: () {
+                setState(() {});
+              },
             ),
 
             const SizedBox(height: AppSpacing.lg),

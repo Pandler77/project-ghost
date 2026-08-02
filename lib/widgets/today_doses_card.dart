@@ -74,6 +74,10 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
           else ...[
             for (var index = 0; index < pendingDoses.length; index++) ...[
               _PendingDoseRow(
+                key: ValueKey(
+                  '${pendingDoses[index].protocolId}-'
+                  '${pendingDoses[index].scheduledFor.microsecondsSinceEpoch}',
+                ),
                 dose: pendingDoses[index],
                 onPressed: () {
                   final isLastPending = pendingDoses.length == 1;
@@ -91,11 +95,13 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                 const SizedBox(height: AppSpacing.sm),
             ],
 
-            if (pendingDoses.isEmpty) const _FinishedTodayBanner(),
+            if (pendingDoses.isEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              const _FinishedTodayBanner(),
+            ],
 
             if (completedDoses.isNotEmpty) ...[
-              if (pendingDoses.isNotEmpty)
-                const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.md),
 
               _CompletedHeader(
                 count: completedDoses.length,
@@ -107,19 +113,32 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                 },
               ),
 
-              if (_showCompleted) ...[
-                const SizedBox(height: AppSpacing.sm),
-                for (var index = 0; index < completedDoses.length; index++) ...[
-                  _CompletedDoseRow(
-                    dose: completedDoses[index],
-                    onRemove: () {
-                      widget.onDosePressed(completedDoses[index]);
-                    },
-                  ),
-                  if (index < completedDoses.length - 1)
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 250),
+                crossFadeState: _showCompleted
+                    ? CrossFadeState.showFirst
+                    : CrossFadeState.showSecond,
+                firstChild: Column(
+                  children: [
                     const SizedBox(height: AppSpacing.sm),
-                ],
-              ],
+                    for (
+                      var index = 0;
+                      index < completedDoses.length;
+                      index++
+                    ) ...[
+                      _CompletedDoseRow(
+                        dose: completedDoses[index],
+                        onRemove: () {
+                          widget.onDosePressed(completedDoses[index]);
+                        },
+                      ),
+                      if (index < completedDoses.length - 1)
+                        const SizedBox(height: AppSpacing.sm),
+                    ],
+                  ],
+                ),
+                secondChild: const SizedBox.shrink(),
+              ),
             ],
           ],
         ],
@@ -216,103 +235,148 @@ class _FinishedTodayBanner extends StatelessWidget {
   }
 }
 
-class _PendingDoseRow extends StatelessWidget {
-  const _PendingDoseRow({required this.dose, required this.onPressed});
+class _PendingDoseRow extends StatefulWidget {
+  const _PendingDoseRow({
+    required this.dose,
+    required this.onPressed,
+    super.key,
+  });
 
   final Dose dose;
   final VoidCallback onPressed;
 
   @override
+  State<_PendingDoseRow> createState() => _PendingDoseRowState();
+}
+
+class _PendingDoseRowState extends State<_PendingDoseRow> {
+  bool _isCompleting = false;
+
+  Future<void> _markTaken() async {
+    if (_isCompleting) {
+      return;
+    }
+
+    setState(() {
+      _isCompleting = true;
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 650));
+
+    if (!mounted) {
+      return;
+    }
+
+    widget.onPressed();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final protocolColor = Color(dose.protocolColorValue);
+    final protocolColor = Color(widget.dose.protocolColorValue);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 14,
+      ),
+      decoration: BoxDecoration(
+        color: protocolColor.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(AppRadius.button),
-        onTap: onPressed,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: protocolColor.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(AppRadius.button),
-            border: Border.all(
-              color: protocolColor.withValues(alpha: 0.45),
-              width: 1.25,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+        border: Border.all(
+          color: protocolColor.withValues(alpha: 0.45),
+          width: 1.25,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.radio_button_unchecked,
-                    color: colorScheme.outline,
-                    size: 23,
+                Text(
+                  widget.dose.protocolName,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dose.protocolName,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${dose.amount} • ${_formatTime(dose.scheduledFor)}',
-                        style: TextStyle(
-                          fontSize: AppTypography.caption,
-                          fontWeight: FontWeight.w500,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      if (dose.hasCycleStatus) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Cycle: '
-                          '${dose.cyclePrimaryLabel!}',
-                          style: TextStyle(
-                            fontSize: AppTypography.caption,
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        if (dose.cycleSecondaryLabel != null &&
-                            dose.cycleSecondaryLabel!.trim().isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            dose.cycleSecondaryLabel!,
-                            style: TextStyle(
-                              fontSize: AppTypography.caption,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ],
+                const SizedBox(height: 3),
+                Text(
+                  '${widget.dose.amount} • '
+                  '${_formatTime(widget.dose.scheduledFor)}',
+                  style: TextStyle(
+                    fontSize: AppTypography.caption,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
                   ),
                 ),
+                if (widget.dose.hasCycleStatus) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Cycle: '
+                    '${widget.dose.cyclePrimaryLabel!}',
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  if (widget.dose.cycleSecondaryLabel?.trim().isNotEmpty ==
+                      true) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.dose.cycleSecondaryLabel!,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
-        ),
+          const SizedBox(width: AppSpacing.md),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            transitionBuilder: (child, animation) {
+              return ScaleTransition(scale: animation, child: child);
+            },
+            child: _isCompleting
+                ? FilledButton.icon(
+                    key: const ValueKey('taken-confirmed'),
+                    onPressed: null,
+                    style: FilledButton.styleFrom(
+                      disabledBackgroundColor: protocolColor,
+                      disabledForegroundColor: Colors.white,
+                      minimumSize: const Size(92, 42),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    icon: const Icon(Icons.check_rounded, size: 19),
+                    label: const Text('Taken'),
+                  )
+                : OutlinedButton(
+                    key: const ValueKey('taken-pending'),
+                    onPressed: _markTaken,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.onSurface,
+                      side: BorderSide(
+                        color: protocolColor.withValues(alpha: 0.75),
+                      ),
+                      minimumSize: const Size(82, 42),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    child: const Text(
+                      'Taken',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }

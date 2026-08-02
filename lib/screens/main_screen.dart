@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_theme_mode.dart';
+import '../models/home_layout.dart';
 import '../models/protocol.dart';
+import '../models/tracking_preferences.dart';
 import '../services/app_data_service.dart';
+import '../services/settings_service.dart';
 import 'calendar_screen.dart';
 import 'dashboard_screen.dart';
+import 'edit_home_screen.dart';
 import 'protocols_screen.dart';
 import 'settings_screen.dart';
 import 'tools_screen.dart';
-import '../models/home_layout.dart';
-import '../services/settings_service.dart';
-import 'edit_home_screen.dart';
-import '../models/tracking_preferences.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({
@@ -33,6 +33,7 @@ class _MainScreenState extends State<MainScreen> {
 
   int _selectedIndex = 0;
   int _dataRevision = 0;
+
   HomeLayout _homeLayout = HomeLayout.defaultLayout;
   TrackingPreferences _trackingPreferences = TrackingPreferences.defaults;
 
@@ -61,6 +62,7 @@ class _MainScreenState extends State<MainScreen> {
       _trackingPreferences = preferences;
     });
   }
+
 
   Future<void> _loadProtocols() async {
     try {
@@ -236,6 +238,7 @@ class _MainScreenState extends State<MainScreen> {
         dataRevision: _dataRevision,
         homeLayout: _homeLayout,
         trackingPreferences: _trackingPreferences,
+        
         onDataChanged: _notifyDataChanged,
       ),
       ProtocolsScreen(
@@ -243,6 +246,7 @@ class _MainScreenState extends State<MainScreen> {
         onProtocolsChanged: _notifyDataChanged,
         onProtocolAdded: _addProtocol,
         onProtocolUpdated: _updateProtocol,
+        
       ),
       CalendarScreen(
         dataService: _appDataService,

@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_theme_mode.dart';
+import '../models/display_preferences.dart';
 import '../models/home_layout.dart';
 import '../models/home_section.dart';
 import '../models/tracking_preferences.dart';
@@ -15,8 +18,9 @@ class SettingsService {
   static const String _trackNotesKey = 'track_notes';
 
   static const String _weightFrequencyKey = 'weight_frequency';
-
   static const String _photoFrequencyKey = 'photo_frequency';
+
+  static const String _displayPreferencesKey = 'display_preferences';
 
   final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
@@ -156,5 +160,41 @@ class SettingsService {
     }
 
     return fallback;
+  }
+
+  // ------------------------
+  // Display preferences
+  // ------------------------
+
+  Future<DisplayPreferences> getDisplayPreferences() async {
+    final savedValue = await _preferences.getString(_displayPreferencesKey);
+
+    if (savedValue == null || savedValue.trim().isEmpty) {
+      return const DisplayPreferences();
+    }
+
+    try {
+      final decoded = jsonDecode(savedValue);
+
+      if (decoded is! Map<String, dynamic>) {
+        return const DisplayPreferences();
+      }
+
+      return DisplayPreferences.fromMap(Map<String, Object?>.from(decoded));
+    } catch (_) {
+      return const DisplayPreferences();
+    }
+  }
+
+  Future<void> saveDisplayPreferences(
+    DisplayPreferences displayPreferences,
+  ) async {
+    final encoded = jsonEncode(displayPreferences.toMap());
+
+    await _preferences.setString(_displayPreferencesKey, encoded);
+  }
+
+  Future<void> resetDisplayPreferences() async {
+    await _preferences.remove(_displayPreferencesKey);
   }
 }

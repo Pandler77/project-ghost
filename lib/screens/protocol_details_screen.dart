@@ -5,6 +5,7 @@ import '../models/protocol_status.dart';
 import '../models/schedule_type.dart';
 import '../theme/app_theme.dart';
 import 'edit_protocol_screen.dart';
+import '../widgets/protocol_cycle_timeline_card.dart';
 
 class ProtocolDetailsScreen extends StatefulWidget {
   const ProtocolDetailsScreen({required this.protocol, super.key});
@@ -139,6 +140,10 @@ class _ProtocolDetailsScreenState extends State<ProtocolDetailsScreen> {
               _StatusBanner(status: _protocol.status),
 
               const SizedBox(height: AppSpacing.md),
+
+              ProtocolCycleTimelineCard(protocol: _protocol),
+
+              const SizedBox(height: AppSpacing.lg),
 
               _DetailTile(label: 'Dose', value: _protocol.dose),
 

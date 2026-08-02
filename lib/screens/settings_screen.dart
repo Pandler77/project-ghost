@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_theme_mode.dart';
+import '../models/display_preferences.dart';
 import '../models/tracking_preferences.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
+import 'display_preferences_screen.dart';
 import 'tracking_preferences_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -24,13 +26,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsService _settingsService = SettingsService();
 
   TrackingPreferences _trackingPreferences = TrackingPreferences.defaults;
+  DisplayPreferences _displayPreferences = const DisplayPreferences();
 
   bool _isLoadingTrackingPreferences = true;
+  bool _isLoadingDisplayPreferences = true;
 
   @override
   void initState() {
     super.initState();
+
     _loadTrackingPreferences();
+    _loadDisplayPreferences();
   }
 
   Future<void> _loadTrackingPreferences() async {
@@ -43,6 +49,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _trackingPreferences = preferences;
       _isLoadingTrackingPreferences = false;
+    });
+  }
+
+  Future<void> _loadDisplayPreferences() async {
+    final preferences = await _settingsService.getDisplayPreferences();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _displayPreferences = preferences;
+      _isLoadingDisplayPreferences = false;
     });
   }
 
@@ -78,6 +97,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _openDisplayPreferences() async {
+    if (_isLoadingDisplayPreferences) {
+      return;
+    }
+
+    final updatedPreferences = await Navigator.push<DisplayPreferences>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            DisplayPreferencesScreen(initialPreferences: _displayPreferences),
+      ),
+    );
+
+    if (updatedPreferences == null || !mounted) {
+      return;
+    }
+
+    await _settingsService.saveDisplayPreferences(updatedPreferences);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _displayPreferences = updatedPreferences;
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Display preferences saved.')));
+  }
+
   String _trackingSummary() {
     final enabled = <String>[];
 
@@ -95,6 +146,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (enabled.isEmpty) {
       return 'Protocols only';
+    }
+
+    return enabled.join(', ');
+  }
+
+  String _displaySummary() {
+    final enabled = <String>[];
+
+    if (_displayPreferences.showUpcoming) {
+      enabled.add('Upcoming');
+    }
+
+    if (_displayPreferences.showWeight) {
+      enabled.add('Weight');
+    }
+
+    if (_displayPreferences.showCycleStatus) {
+      enabled.add('Cycles');
+    }
+
+    if (_displayPreferences.compactMode) {
+      enabled.add('Compact');
+    }
+
+    if (enabled.isEmpty) {
+      return 'Minimal display';
     }
 
     return enabled.join(', ');
@@ -145,27 +222,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            const _SettingsSectionHeader(title: 'Tracking'),
+            const _SettingsSectionHeader(title: 'Preferences'),
             const SizedBox(height: AppSpacing.sm),
             Card(
-              child: ListTile(
-                leading: const Icon(Icons.tune_outlined),
-                title: const Text('Tracking Preferences'),
-                subtitle: Text(
-                  _isLoadingTrackingPreferences
-                      ? 'Loading preferences...'
-                      : _trackingSummary(),
-                ),
-                trailing: _isLoadingTrackingPreferences
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.chevron_right),
-                onTap: _isLoadingTrackingPreferences
-                    ? null
-                    : _openTrackingPreferences,
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.tune_outlined),
+                    title: const Text('Tracking Preferences'),
+                    subtitle: Text(
+                      _isLoadingTrackingPreferences
+                          ? 'Loading preferences...'
+                          : _trackingSummary(),
+                    ),
+                    trailing: _isLoadingTrackingPreferences
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.chevron_right),
+                    onTap: _isLoadingTrackingPreferences
+                        ? null
+                        : _openTrackingPreferences,
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.dashboard_customize_outlined),
+                    title: const Text('Display Preferences'),
+                    subtitle: Text(
+                      _isLoadingDisplayPreferences
+                          ? 'Loading preferences...'
+                          : _displaySummary(),
+                    ),
+                    trailing: _isLoadingDisplayPreferences
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.chevron_right),
+                    onTap: _isLoadingDisplayPreferences
+                        ? null
+                        : _openDisplayPreferences,
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),

@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 
-import '../models/cycle_status.dart';
 import '../models/protocol.dart';
 import '../models/protocol_status.dart';
-import '../models/schedule_type.dart';
-import '../services/cycle_status_formatter.dart';
-import '../services/cycle_status_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/protocols/empty_protocols_state.dart';
+import '../widgets/protocols/protocol_card.dart';
+import '../widgets/protocols/protocol_filter_chips.dart';
+import '../widgets/protocols/protocol_search_bar.dart';
 import 'add_protocol_screen.dart';
 import 'protocol_details_screen.dart';
+
+enum ProtocolSortOption {
+  nameAscending,
+  nameDescending,
+  recentlyAdded,
+  oldestAdded,
+  startDate,
+}
 
 class ProtocolsScreen extends StatefulWidget {
   const ProtocolsScreen({
@@ -29,6 +37,60 @@ class ProtocolsScreen extends StatefulWidget {
 }
 
 class _ProtocolsScreenState extends State<ProtocolsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  String _searchQuery = '';
+  ProtocolStatus? _statusFilter;
+  ProtocolSortOption _sortOption = ProtocolSortOption.nameAscending;
+
+  Future<void> _showSortMenu(BuildContext context) async {
+    final selected = await showMenu<ProtocolSortOption>(
+      context: context,
+      position: const RelativeRect.fromLTRB(1000, 300, 16, 0),
+      items: [
+        CheckedPopupMenuItem(
+          value: ProtocolSortOption.nameAscending,
+          checked: _sortOption == ProtocolSortOption.nameAscending,
+          child: const Text('Alphabetical A–Z'),
+        ),
+        CheckedPopupMenuItem(
+          value: ProtocolSortOption.nameDescending,
+          checked: _sortOption == ProtocolSortOption.nameDescending,
+          child: const Text('Alphabetical Z–A'),
+        ),
+        CheckedPopupMenuItem(
+          value: ProtocolSortOption.recentlyAdded,
+          checked: _sortOption == ProtocolSortOption.recentlyAdded,
+          child: const Text('Recently added'),
+        ),
+        CheckedPopupMenuItem(
+          value: ProtocolSortOption.oldestAdded,
+          checked: _sortOption == ProtocolSortOption.oldestAdded,
+          child: const Text('Oldest added'),
+        ),
+        CheckedPopupMenuItem(
+          value: ProtocolSortOption.startDate,
+          checked: _sortOption == ProtocolSortOption.startDate,
+          child: const Text('Start date'),
+        ),
+      ],
+    );
+
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _sortOption = selected;
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _openAddProtocol() async {
     final protocol = await Navigator.push<Protocol>(
       context,
@@ -80,409 +142,142 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
     widget.onProtocolsChanged();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Manage what you are currently tracking.',
-            style: TextStyle(
-              fontSize: AppTypography.caption,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _openAddProtocol,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Protocol'),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (widget.protocols.isEmpty)
-            const _EmptyProtocolsState()
-          else
-            for (var index = 0; index < widget.protocols.length; index++) ...[
-              _ProtocolRow(
-                protocol: widget.protocols[index],
-                onPressed: () {
-                  _openProtocolDetails(widget.protocols[index]);
-                },
-              ),
-              if (index < widget.protocols.length - 1)
-                const SizedBox(height: AppSpacing.sm),
-            ],
-        ],
-      ),
-    );
-  }
-}
+  List<Protocol> _filteredProtocols() {
+    final search = _searchQuery.trim().toLowerCase();
 
-class _ProtocolRow extends StatelessWidget {
-  const _ProtocolRow({required this.protocol, required this.onPressed});
+    final filtered = widget.protocols.where((protocol) {
+      final matchesStatus =
+          _statusFilter == null || protocol.status == _statusFilter;
 
-  static const CycleStatusService _cycleStatusService = CycleStatusService();
-
-  static const CycleStatusFormatter _cycleStatusFormatter =
-      CycleStatusFormatter();
-
-  final Protocol protocol;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final protocolColor = Color(protocol.colorValue);
-
-    final background = switch (protocol.status) {
-      ProtocolStatus.active => protocolColor.withValues(alpha: 0.10),
-
-      ProtocolStatus.paused => Colors.amber.withValues(alpha: 0.12),
-
-      ProtocolStatus.archived => colorScheme.surfaceContainerHighest.withValues(
-        alpha: 0.65,
-      ),
-    };
-
-    final contentOpacity = protocol.status == ProtocolStatus.archived
-        ? 0.65
-        : 1.0;
-
-    final cycleStatus = _cycleStatusService.statusForDate(
-      protocol,
-      DateTime.now(),
-    );
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.button),
-        onTap: onPressed,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(AppRadius.button),
-            border: Border.all(
-              color: protocol.status == ProtocolStatus.active
-                  ? protocolColor.withValues(alpha: .45)
-                  : Colors.transparent,
-              width: 1.25,
-            ),
-          ),
-          child: Opacity(
-            opacity: contentOpacity,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: 14,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                protocol.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                            ),
-                            if (protocol.status != ProtocolStatus.active)
-                              _StatusBadge(status: protocol.status),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          protocol.dose,
-                          style: TextStyle(
-                            fontSize: AppTypography.caption,
-                            fontWeight: FontWeight.w500,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _formatSchedule(protocol),
-                          style: TextStyle(
-                            fontSize: AppTypography.caption,
-                            fontWeight: FontWeight.w500,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        if (protocol.useCycle) ...[
-                          const SizedBox(height: AppSpacing.sm),
-                          Text(
-                            'Cycle: ${_cycleStatusFormatter.primaryLabel(cycleStatus)}',
-                            style: TextStyle(
-                              fontSize: AppTypography.caption,
-                              fontWeight: FontWeight.w700,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                          if (_cycleSecondaryText(cycleStatus).isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              _cycleSecondaryText(cycleStatus),
-                              style: TextStyle(
-                                fontSize: AppTypography.caption,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _cycleSecondaryText(CycleStatus status) {
-    if (!status.isCycled) {
-      return '';
-    }
-
-    if (status.isBeforeStart) {
-      final startDate = status.nextTransitionDate;
-
-      if (startDate == null) {
-        return '';
+      if (!matchesStatus) {
+        return false;
       }
 
-      final days = status.daysRemainingInCurrentPhase;
-
-      return 'Starts ${_formatShortDate(startDate)}'
-          ' • ${_remainingText(days)}';
-    }
-
-    if (status.phaseLabel == 'Cycle complete') {
-      return 'This cycle has ended';
-    }
-
-    if (status.isActive) {
-      final transitionDate = status.nextTransitionDate;
-      final days = status.daysRemainingInCurrentPhase;
-
-      if (transitionDate == null) {
-        return days > 0 ? _remainingText(days) : 'Active';
+      if (search.isEmpty) {
+        return true;
       }
 
-      final endDate = transitionDate.subtract(const Duration(days: 1));
+      return protocol.name.toLowerCase().contains(search) ||
+          protocol.dose.toLowerCase().contains(search);
+    }).toList();
 
-      return 'Ends: ${_formatShortDate(endDate)}'
-          ' • ${_remainingText(days)}';
+    switch (_sortOption) {
+      case ProtocolSortOption.nameAscending:
+        filtered.sort(
+          (first, second) =>
+              first.name.toLowerCase().compareTo(second.name.toLowerCase()),
+        );
+
+      case ProtocolSortOption.nameDescending:
+        filtered.sort(
+          (first, second) =>
+              second.name.toLowerCase().compareTo(first.name.toLowerCase()),
+        );
+
+      case ProtocolSortOption.recentlyAdded:
+        filtered.sort(
+          (first, second) => _numericId(second).compareTo(_numericId(first)),
+        );
+
+      case ProtocolSortOption.oldestAdded:
+        filtered.sort(
+          (first, second) => _numericId(first).compareTo(_numericId(second)),
+        );
+
+      case ProtocolSortOption.startDate:
+        filtered.sort(
+          (first, second) =>
+              first.schedule.startDate.compareTo(second.schedule.startDate),
+        );
     }
 
-    final resumeDate = status.nextTransitionDate;
-
-    if (resumeDate == null) {
-      return '';
-    }
-
-    final days = status.daysRemainingInCurrentPhase;
-
-    return 'Resumes ${_formatShortDate(resumeDate)}'
-        ' • ${_remainingText(days)}';
+    return filtered;
   }
 
-  String _remainingText(int days) {
-    if (days <= 0) {
-      return 'Last Day';
-    }
-
-    return '$days ${days == 1 ? 'Day' : 'Days'} Remaining';
+  int _numericId(Protocol protocol) {
+    return int.tryParse(protocol.id) ?? 0;
   }
-
-  String _formatShortDate(DateTime date) {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-
-    return '${months[date.month - 1]} ${date.day}';
-  }
-
-  String _formatSchedule(Protocol protocol) {
-    final schedule = protocol.schedule;
-
-    final time = _formatTime(schedule.hour, schedule.minute);
-
-    switch (schedule.type) {
-      case ScheduleType.daily:
-        return 'Daily • $time';
-
-      case ScheduleType.weekly:
-        return '${_weekdayName(schedule.weekday!)} • $time';
-
-      case ScheduleType.everyXDays:
-        return 'Every ${schedule.intervalDays} days • $time';
-
-      case ScheduleType.specificDays:
-        final days = schedule.specificWeekdays.toList()..sort();
-
-        return '${days.map(_shortWeekdayName).join(' • ')}'
-            ' • $time';
-
-      case ScheduleType.monthly:
-        return 'Monthly on day '
-            '${schedule.monthlyDay} • $time';
-    }
-  }
-
-  String _weekdayName(int weekday) {
-    switch (weekday) {
-      case DateTime.monday:
-        return 'Monday';
-      case DateTime.tuesday:
-        return 'Tuesday';
-      case DateTime.wednesday:
-        return 'Wednesday';
-      case DateTime.thursday:
-        return 'Thursday';
-      case DateTime.friday:
-        return 'Friday';
-      case DateTime.saturday:
-        return 'Saturday';
-      case DateTime.sunday:
-        return 'Sunday';
-      default:
-        return '';
-    }
-  }
-
-  String _shortWeekdayName(int weekday) {
-    switch (weekday) {
-      case DateTime.monday:
-        return 'Mon';
-      case DateTime.tuesday:
-        return 'Tue';
-      case DateTime.wednesday:
-        return 'Wed';
-      case DateTime.thursday:
-        return 'Thu';
-      case DateTime.friday:
-        return 'Fri';
-      case DateTime.saturday:
-        return 'Sat';
-      case DateTime.sunday:
-        return 'Sun';
-      default:
-        return '';
-    }
-  }
-
-  String _formatTime(int hour, int minute) {
-    final displayHour = hour == 0
-        ? 12
-        : hour > 12
-        ? hour - 12
-        : hour;
-
-    final formattedMinute = minute.toString().padLeft(2, '0');
-
-    final period = hour >= 12 ? 'PM' : 'AM';
-
-    return '$displayHour:$formattedMinute $period';
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
-
-  final ProtocolStatus status;
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+Widget build(BuildContext context) {
+  final filteredProtocols = _filteredProtocols();
 
-    final label = switch (status) {
-      ProtocolStatus.active => 'Active',
-      ProtocolStatus.paused => 'Paused',
-      ProtocolStatus.archived => 'Archived',
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: colorScheme.onSurfaceVariant,
+  return SafeArea(
+    child: ListView(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      children: [
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Manage what you are currently tracking.',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
-      ),
-    );
-  }
-}
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _openAddProtocol,
+            icon: const Icon(Icons.add),
+            label: const Text('Add Protocol'),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          height: 48,
+          child: ProtocolSearchBar(
+            controller: _searchController,
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+            onClear: () {
+              _searchController.clear();
 
-class _EmptyProtocolsState extends StatelessWidget {
-  const _EmptyProtocolsState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-      child: Column(
-        children: [
-          Icon(
-            Icons.medication_outlined,
-            size: 40,
-            color: Theme.of(context).colorScheme.outline,
+              setState(() {
+                _searchQuery = '';
+              });
+            },
           ),
-          const SizedBox(height: AppSpacing.md),
-          const Text(
-            'No protocols yet',
-            style: TextStyle(
-              fontSize: AppTypography.body,
-              fontWeight: FontWeight.w600,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        ProtocolFilterChips(
+          selectedStatus: _statusFilter,
+          onStatusChanged: (status) {
+            setState(() {
+              _statusFilter = status;
+            });
+          },
+          onSortPressed: () {
+            _showSortMenu(context);
+          },
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (widget.protocols.isEmpty)
+          const EmptyProtocolsState()
+        else if (filteredProtocols.isEmpty)
+          const NoMatchingProtocolsState(
+            onClearFilters: null,
+          )
+        else
+          for (
+            var index = 0;
+            index < filteredProtocols.length;
+            index++
+          ) ...[
+            ProtocolCard(
+              protocol: filteredProtocols[index],
+              onPressed: () {
+                _openProtocolDetails(
+                  filteredProtocols[index],
+                );
+              },
             ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Use Add Protocol',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: AppTypography.caption,
-              fontWeight: FontWeight.w500,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
+            if (index < filteredProtocols.length - 1)
+              const SizedBox(height: AppSpacing.sm),
+          ],
         ],
       ),
     );

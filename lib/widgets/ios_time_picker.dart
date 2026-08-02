@@ -72,7 +72,7 @@ Future<TimeOfDay?> showIosTimePicker({
                       mode: CupertinoDatePickerMode.time,
                       initialDateTime: selectedDateTime,
                       use24hFormat: false,
-                      minuteInterval: 5,
+                      minuteInterval: 1,
                       onDateTimeChanged: (value) {
                         selectedDateTime = value;
                       },

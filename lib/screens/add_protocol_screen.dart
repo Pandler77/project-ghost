@@ -71,7 +71,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   DateTime _selectedStartDate = DateTime.now();
   int _selectedColorValue = Protocol.defaultColorValue;
 
-  bool _useCycle = false;
+  bool? _useCycle;
   DateTime _cycleStartDate = DateTime.now();
   CycleUnit _cycleOnUnit = CycleUnit.weeks;
   CycleUnit _cycleOffUnit = CycleUnit.weeks;
@@ -214,7 +214,11 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         return true;
 
       case 5:
-        if (!_useCycle) {
+        if (_useCycle == null) {
+          return false;
+        }
+
+        if (_useCycle == false) {
           return true;
         }
 
@@ -1217,23 +1221,23 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       dose: _formattedDose,
       schedule: _createSchedule(),
       colorValue: _selectedColorValue,
-      useCycle: _useCycle,
-      cycleStartDate: _useCycle
+      useCycle: _useCycle == true,
+      cycleStartDate: _useCycle == true
           ? DateTime(
               _cycleStartDate.year,
               _cycleStartDate.month,
               _cycleStartDate.day,
             )
           : null,
-      cycleOnDuration: _useCycle
+      cycleOnDuration: _useCycle == true
           ? int.parse(_cycleOnDurationController.text.trim())
           : 1,
       cycleOnUnit: _cycleOnUnit,
-      cycleOffDuration: _useCycle
+      cycleOffDuration: _useCycle == true
           ? int.parse(_cycleOffDurationController.text.trim())
           : 0,
       cycleOffUnit: _cycleOffUnit,
-      repeatCycle: _useCycle && _repeatCycle,
+      repeatCycle: _useCycle == true && _repeatCycle,
       reminderEnabled: _reminderEnabled == true,
       reminderMinutesBefore: _reminderEnabled == true
           ? _reminderMinutesBefore
@@ -1436,7 +1440,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   }
 
   String _cycleReviewSummary() {
-    if (!_useCycle) {
+    if (_useCycle != true) {
       return 'Continuous';
     }
 

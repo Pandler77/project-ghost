@@ -21,7 +21,7 @@ class ProtocolCycleEditor extends StatelessWidget {
     super.key,
   });
 
-  final bool useCycle;
+  final bool? useCycle;
   final DateTime cycleStartDate;
 
   final TextEditingController onDurationController;
@@ -80,25 +80,25 @@ class ProtocolCycleEditor extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         _CycleModeTile(
-          title: 'No',
-          subtitle: 'Run continuously on its normal schedule.',
-          icon: Icons.all_inclusive,
-          isSelected: !useCycle,
-          onTap: () {
-            onUseCycleChanged(false);
-          },
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _CycleModeTile(
           title: 'Yes',
           subtitle: 'Run during planned on-cycle periods.',
           icon: Icons.event_repeat_outlined,
-          isSelected: useCycle,
+          isSelected: useCycle == true,
           onTap: () {
             onUseCycleChanged(true);
           },
         ),
-        if (useCycle) ...[
+        const SizedBox(height: AppSpacing.sm),
+        _CycleModeTile(
+          title: 'No',
+          subtitle: 'Run continuously on its normal schedule.',
+          icon: Icons.all_inclusive,
+          isSelected: useCycle == false,
+          onTap: () {
+            onUseCycleChanged(false);
+          },
+        ),
+        if (useCycle == true) ...[
           const SizedBox(height: AppSpacing.lg),
           const _SectionLabel('Cycle start date'),
           const SizedBox(height: AppSpacing.sm),

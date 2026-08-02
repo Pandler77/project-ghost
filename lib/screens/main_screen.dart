@@ -5,6 +5,7 @@ import '../models/home_layout.dart';
 import '../models/protocol.dart';
 import '../models/tracking_preferences.dart';
 import '../services/app_data_service.dart';
+import '../services/notification_service.dart';
 import '../services/settings_service.dart';
 import 'calendar_screen.dart';
 import 'dashboard_screen.dart';
@@ -17,11 +18,15 @@ class MainScreen extends StatefulWidget {
   const MainScreen({
     required this.themeMode,
     required this.onThemeModeChanged,
+    this.notificationProtocolId,
+    this.onNotificationHandled,
     super.key,
   });
 
   final AppThemeMode themeMode;
   final ValueChanged<AppThemeMode> onThemeModeChanged;
+  final String? notificationProtocolId;
+  final VoidCallback? onNotificationHandled;
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -49,6 +54,36 @@ class _MainScreenState extends State<MainScreen> {
     _loadProtocols();
     _loadHomeLayout();
     _loadTrackingPreferences();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleNotificationNavigation();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant MainScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.notificationProtocolId != oldWidget.notificationProtocolId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleNotificationNavigation();
+      });
+    }
+  }
+
+  void _handleNotificationNavigation() {
+    final protocolId = widget.notificationProtocolId;
+
+    if (protocolId == null || protocolId.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedIndex = 0;
+      _dataRevision++;
+    });
+
+    widget.onNotificationHandled?.call();
   }
 
   Future<void> _loadTrackingPreferences() async {
@@ -63,10 +98,13 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-
   Future<void> _loadProtocols() async {
     try {
       final protocols = await _appDataService.getProtocols();
+
+      await NotificationService.instance.synchronizeProtocolReminders(
+        protocols,
+      );
 
       if (!mounted) {
         return;
@@ -238,7 +276,6 @@ class _MainScreenState extends State<MainScreen> {
         dataRevision: _dataRevision,
         homeLayout: _homeLayout,
         trackingPreferences: _trackingPreferences,
-        
         onDataChanged: _notifyDataChanged,
       ),
       ProtocolsScreen(
@@ -246,7 +283,6 @@ class _MainScreenState extends State<MainScreen> {
         onProtocolsChanged: _notifyDataChanged,
         onProtocolAdded: _addProtocol,
         onProtocolUpdated: _updateProtocol,
-        
       ),
       CalendarScreen(
         dataService: _appDataService,

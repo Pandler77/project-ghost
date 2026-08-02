@@ -2,12 +2,18 @@ import '../core/repository/ghost_repository.dart';
 import '../models/dose_record.dart';
 import '../models/protocol.dart';
 import '../models/weight_record.dart';
+import 'notification_service.dart';
 
 class AppDataService {
-  AppDataService({GhostRepository? repository})
-    : _repository = repository ?? GhostRepository();
+  AppDataService({
+    GhostRepository? repository,
+    NotificationService? notificationService,
+  }) : _repository = repository ?? GhostRepository(),
+       _notificationService =
+           notificationService ?? NotificationService.instance;
 
   final GhostRepository _repository;
+  final NotificationService _notificationService;
 
   String get displayName => 'Frank';
 
@@ -15,16 +21,22 @@ class AppDataService {
     return _repository.getProtocols();
   }
 
-  Future<void> addProtocol(Protocol protocol) {
-    return _repository.insertProtocol(protocol);
+  Future<void> addProtocol(Protocol protocol) async {
+    await _repository.insertProtocol(protocol);
+
+    await _notificationService.scheduleProtocolReminders(protocol);
   }
 
-  Future<void> updateProtocol(Protocol protocol) {
-    return _repository.updateProtocol(protocol);
+  Future<void> updateProtocol(Protocol protocol) async {
+    await _repository.updateProtocol(protocol);
+
+    await _notificationService.scheduleProtocolReminders(protocol);
   }
 
-  Future<void> deleteProtocol(String protocolId) {
-    return _repository.deleteProtocol(protocolId);
+  Future<void> deleteProtocol(String protocolId) async {
+    await _notificationService.cancelProtocolReminders(protocolId);
+
+    await _repository.deleteProtocol(protocolId);
   }
 
   Future<List<DoseRecord>> getAllDoseRecords() {
@@ -43,8 +55,15 @@ class AppDataService {
     return _repository.getDoseRecordsForDate(date);
   }
 
-  Future<void> saveDoseRecord(DoseRecord record) {
-    return _repository.saveDoseRecord(record);
+  Future<void> saveDoseRecord(DoseRecord record) async {
+    await _repository.saveDoseRecord(record);
+
+    if (record.completedAt != null) {
+      await _notificationService.cancelFollowUpReminder(
+        protocolId: record.protocolId,
+        scheduledDoseTime: record.scheduledFor,
+      );
+    }
   }
 
   Future<void> deleteDoseRecord({

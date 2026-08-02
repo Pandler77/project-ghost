@@ -5,6 +5,7 @@ import 'models/tracking_preferences.dart';
 import 'screens/main_screen.dart';
 import 'screens/onboarding_setup_screen.dart';
 import 'screens/welcome_screen.dart';
+import 'services/notification_service.dart';
 import 'services/settings_service.dart';
 
 class ProjectGhostApp extends StatefulWidget {
@@ -16,6 +17,7 @@ class ProjectGhostApp extends StatefulWidget {
 
 class _ProjectGhostAppState extends State<ProjectGhostApp> {
   final SettingsService _settingsService = SettingsService();
+  final NotificationService _notificationService = NotificationService.instance;
 
   AppThemeMode _themeMode = AppThemeMode.system;
 
@@ -23,10 +25,50 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
   bool _isOnboardingComplete = false;
   bool _isShowingSetup = false;
 
+  String? _notificationProtocolId;
+
   @override
   void initState() {
     super.initState();
+
+    _notificationProtocolId = _notificationService.pendingProtocolId;
+    _notificationService.protocolNavigation.addListener(
+      _handleNotificationNavigation,
+    );
+
     _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    _notificationService.protocolNavigation.removeListener(
+      _handleNotificationNavigation,
+    );
+    super.dispose();
+  }
+
+  void _handleNotificationNavigation() {
+    final protocolId = _notificationService.protocolNavigation.value;
+
+    if (protocolId == null || protocolId.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _notificationProtocolId = protocolId;
+    });
+  }
+
+  void _completeNotificationNavigation() {
+    _notificationService.clearPendingNavigation();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _notificationProtocolId = null;
+    });
   }
 
   Future<void> _loadSettings() async {
@@ -66,7 +108,6 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
 
   Future<void> _completeOnboarding(TrackingPreferences preferences) async {
     await _settingsService.saveTrackingPreferences(preferences);
-
     await _settingsService.saveOnboardingComplete(true);
 
     if (!mounted) {
@@ -92,6 +133,8 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
       return MainScreen(
         themeMode: _themeMode,
         onThemeModeChanged: _changeThemeMode,
+        notificationProtocolId: _notificationProtocolId,
+        onNotificationHandled: _completeNotificationNavigation,
       );
     }
 

@@ -9,6 +9,7 @@ class WeightCard extends StatelessWidget {
     required this.startingWeight,
     required this.weightRecords,
     required this.onLogWeight,
+    required this.onOpenHistory,
     super.key,
   });
 
@@ -16,6 +17,7 @@ class WeightCard extends StatelessWidget {
   final double startingWeight;
   final List<WeightRecord> weightRecords;
   final VoidCallback onLogWeight;
+  final VoidCallback onOpenHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -59,82 +61,95 @@ class WeightCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         Card(
           elevation: 1,
+          clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.card),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 4,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      RichText(
-                        text: TextSpan(
-                          style: DefaultTextStyle.of(context).style,
-                          children: [
-                            TextSpan(
-                              text: currentWeight.toStringAsFixed(1),
-                              style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
+          child: InkWell(
+            onTap: onOpenHistory,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RichText(
+                          text: TextSpan(
+                            style: DefaultTextStyle.of(context).style,
+                            children: [
+                              TextSpan(
+                                text: currentWeight.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
+                              TextSpan(
+                                text: ' lb',
+                                style: TextStyle(
+                                  fontSize: AppTypography.body,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Row(
+                          children: [
+                            Icon(
+                              trendIcon,
+                              size: 17,
+                              color: colorScheme.primary,
                             ),
-                            TextSpan(
-                              text: ' lb',
-                              style: TextStyle(
-                                fontSize: AppTypography.body,
-                                color: colorScheme.onSurfaceVariant,
+                            const SizedBox(width: AppSpacing.xs),
+                            Expanded(
+                              child: Text(
+                                changeText,
+                                style: TextStyle(
+                                  fontSize: AppTypography.caption,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Row(
-                        children: [
-                          Icon(trendIcon, size: 17, color: colorScheme.primary),
-                          const SizedBox(width: AppSpacing.xs),
-                          Expanded(
-                            child: Text(
-                              changeText,
-                              style: TextStyle(
-                                fontSize: AppTypography.caption,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Started at '
+                          '${startingWeight.toStringAsFixed(1)} lb',
+                          style: TextStyle(
+                            fontSize: AppTypography.caption,
+                            color: colorScheme.onSurfaceVariant,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Started at '
-                        '${startingWeight.toStringAsFixed(1)} lb',
-                        style: TextStyle(
-                          fontSize: AppTypography.caption,
-                          color: colorScheme.onSurfaceVariant,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  flex: 5,
-                  child: SizedBox(
-                    height: 72,
-                    child: CustomPaint(
-                      painter: _WeightTrendPainter(
-                        records: weightRecords,
-                        lineColor: colorScheme.primary,
-                        guideColor: colorScheme.outlineVariant,
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    flex: 5,
+                    child: SizedBox(
+                      height: 72,
+                      child: CustomPaint(
+                        painter: _WeightTrendPainter(
+                          records: weightRecords,
+                          lineColor: colorScheme.primary,
+                          guideColor: colorScheme.outlineVariant,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: AppSpacing.xs),
+                  Icon(
+                    Icons.chevron_right,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -208,6 +223,7 @@ class _WeightTrendPainter extends CustomPainter {
     );
 
     final range = maximumWeight - minimumWeight;
+
     final points = <Offset>[];
 
     for (var index = 0; index < records.length; index++) {

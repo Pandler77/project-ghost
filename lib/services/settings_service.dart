@@ -22,6 +22,11 @@ class SettingsService {
 
   static const String _displayPreferencesKey = 'display_preferences';
 
+  static const String _ghostSupplyBetaDismissedKey =
+      'ghost_supply_beta_dismissed';
+
+  static const String _activeProfileIdKey = 'active_profile_id';
+
   final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
   // ------------------------
@@ -196,5 +201,37 @@ class SettingsService {
 
   Future<void> resetDisplayPreferences() async {
     await _preferences.remove(_displayPreferencesKey);
+  }
+
+  // ------------------------
+  // Active profile
+  // ------------------------
+
+  Future<String?> getActiveProfileId() async {
+    return _preferences.getString(_activeProfileIdKey);
+  }
+
+  Future<void> saveActiveProfileId(String profileId) async {
+    await _preferences.setString(_activeProfileIdKey, profileId);
+  }
+
+  Future<void> clearActiveProfileId() async {
+    await _preferences.remove(_activeProfileIdKey);
+  }
+
+  // ------------------------
+  // Ghost Supply Beta
+  // ------------------------
+
+  Future<bool> getGhostSupplyBetaDismissed() async {
+    return await _preferences.getBool(_ghostSupplyBetaDismissedKey) ?? false;
+  }
+
+  Future<void> saveGhostSupplyBetaDismissed(bool isDismissed) async {
+    await _preferences.setBool(_ghostSupplyBetaDismissedKey, isDismissed);
+  }
+
+  Future<void> resetGhostSupplyBetaDismissed() async {
+    await _preferences.remove(_ghostSupplyBetaDismissedKey);
   }
 }

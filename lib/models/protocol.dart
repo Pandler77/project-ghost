@@ -1,4 +1,5 @@
 import 'cycle_unit.dart';
+import 'dose_unit.dart';
 import 'protocol_schedule.dart';
 import 'protocol_status.dart';
 import 'schedule_type.dart';
@@ -7,7 +8,13 @@ class Protocol {
   Protocol({
     String? id,
     required this.name,
-    required this.dose,
+
+    // Temporary legacy support lets existing screens continue using:
+    // dose: '3 mg'
+    String? dose,
+
+    double? doseAmount,
+    DoseUnit? doseUnit,
     required this.schedule,
     this.status = ProtocolStatus.active,
     this.colorValue = defaultColorValue,
@@ -22,7 +29,13 @@ class Protocol {
     this.reminderMinutesBefore = 0,
     this.missedDoseReminderEnabled = false,
     this.missedDoseReminderMinutesAfter = 60,
-  }) : id = id ?? name;
+  }) : assert(
+         dose != null || doseAmount != null,
+         'Either dose or doseAmount must be provided.',
+       ),
+       id = id ?? name,
+       doseAmount = doseAmount ?? _parseDoseAmount(dose),
+       doseUnit = doseUnit ?? _parseDoseUnit(dose);
 
   static const int defaultColorValue = 0xFF6750A4;
 
@@ -30,7 +43,13 @@ class Protocol {
 
   final String id;
   final String name;
-  final String dose;
+
+  /// Structured numeric dose used for calculations and validation.
+  final double doseAmount;
+
+  /// Structured dose unit used for compatibility checking.
+  final DoseUnit doseUnit;
+
   final ProtocolSchedule schedule;
 
   ProtocolStatus status;
@@ -49,10 +68,18 @@ class Protocol {
   final bool missedDoseReminderEnabled;
   final int missedDoseReminderMinutesAfter;
 
+  /// Keeps existing UI references such as protocol.dose working.
+  String get dose => '${_formatAmount(doseAmount)} ${doseUnit.label}';
+
   Protocol copyWith({
     String? id,
     String? name,
+
+    // Temporary legacy support.
     String? dose,
+
+    double? doseAmount,
+    DoseUnit? doseUnit,
     ProtocolSchedule? schedule,
     ProtocolStatus? status,
     int? colorValue,
@@ -68,10 +95,14 @@ class Protocol {
     bool? missedDoseReminderEnabled,
     int? missedDoseReminderMinutesAfter,
   }) {
+    final parsedLegacyAmount = dose == null ? null : _parseDoseAmount(dose);
+    final parsedLegacyUnit = dose == null ? null : _parseDoseUnit(dose);
+
     return Protocol(
       id: id ?? this.id,
       name: name ?? this.name,
-      dose: dose ?? this.dose,
+      doseAmount: doseAmount ?? parsedLegacyAmount ?? this.doseAmount,
+      doseUnit: doseUnit ?? parsedLegacyUnit ?? this.doseUnit,
       schedule: schedule ?? this.schedule,
       status: status ?? this.status,
       colorValue: colorValue ?? this.colorValue,
@@ -98,7 +129,14 @@ class Protocol {
     return {
       'id': id,
       'name': name,
+
+      // Legacy column retained temporarily for older app versions/data.
       'dose': dose,
+
+      // New structured columns.
+      'dose_amount': doseAmount,
+      'dose_unit': doseUnit.storageValue,
+
       'status': status.name,
       'color_value': colorValue,
       'schedule_type': schedule.type.name,
@@ -173,10 +211,21 @@ class Protocol {
 
     final storedCycleStartDate = map['cycle_start_date'] as String?;
 
+    final storedDoseAmount = (map['dose_amount'] as num?)?.toDouble();
+    final storedDoseUnit = map['dose_unit'] as String?;
+    final legacyDose = map['dose'] as String?;
+
     return Protocol(
       id: map['id'] as String,
       name: map['name'] as String,
-      dose: map['dose'] as String,
+
+      // New records use structured values.
+      // Older records fall back to parsing the original dose string.
+      doseAmount: storedDoseAmount ?? _parseDoseAmount(legacyDose),
+      doseUnit: storedDoseUnit == null
+          ? _parseDoseUnit(legacyDose)
+          : DoseUnitDetails.fromStorageValue(storedDoseUnit),
+
       status: ProtocolStatus.values.byName(map['status'] as String),
       colorValue: (map['color_value'] as num?)?.toInt() ?? defaultColorValue,
       schedule: schedule,
@@ -195,8 +244,6 @@ class Protocol {
         fallback: CycleUnit.weeks,
       ),
       repeatCycle: (map['repeat_cycle'] as num?)?.toInt() == 1,
-
-      // Safe defaults preserve older saved protocols.
       reminderEnabled: (map['reminder_enabled'] as num?)?.toInt() == 1,
       reminderMinutesBefore:
           (map['reminder_minutes_before'] as num?)?.toInt() ?? 0,
@@ -205,6 +252,37 @@ class Protocol {
       missedDoseReminderMinutesAfter:
           (map['missed_dose_reminder_minutes_after'] as num?)?.toInt() ?? 60,
     );
+  }
+
+  static double _parseDoseAmount(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 0;
+    }
+
+    final match = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(value);
+
+    return double.tryParse(match?.group(1) ?? '') ?? 0;
+  }
+
+  static DoseUnit _parseDoseUnit(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return DoseUnit.mg;
+    }
+
+    final unitText = value.replaceAll(RegExp(r'[\d.\s]'), '');
+
+    return DoseUnitDetails.fromStorageValue(unitText);
+  }
+
+  static String _formatAmount(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+
+    return value
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   static Set<int> _parseSpecificWeekdays(String? value) {

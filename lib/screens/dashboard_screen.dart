@@ -6,19 +6,23 @@ import '../models/dose.dart';
 import '../models/dose_record.dart';
 import '../models/home_layout.dart';
 import '../models/home_section.dart';
+import '../models/inventory_item.dart';
 import '../models/protocol.dart';
+import '../models/tracking_preferences.dart';
 import '../models/weight_record.dart';
 import '../services/app_data_service.dart';
 import '../services/dose_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/empty_today_card.dart';
+import '../widgets/ghost_supply_card.dart';
 import '../widgets/today_doses_card.dart';
 import '../widgets/upcoming_carousel.dart';
 import '../widgets/weight_card.dart';
 import 'add_protocol_screen.dart';
 import 'daily_timeline_screen.dart';
-import '../models/tracking_preferences.dart';
+import 'inventory_screen.dart';
+import 'weight_history_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -51,6 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Dose> _doses = [];
   List<WeightRecord> _weightRecords = [];
+  List<InventoryItem> _inventoryItems = [];
 
   Timer? _refreshTimer;
 
@@ -87,7 +92,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadDashboardData() async {
-    await Future.wait([_loadDoseData(), _loadWeightData()]);
+    await Future.wait([
+      _loadDoseData(),
+      _loadWeightData(),
+      _loadInventoryData(),
+    ]);
   }
 
   Future<void> _loadDoseData() async {
@@ -123,6 +132,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadWeightData() async {
     final records = await widget.dataService.getWeightRecords();
 
+    records.sort(
+      (first, second) => second.recordedAt.compareTo(first.recordedAt),
+    );
+
     if (!mounted) {
       return;
     }
@@ -130,6 +143,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _weightRecords = records;
       _isLoadingWeight = false;
+    });
+  }
+
+  Future<void> _loadInventoryData() async {
+    final items = await widget.dataService.getInventoryItems();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _inventoryItems = items;
     });
   }
 
@@ -147,6 +172,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         dose.completedAt = null;
       });
+
+      await _loadInventoryData();
+
+      if (!mounted) {
+        return;
+      }
 
       widget.onDataChanged();
       return;
@@ -175,6 +206,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       dose.completedAt = completedAt;
     });
+
+    await _loadInventoryData();
+
+    if (!mounted) {
+      return;
+    }
 
     widget.onDataChanged();
   }
@@ -218,6 +255,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _loadDashboardData();
   }
 
+  Future<void> _openGhostSupply() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InventoryScreen(
+          dataService: widget.dataService,
+          protocols: widget.protocols,
+        ),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadInventoryData();
+  }
+
   Future<void> _openWeightDialog() async {
     final weight = await showDialog<double>(
       context: context,
@@ -235,8 +290,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final now = DateTime.now();
 
+    final existingRecord = await widget.dataService.getWeightRecordForDate(now);
+
     final record = WeightRecord(
-      id: now.microsecondsSinceEpoch.toString(),
+      id: existingRecord?.id ?? now.microsecondsSinceEpoch.toString(),
       weight: weight,
       recordedAt: now,
     );
@@ -244,6 +301,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await widget.dataService.saveWeightRecord(record);
 
     if (!mounted) {
+      return;
+    }
+
+    await _loadWeightData();
+
+    if (!mounted) {
+      return;
+    }
+
+    widget.onDataChanged();
+  }
+
+  Future<void> _openWeightHistory() async {
+    final didChange = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WeightHistoryScreen(dataService: widget.dataService),
+      ),
+    );
+
+    if (!mounted || didChange != true) {
       return;
     }
 
@@ -278,8 +356,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           !widget.trackingPreferences.trackWeight) {
         continue;
       }
+
       final Widget sectionWidget = switch (section) {
         HomeSection.today => _buildTodaySection(),
+        HomeSection.ghostSupply => _buildGhostSupplySection(),
         HomeSection.upcoming => _buildUpcomingSection(),
         HomeSection.weight => _buildWeightSection(
           hasWeight: hasWeight,
@@ -301,6 +381,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildTodaySection() {
     return TodayDosesCard(doses: _doses, onDosePressed: _toggleDose);
+  }
+
+  Widget _buildGhostSupplySection() {
+    return GhostSupplyCard(
+      items: _inventoryItems,
+      protocols: widget.protocols,
+      onTap: _openGhostSupply,
+    );
   }
 
   Widget _buildUpcomingSection() {
@@ -333,6 +421,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       startingWeight: startingWeight!,
       weightRecords: _weightRecords,
       onLogWeight: _openWeightDialog,
+      onOpenHistory: _openWeightHistory,
     );
   }
 
@@ -343,7 +432,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final hasProtocols = widget.protocols.isNotEmpty;
-
     final hasWeight = _weightRecords.isNotEmpty;
 
     final currentWeight = hasWeight ? _weightRecords.first.weight : null;

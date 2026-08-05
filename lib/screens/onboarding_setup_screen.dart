@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
 
+import '../models/profile.dart';
 import '../models/tracking_preferences.dart';
 import '../theme/app_theme.dart';
+
+class OnboardingSetupResult {
+  const OnboardingSetupResult({
+    required this.profileName,
+    required this.profileType,
+    required this.preferences,
+  });
+
+  final String profileName;
+  final ProfileType profileType;
+  final TrackingPreferences preferences;
+}
 
 class OnboardingSetupScreen extends StatefulWidget {
   const OnboardingSetupScreen({required this.onComplete, super.key});
 
-  final Future<void> Function(TrackingPreferences preferences) onComplete;
+  final Future<void> Function(OnboardingSetupResult result) onComplete;
 
   @override
   State<OnboardingSetupScreen> createState() => _OnboardingSetupScreenState();
@@ -15,20 +28,37 @@ class OnboardingSetupScreen extends StatefulWidget {
 class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
   final PageController _pageController = PageController();
 
+  late final TextEditingController _profileNameController;
+
   TrackingPreferences _preferences = TrackingPreferences.defaults;
+  ProfileType _profileType = ProfileType.self;
 
   int _currentPage = 0;
   bool _isSaving = false;
 
-  static const int _pageCount = 3;
+  static const int _pageCount = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileNameController = TextEditingController();
+  }
 
   @override
   void dispose() {
+    _profileNameController.dispose();
     _pageController.dispose();
     super.dispose();
   }
 
   Future<void> _nextPage() async {
+    if (_currentPage == 0 && _profileNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile name is required.')),
+      );
+      return;
+    }
+
     if (_currentPage == _pageCount - 1) {
       await _finishSetup();
       return;
@@ -57,12 +87,24 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
       return;
     }
 
+    final profileName = _profileNameController.text.trim();
+
+    if (profileName.isEmpty) {
+      return;
+    }
+
     setState(() {
       _isSaving = true;
     });
 
     try {
-      await widget.onComplete(_preferences);
+      await widget.onComplete(
+        OnboardingSetupResult(
+          profileName: profileName,
+          profileType: _profileType,
+          preferences: _preferences,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -99,6 +141,15 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
                   });
                 },
                 children: [
+                  _ProfileSetupPage(
+                    nameController: _profileNameController,
+                    selectedType: _profileType,
+                    onTypeChanged: (type) {
+                      setState(() {
+                        _profileType = type;
+                      });
+                    },
+                  ),
                   _TrackingSelectionPage(
                     preferences: _preferences,
                     onChanged: _updatePreferences,
@@ -107,7 +158,11 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
                     preferences: _preferences,
                     onChanged: _updatePreferences,
                   ),
-                  _FinishSetupPage(preferences: _preferences),
+                  _FinishSetupPage(
+                    profileNameController: _profileNameController,
+                    profileType: _profileType,
+                    preferences: _preferences,
+                  ),
                 ],
               ),
             ),
@@ -194,6 +249,128 @@ class _OnboardingHeader extends StatelessWidget {
   }
 }
 
+class _ProfileSetupPage extends StatelessWidget {
+  const _ProfileSetupPage({
+    required this.nameController,
+    required this.selectedType,
+    required this.onTypeChanged,
+  });
+
+  final TextEditingController nameController;
+  final ProfileType selectedType;
+  final ValueChanged<ProfileType> onTypeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _OnboardingPageLayout(
+      icon: Icons.person_add_alt_1_outlined,
+      title: 'Let’s create your first profile.',
+      subtitle:
+          'Profiles keep protocols, weight, inventory, and history completely separate.',
+      children: [
+        TextField(
+          controller: nameController,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(
+            labelText: 'Profile name',
+            hintText: 'Frank',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        const Text(
+          'This profile is for',
+          style: TextStyle(
+            fontSize: AppTypography.title,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final type in ProfileType.values) ...[
+          _OnboardingProfileTypeTile(
+            type: type,
+            selected: selectedType == type,
+            onTap: () => onTypeChanged(type),
+          ),
+          if (type != ProfileType.values.last)
+            const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
+    );
+  }
+}
+
+class _OnboardingProfileTypeTile extends StatelessWidget {
+  const _OnboardingProfileTypeTile({
+    required this.type,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ProfileType type;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        child: Ink(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: selected
+                ? colors.primaryContainer
+                : colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            border: Border.all(
+              color: selected ? colors.primary : colors.outlineVariant,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? colors.primary.withValues(alpha: 0.12)
+                      : colors.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _profileTypeIcon(type),
+                  color: selected ? colors.primary : colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  type.label,
+                  style: const TextStyle(
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Icon(
+                selected ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: selected ? colors.primary : colors.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TrackingSelectionPage extends StatelessWidget {
   const _TrackingSelectionPage({
     required this.preferences,
@@ -270,7 +447,6 @@ class _CustomizeTrackingPage extends StatelessWidget {
           : 'You can enable more tracking options later in Settings.',
       children: [
         if (!hasOptionalTracking) const _NothingSelectedCard(),
-
         if (preferences.trackWeight) ...[
           _FrequencyCard(
             icon: Icons.monitor_weight_outlined,
@@ -282,10 +458,8 @@ class _CustomizeTrackingPage extends StatelessWidget {
             },
           ),
         ],
-
         if (preferences.trackWeight && preferences.trackPhotos)
           const SizedBox(height: AppSpacing.md),
-
         if (preferences.trackPhotos) ...[
           _FrequencyCard(
             icon: Icons.photo_camera_outlined,
@@ -297,11 +471,9 @@ class _CustomizeTrackingPage extends StatelessWidget {
             },
           ),
         ],
-
         if ((preferences.trackWeight || preferences.trackPhotos) &&
             preferences.trackNotes)
           const SizedBox(height: AppSpacing.md),
-
         if (preferences.trackNotes)
           const _EnabledTrackingCard(
             icon: Icons.notes_outlined,
@@ -314,17 +486,32 @@ class _CustomizeTrackingPage extends StatelessWidget {
 }
 
 class _FinishSetupPage extends StatelessWidget {
-  const _FinishSetupPage({required this.preferences});
+  const _FinishSetupPage({
+    required this.profileNameController,
+    required this.profileType,
+    required this.preferences,
+  });
 
+  final TextEditingController profileNameController;
+  final ProfileType profileType;
   final TrackingPreferences preferences;
 
   @override
   Widget build(BuildContext context) {
+    final profileName = profileNameController.text.trim();
+
     return _OnboardingPageLayout(
       icon: Icons.check_circle_outline,
       title: 'You’re all set.',
-      subtitle: 'Your tracker is ready. You can change these choices anytime.',
+      subtitle:
+          'Your profile and tracker are ready. You can change these choices anytime.',
       children: [
+        _SummaryRow(
+          icon: _profileTypeIcon(profileType),
+          title: 'Profile',
+          value: profileName.isEmpty ? 'Not set' : profileName,
+        ),
+        const SizedBox(height: AppSpacing.md),
         const _SummaryRow(
           icon: Icons.medication_outlined,
           title: 'Protocols',
@@ -641,5 +828,15 @@ String _frequencyLabel(TrackingFrequency frequency) {
     TrackingFrequency.daily => 'Daily',
     TrackingFrequency.weekly => 'Weekly',
     TrackingFrequency.monthly => 'Monthly',
+  };
+}
+
+IconData _profileTypeIcon(ProfileType type) {
+  return switch (type) {
+    ProfileType.self => Icons.person,
+    ProfileType.familyMember => Icons.people,
+    ProfileType.child => Icons.child_care,
+    ProfileType.pet => Icons.pets,
+    ProfileType.other => Icons.account_circle,
   };
 }

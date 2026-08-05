@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'models/app_theme_mode.dart';
-import 'models/tracking_preferences.dart';
 import 'screens/main_screen.dart';
 import 'screens/onboarding_setup_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'services/notification_service.dart';
+import 'services/profile_service.dart';
 import 'services/settings_service.dart';
 
 class ProjectGhostApp extends StatefulWidget {
@@ -17,6 +17,7 @@ class ProjectGhostApp extends StatefulWidget {
 
 class _ProjectGhostAppState extends State<ProjectGhostApp> {
   final SettingsService _settingsService = SettingsService();
+  final ProfileService _profileService = ProfileService();
   final NotificationService _notificationService = NotificationService.instance;
 
   AppThemeMode _themeMode = AppThemeMode.system;
@@ -32,6 +33,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
     super.initState();
 
     _notificationProtocolId = _notificationService.pendingProtocolId;
+
     _notificationService.protocolNavigation.addListener(
       _handleNotificationNavigation,
     );
@@ -44,6 +46,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
     _notificationService.protocolNavigation.removeListener(
       _handleNotificationNavigation,
     );
+
     super.dispose();
   }
 
@@ -106,8 +109,21 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
     });
   }
 
-  Future<void> _completeOnboarding(TrackingPreferences preferences) async {
-    await _settingsService.saveTrackingPreferences(preferences);
+  Future<void> _completeOnboarding(OnboardingSetupResult result) async {
+    final activeProfile = await _profileService.getActiveProfile();
+
+    await _profileService.updateProfile(
+      activeProfile.copyWith(
+        name: result.profileName,
+        type: result.profileType,
+        updatedAt: DateTime.now(),
+      ),
+    );
+
+    await _profileService.setActiveProfile(activeProfile.id);
+
+    await _settingsService.saveTrackingPreferences(result.preferences);
+
     await _settingsService.saveOnboardingComplete(true);
 
     if (!mounted) {

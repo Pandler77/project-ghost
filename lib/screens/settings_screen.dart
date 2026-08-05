@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../models/app_theme_mode.dart';
 import '../models/display_preferences.dart';
 import '../models/tracking_preferences.dart';
+import '../services/app_data_service.dart';
 import '../services/notification_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
 import 'display_preferences_screen.dart';
+import 'premium_screen.dart';
 import 'tracking_preferences_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -25,6 +27,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsService _settingsService = SettingsService();
+
+  final AppDataService _dataService = AppDataService();
 
   TrackingPreferences _trackingPreferences = TrackingPreferences.defaults;
 
@@ -65,6 +69,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _displayPreferences = preferences;
       _isLoadingDisplayPreferences = false;
     });
+  }
+
+  Future<void> _openPremium() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PremiumScreen(dataService: _dataService),
+      ),
+    );
   }
 
   Future<void> _openTrackingPreferences() async {
@@ -181,14 +194,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [colors.primary, colors.primaryContainer],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.card),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  onTap: _openPremium,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.workspace_premium,
+                            size: 34,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ghost Premium',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: AppTypography.title,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Unlimited logging, Ghost Supply™, '
+                                'weight analytics, profiles, and more.',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: AppTypography.caption,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        const Icon(Icons.chevron_right, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.lg),
+
             const _SettingsSectionHeader(title: 'Appearance'),
+
             const SizedBox(height: AppSpacing.sm),
+
             Card(
               child: RadioGroup<AppThemeMode>(
                 groupValue: widget.themeMode,
@@ -223,9 +307,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+
             const SizedBox(height: AppSpacing.lg),
+
             const _SettingsSectionHeader(title: 'Preferences'),
+
             const SizedBox(height: AppSpacing.sm),
+
             Card(
               child: Column(
                 children: [
@@ -271,9 +359,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+
             const SizedBox(height: AppSpacing.lg),
+
             const _SettingsSectionHeader(title: 'Coming Soon'),
+
             const SizedBox(height: AppSpacing.sm),
+
             Card(
               child: Column(
                 children: [

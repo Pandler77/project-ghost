@@ -18,6 +18,7 @@ import 'premium_screen.dart';
 import 'protocols_screen.dart';
 import 'settings_screen.dart';
 import 'tools_screen.dart';
+import '../widgets/profile_avatar.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({
@@ -54,6 +55,7 @@ class _MainScreenState extends State<MainScreen> {
   Profile? _activeProfile;
 
   bool _isLoading = true;
+  bool _isSwitchingProfile = false;
   String? _loadError;
 
   @override
@@ -174,16 +176,18 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _switchProfile(Profile profile) async {
-    if (_activeProfile?.id == profile.id) {
+    if (_activeProfile?.id == profile.id || _isSwitchingProfile) {
       return;
     }
 
     setState(() {
-      _isLoading = true;
+      _isSwitchingProfile = true;
       _loadError = null;
     });
 
     try {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
       await _profileService.setActiveProfile(profile.id);
 
       final protocols = await _appDataService.getProtocols();
@@ -200,17 +204,23 @@ class _MainScreenState extends State<MainScreen> {
         _activeProfile = profile;
         _protocols = protocols;
         _dataRevision++;
-        _isLoading = false;
       });
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
     } catch (error) {
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _isLoading = false;
         _loadError = error.toString();
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSwitchingProfile = false;
+        });
+      }
     }
   }
 
@@ -264,7 +274,7 @@ class _MainScreenState extends State<MainScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    _ProfileAvatar(profile: profile, size: 42),
+                                    ProfileAvatar(profile: profile, radius: 21),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
@@ -389,6 +399,9 @@ class _MainScreenState extends State<MainScreen> {
     final profile = await _profileService.createProfile(
       name: result.name,
       type: result.type,
+      colorValue: result.colorValue,
+      iconCodePoint: result.iconCodePoint,
+      enabledModules: result.enabledModules,
     );
 
     await _profileService.setActiveProfile(profile.id);
@@ -631,10 +644,10 @@ class _MainScreenState extends State<MainScreen> {
 
     final screens = <Widget>[
       DashboardScreen(
+        profile: _activeProfile!,
         protocols: _protocols,
         onProtocolAdded: _addProtocol,
         dataService: _appDataService,
-        displayName: activeProfile.name,
         dataRevision: _dataRevision,
         homeLayout: _homeLayout,
         trackingPreferences: _trackingPreferences,
@@ -678,7 +691,15 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ],
       ),
-      body: IndexedStack(index: _selectedIndex, children: screens),
+      body: AnimatedOpacity(
+        opacity: _isSwitchingProfile ? 0.35 : 1,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        child: IgnorePointer(
+          ignoring: _isSwitchingProfile,
+          child: IndexedStack(index: _selectedIndex, children: screens),
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
@@ -733,7 +754,7 @@ class _ProfileSelectorButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ProfileAvatar(profile: profile, size: 30),
+              ProfileAvatar(profile: profile, radius: 15),
               const SizedBox(width: 8),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 150),
@@ -755,37 +776,6 @@ class _ProfileSelectorButton extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({required this.profile, required this.size});
-
-  final Profile profile;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    final icon = _defaultProfileIcon(profile.type);
-
-    final backgroundColor = profile.colorValue == null
-        ? colors.primaryContainer
-        : Color(profile.colorValue!);
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
-      child: Icon(
-        icon,
-        size: size * 0.56,
-        color: profile.colorValue == null
-            ? colors.onPrimaryContainer
-            : Colors.white,
       ),
     );
   }
@@ -814,14 +804,4 @@ class _GhostPremiumBadge extends StatelessWidget {
       ),
     );
   }
-}
-
-IconData _defaultProfileIcon(ProfileType type) {
-  return switch (type) {
-    ProfileType.self => Icons.person,
-    ProfileType.familyMember => Icons.people,
-    ProfileType.child => Icons.child_care,
-    ProfileType.pet => Icons.pets,
-    ProfileType.other => Icons.account_circle,
-  };
 }

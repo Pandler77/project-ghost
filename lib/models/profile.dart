@@ -1,3 +1,5 @@
+import 'profile_module.dart';
+
 enum ProfileType { self, familyMember, child, pet, other }
 
 extension ProfileTypeDetails on ProfileType {
@@ -40,9 +42,14 @@ class Profile {
     required this.type,
     this.iconCodePoint,
     this.colorValue,
+    this.avatarImagePath,
+    Set<ProfileModule>? enabledModules,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+       enabledModules = Set.unmodifiable(
+         enabledModules ?? ProfileModuleDetails.defaultModules,
+       ),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -53,8 +60,14 @@ class Profile {
   final ProfileType type;
   final int? iconCodePoint;
   final int? colorValue;
+  final String? avatarImagePath;
+  final Set<ProfileModule> enabledModules;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  bool hasModule(ProfileModule module) {
+    return enabledModules.contains(module);
+  }
 
   Profile copyWith({
     String? id,
@@ -62,6 +75,8 @@ class Profile {
     ProfileType? type,
     Object? iconCodePoint = _unset,
     Object? colorValue = _unset,
+    Object? avatarImagePath = _unset,
+    Object? enabledModules = _unset,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -75,6 +90,12 @@ class Profile {
       colorValue: identical(colorValue, _unset)
           ? this.colorValue
           : colorValue as int?,
+      avatarImagePath: identical(avatarImagePath, _unset)
+          ? this.avatarImagePath
+          : avatarImagePath as String?,
+      enabledModules: identical(enabledModules, _unset)
+          ? this.enabledModules
+          : enabledModules as Set<ProfileModule>,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
     );
@@ -87,6 +108,8 @@ class Profile {
       'type': type.storageValue,
       'icon_code_point': iconCodePoint,
       'color_value': colorValue,
+      'avatar_image_path': avatarImagePath,
+      'enabled_modules': ProfileModuleDetails.encode(enabledModules),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -99,6 +122,10 @@ class Profile {
       type: ProfileTypeDetails.fromStorageValue(map['type'] as String?),
       iconCodePoint: (map['icon_code_point'] as num?)?.toInt(),
       colorValue: (map['color_value'] as num?)?.toInt(),
+      avatarImagePath: map['avatar_image_path'] as String?,
+      enabledModules: ProfileModuleDetails.decode(
+        map['enabled_modules'] as String?,
+      ),
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );

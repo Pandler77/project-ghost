@@ -23,28 +23,30 @@ import 'add_protocol_screen.dart';
 import 'daily_timeline_screen.dart';
 import 'inventory_screen.dart';
 import 'weight_history_screen.dart';
+import '../models/profile.dart';
+import '../models/profile_module.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     required this.protocols,
     required this.onProtocolAdded,
     required this.dataService,
-    required this.displayName,
     required this.dataRevision,
     required this.homeLayout,
     required this.onDataChanged,
     required this.trackingPreferences,
+    required this.profile,
     super.key,
   });
 
   final List<Protocol> protocols;
   final Future<void> Function(Protocol protocol) onProtocolAdded;
   final AppDataService dataService;
-  final String displayName;
   final int dataRevision;
   final HomeLayout homeLayout;
   final VoidCallback onDataChanged;
   final TrackingPreferences trackingPreferences;
+  final Profile profile;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -346,7 +348,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required double? startingWeight,
   }) {
     if (!hasProtocols) {
-      return [EmptyTodayCard(onAddProtocol: _openAddProtocol)];
+      if (widget.profile.hasModule(ProfileModule.protocols)) {
+        return [EmptyTodayCard(onAddProtocol: _openAddProtocol)];
+      }
+
+      if (widget.profile.hasModule(ProfileModule.weight)) {
+        return [_EmptyWeightCard(onLogWeight: _openWeightDialog)];
+      }
+
+      return const [];
     }
 
     final sections = <Widget>[];
@@ -459,7 +469,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           children: [
             DashboardHeader(
-              name: widget.displayName,
               remainingDoses: remainingDoses,
               totalDoses: _doses.length,
             ),

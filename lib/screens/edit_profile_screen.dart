@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../models/profile.dart';
+import '../models/profile_module.dart';
+import '../services/profile_avatar_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/profile_avatar.dart';
+import 'profile_avatar_picker_screen.dart';
 
 enum EditProfileAction { saved, deleted }
 
@@ -27,10 +31,18 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  final ProfileAvatarService _avatarService = ProfileAvatarService();
+
   late final TextEditingController _nameController;
 
   late ProfileType _selectedType;
   late int? _selectedColorValue;
+  late int? _selectedAvatarId;
+  late String? _selectedAvatarImagePath;
+  late final Set<ProfileModule> _selectedModules;
+
+  bool _isSavingPhoto = false;
+  bool _didSave = false;
 
   static const List<int?> _profileColors = [
     null,
@@ -53,31 +65,221 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     _selectedType = widget.profile.type;
     _selectedColorValue = widget.profile.colorValue;
+    _selectedAvatarId = widget.profile.iconCodePoint;
+    _selectedAvatarImagePath = widget.profile.avatarImagePath;
+    _selectedModules = {...widget.profile.enabledModules};
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+
+    final pendingPath = _selectedAvatarImagePath;
+    final originalPath = widget.profile.avatarImagePath;
+
+    if (!_didSave &&
+        pendingPath != null &&
+        pendingPath.isNotEmpty &&
+        pendingPath != originalPath) {
+      _avatarService.deleteAvatar(pendingPath);
+    }
+
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _chooseBuiltInAvatar() async {
+    final selectedAvatarId = await Navigator.push<int?>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ProfileAvatarPickerScreen(selectedAvatarId: _selectedAvatarId),
+      ),
+    );
+
+    if (!mounted || selectedAvatarId == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedAvatarId = selectedAvatarId;
+      _selectedAvatarImagePath = null;
+    });
+  }
+
+  Future<void> _choosePhotoSource() async {
+    final action = await showModalBottomSheet<_PhotoAction>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const ListTile(
+                  title: Text(
+                    'Profile photo',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text('Choose a photo source.'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Choose from gallery'),
+                  onTap: () {
+                    Navigator.pop(sheetContext, _PhotoAction.gallery);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_camera_outlined),
+                  title: const Text('Take photo'),
+                  onTap: () {
+                    Navigator.pop(sheetContext, _PhotoAction.camera);
+                  },
+                ),
+                if (_selectedAvatarImagePath != null)
+                  ListTile(
+                    leading: Icon(
+                      Icons.delete_outline,
+                      color: Theme.of(sheetContext).colorScheme.error,
+                    ),
+                    title: Text(
+                      'Remove photo',
+                      style: TextStyle(
+                        color: Theme.of(sheetContext).colorScheme.error,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext, _PhotoAction.remove);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (action == null || !mounted) {
+      return;
+    }
+
+    if (action == _PhotoAction.remove) {
+      final currentPath = _selectedAvatarImagePath;
+      final originalPath = widget.profile.avatarImagePath;
+
+      if (currentPath != null &&
+          currentPath.isNotEmpty &&
+          currentPath != originalPath) {
+        await _avatarService.deleteAvatar(currentPath);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _selectedAvatarImagePath = null;
+      });
+
+      return;
+    }
+
+    setState(() {
+      _isSavingPhoto = true;
+    });
+
+    try {
+      final path = action == _PhotoAction.gallery
+          ? await _avatarService.pickFromGallery(profileId: widget.profile.id)
+          : await _avatarService.takePhoto(profileId: widget.profile.id);
+
+      if (!mounted || path == null) {
+        return;
+      }
+
+      final previousPendingPath = _selectedAvatarImagePath;
+      final originalPath = widget.profile.avatarImagePath;
+
+      if (previousPendingPath != null &&
+          previousPendingPath.isNotEmpty &&
+          previousPendingPath != originalPath &&
+          previousPendingPath != path) {
+        await _avatarService.deleteAvatar(previousPendingPath);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _selectedAvatarImagePath = path;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update profile photo: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingPhoto = false;
+        });
+      }
+    }
+  }
+
+  void _resetBuiltInAvatar() {
+    setState(() {
+      _selectedAvatarId = null;
+    });
+  }
+
+  Future<void> _save() async {
     final name = _nameController.text.trim();
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile name is required.')),
       );
+      return;
+    }
 
+    if (_selectedModules.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select at least one tracking module.')),
+      );
+      return;
+    }
+
+    final originalPhotoPath = widget.profile.avatarImagePath;
+    final updatedPhotoPath = _selectedAvatarImagePath;
+
+    if (originalPhotoPath != null &&
+        originalPhotoPath.isNotEmpty &&
+        originalPhotoPath != updatedPhotoPath) {
+      await _avatarService.deleteAvatar(originalPhotoPath);
+    }
+
+    if (!mounted) {
       return;
     }
 
     final updatedProfile = widget.profile.copyWith(
       name: name,
       type: _selectedType,
+      iconCodePoint: _selectedAvatarId,
       colorValue: _selectedColorValue,
+      avatarImagePath: updatedPhotoPath,
+      enabledModules: Set<ProfileModule>.from(_selectedModules),
       updatedAt: DateTime.now(),
     );
+
+    _didSave = true;
 
     Navigator.pop(
       context,
@@ -95,7 +297,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           content: Text('You cannot delete the only remaining profile.'),
         ),
       );
-
       return;
     }
 
@@ -106,7 +307,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           title: const Text('Delete profile?'),
           content: Text(
             'Deleting ${widget.profile.name} will permanently remove '
-            'its protocols, dose history, weight records, and inventory.',
+            'its protocols, dose history, weight records, inventory, '
+            'and profile photo.',
           ),
           actions: [
             TextButton(
@@ -134,6 +336,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
+    await _avatarService.deleteAvatar(widget.profile.avatarImagePath);
+
+    final pendingPath = _selectedAvatarImagePath;
+
+    if (pendingPath != null &&
+        pendingPath.isNotEmpty &&
+        pendingPath != widget.profile.avatarImagePath) {
+      await _avatarService.deleteAvatar(pendingPath);
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    _didSave = true;
+
     Navigator.pop(
       context,
       const EditProfileResult(action: EditProfileAction.deleted),
@@ -144,6 +362,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
+    final previewName = _nameController.text.trim().isEmpty
+        ? widget.profile.name
+        : _nameController.text.trim();
+
+    final previewProfile = widget.profile.copyWith(
+      name: previewName,
+      type: _selectedType,
+      iconCodePoint: _selectedAvatarId,
+      colorValue: _selectedColorValue,
+      avatarImagePath: _selectedAvatarImagePath,
+      enabledModules: Set<ProfileModule>.from(_selectedModules),
+      updatedAt: widget.profile.updatedAt,
+    );
+
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Profile')),
       body: SafeArea(
@@ -151,13 +383,69 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
             Center(
-              child: _ProfilePreview(
-                name: _nameController.text.trim().isEmpty
-                    ? widget.profile.name
-                    : _nameController.text.trim(),
-                type: _selectedType,
-                colorValue: _selectedColorValue,
+              child: Column(
+                children: [
+                  ProfileAvatar(
+                    profile: previewProfile,
+                    radius: 42,
+                    showBorder: true,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    previewName,
+                    style: const TextStyle(
+                      fontSize: AppTypography.title,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _selectedType.label,
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
+            ),
+
+            const SizedBox(height: AppSpacing.md),
+
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _isSavingPhoto ? null : _choosePhotoSource,
+                  icon: _isSavingPhoto
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_a_photo_outlined),
+                  label: Text(
+                    _selectedAvatarImagePath == null
+                        ? 'Choose Photo'
+                        : 'Change Photo',
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _chooseBuiltInAvatar,
+                  icon: const Icon(Icons.account_circle_outlined),
+                  label: Text(
+                    _selectedAvatarId == null ? 'Choose Icon' : 'Change Icon',
+                  ),
+                ),
+                if (_selectedAvatarId != null &&
+                    _selectedAvatarImagePath == null)
+                  TextButton(
+                    onPressed: _resetBuiltInAvatar,
+                    child: const Text('Reset Icon'),
+                  ),
+              ],
             ),
 
             const SizedBox(height: AppSpacing.lg),
@@ -242,10 +530,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             const SizedBox(height: AppSpacing.lg),
 
+            const Text(
+              'Tracking Modules',
+              style: TextStyle(
+                fontSize: AppTypography.title,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.xs),
+
+            Text(
+              'Choose which features this profile uses.',
+              style: TextStyle(
+                fontSize: AppTypography.caption,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.sm),
+
+            for (final module in ProfileModule.values)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _selectedModules.contains(module),
+                title: Text(module.label),
+                subtitle: Text(module.description),
+                controlAffinity: ListTileControlAffinity.leading,
+                onChanged: (selected) {
+                  setState(() {
+                    if (selected == true) {
+                      _selectedModules.add(module);
+                    } else {
+                      _selectedModules.remove(module);
+                    }
+                  });
+                },
+              ),
+
+            const SizedBox(height: AppSpacing.lg),
+
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _save,
+                onPressed: _isSavingPhoto ? null : _save,
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('Save Changes'),
               ),
@@ -256,7 +584,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: _delete,
+                onPressed: _isSavingPhoto ? null : _delete,
                 icon: const Icon(Icons.delete_outline),
                 label: Text(
                   widget.canDelete
@@ -280,60 +608,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 }
 
-class _ProfilePreview extends StatelessWidget {
-  const _ProfilePreview({
-    required this.name,
-    required this.type,
-    required this.colorValue,
-  });
-
-  final String name;
-  final ProfileType type;
-  final int? colorValue;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    final backgroundColor = colorValue == null
-        ? colors.primaryContainer
-        : Color(colorValue!);
-
-    final foregroundColor = colorValue == null
-        ? colors.onPrimaryContainer
-        : Colors.white;
-
-    return Column(
-      children: [
-        Container(
-          width: 84,
-          height: 84,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(_profileTypeIcon(type), size: 42, color: foregroundColor),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          name,
-          style: const TextStyle(
-            fontSize: AppTypography.title,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          type.label,
-          style: TextStyle(
-            fontSize: AppTypography.caption,
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
+enum _PhotoAction { gallery, camera, remove }
 
 class _ProfileTypeTile extends StatelessWidget {
   const _ProfileTypeTile({

@@ -7,7 +7,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String databaseName = 'ghost.db';
-  static const int databaseVersion = 11;
+  static const int databaseVersion = 13;
 
   static const String profilesTable = 'profiles';
   static const String protocolsTable = 'protocols';
@@ -112,6 +112,21 @@ class AppDatabase {
 
     if (oldVersion < 11) {
       await _addProtocolDoseColumns(database);
+    }
+
+    if (oldVersion < 12) {
+      await database.execute('''
+    ALTER TABLE $profilesTable
+    ADD COLUMN enabled_modules TEXT NOT NULL
+    DEFAULT 'protocols,weight,inventory'
+  ''');
+    }
+
+    if (oldVersion < 13) {
+      await database.execute('''
+    ALTER TABLE $profilesTable
+    ADD COLUMN avatar_image_path TEXT
+  ''');
     }
   }
 
@@ -239,6 +254,9 @@ class AppDatabase {
         type TEXT NOT NULL,
         icon_code_point INTEGER,
         color_value INTEGER,
+        avatar_image_path TEXT,
+        enabled_modules TEXT NOT NULL
+        DEFAULT 'protocols,weight,inventory',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -254,8 +272,10 @@ class AppDatabase {
       'type': 'self',
       'icon_code_point': null,
       'color_value': null,
+      'enabled_modules': 'protocols,weight,inventory',
       'created_at': now,
       'updated_at': now,
+      'avatar_image_path': null,
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 

@@ -3,6 +3,7 @@ import '../core/repository/profile_repository.dart';
 import '../models/profile.dart';
 import 'entitlement_service.dart';
 import 'settings_service.dart';
+import '../models/profile_module.dart';
 
 class ProfileService {
   ProfileService({
@@ -71,6 +72,7 @@ class ProfileService {
     required ProfileType type,
     int? iconCodePoint,
     int? colorValue,
+    Set<ProfileModule>? enabledModules,
   }) async {
     final trimmedName = name.trim();
 
@@ -89,6 +91,7 @@ class ProfileService {
       type: type,
       iconCodePoint: iconCodePoint,
       colorValue: colorValue,
+      enabledModules: enabledModules ?? ProfileModuleDetails.defaultModules,
     );
 
     await _repository.saveProfile(profile);

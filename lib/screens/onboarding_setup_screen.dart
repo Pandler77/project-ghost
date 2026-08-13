@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/measurement_system.dart';
 import '../models/profile.dart';
 import '../models/tracking_preferences.dart';
 import '../theme/app_theme.dart';
@@ -9,17 +10,26 @@ class OnboardingSetupResult {
     required this.profileName,
     required this.profileType,
     required this.preferences,
+    required this.heightCm,
+    required this.measurementSystem,
   });
 
   final String profileName;
   final ProfileType profileType;
   final TrackingPreferences preferences;
+  final double heightCm;
+  final MeasurementSystem measurementSystem;
 }
 
 class OnboardingSetupScreen extends StatefulWidget {
-  const OnboardingSetupScreen({required this.onComplete, super.key});
+  const OnboardingSetupScreen({
+    required this.onComplete,
+    required this.onBackToWelcome,
+    super.key,
+  });
 
   final Future<void> Function(OnboardingSetupResult result) onComplete;
+  final VoidCallback onBackToWelcome;
 
   @override
   State<OnboardingSetupScreen> createState() => _OnboardingSetupScreenState();
@@ -29,9 +39,13 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
   final PageController _pageController = PageController();
 
   late final TextEditingController _profileNameController;
+  late final TextEditingController _heightFeetController;
+  late final TextEditingController _heightInchesController;
+  late final TextEditingController _heightCmController;
 
   TrackingPreferences _preferences = TrackingPreferences.defaults;
   ProfileType _profileType = ProfileType.self;
+  MeasurementSystem _measurementSystem = MeasurementSystem.imperial;
 
   int _currentPage = 0;
   bool _isSaving = false;
@@ -41,22 +55,59 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
   @override
   void initState() {
     super.initState();
+
     _profileNameController = TextEditingController();
+    _heightFeetController = TextEditingController();
+    _heightInchesController = TextEditingController();
+    _heightCmController = TextEditingController();
   }
 
   @override
   void dispose() {
     _profileNameController.dispose();
+    _heightFeetController.dispose();
+    _heightInchesController.dispose();
+    _heightCmController.dispose();
     _pageController.dispose();
     super.dispose();
   }
 
+  double? get _heightCm {
+    if (_measurementSystem == MeasurementSystem.metric) {
+      final value = double.tryParse(_heightCmController.text.trim());
+
+      if (value == null || value <= 0) {
+        return null;
+      }
+
+      return value;
+    }
+
+    final feet = int.tryParse(_heightFeetController.text.trim());
+    final inches = int.tryParse(_heightInchesController.text.trim()) ?? 0;
+
+    if (feet == null || feet <= 0 || inches < 0 || inches >= 12) {
+      return null;
+    }
+
+    return ((feet * 12) + inches) * 2.54;
+  }
+
   Future<void> _nextPage() async {
-    if (_currentPage == 0 && _profileNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile name is required.')),
-      );
-      return;
+    if (_currentPage == 0) {
+      if (_profileNameController.text.trim().isEmpty) {
+        _showMessage('Profile name is required.');
+        return;
+      }
+
+      if (_heightCm == null) {
+        _showMessage(
+          _measurementSystem == MeasurementSystem.imperial
+              ? 'Enter a valid height in feet and inches.'
+              : 'Enter a valid height in centimeters.',
+        );
+        return;
+      }
     }
 
     if (_currentPage == _pageCount - 1) {
@@ -72,7 +123,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
 
   Future<void> _previousPage() async {
     if (_currentPage == 0) {
-      Navigator.pop(context);
+      widget.onBackToWelcome();
       return;
     }
 
@@ -88,8 +139,9 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
     }
 
     final profileName = _profileNameController.text.trim();
+    final heightCm = _heightCm;
 
-    if (profileName.isEmpty) {
+    if (profileName.isEmpty || heightCm == null) {
       return;
     }
 
@@ -103,6 +155,8 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
           profileName: profileName,
           profileType: _profileType,
           preferences: _preferences,
+          heightCm: heightCm,
+          measurementSystem: _measurementSystem,
         ),
       );
     } finally {
@@ -114,14 +168,49 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
     }
   }
 
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   void _updatePreferences(TrackingPreferences preferences) {
     setState(() {
       _preferences = preferences;
     });
   }
 
+  void _setMeasurementSystem(MeasurementSystem system) {
+    if (_measurementSystem == system) {
+      return;
+    }
+
+    final currentHeightCm = _heightCm;
+
+    setState(() {
+      _measurementSystem = system;
+
+      if (currentHeightCm == null) {
+        return;
+      }
+
+      if (system == MeasurementSystem.metric) {
+        _heightCmController.text = currentHeightCm.toStringAsFixed(1);
+      } else {
+        final totalInches = currentHeightCm / 2.54;
+        final feet = totalInches ~/ 12;
+        final inches = (totalInches - (feet * 12)).round().clamp(0, 11);
+
+        _heightFeetController.text = feet.toString();
+        _heightInchesController.text = inches.toString();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -131,6 +220,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
               pageCount: _pageCount,
               onBack: _previousPage,
             ),
+
             Expanded(
               child: PageView(
                 controller: _pageController,
@@ -149,6 +239,11 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
                         _profileType = type;
                       });
                     },
+                    measurementSystem: _measurementSystem,
+                    onMeasurementSystemChanged: _setMeasurementSystem,
+                    heightFeetController: _heightFeetController,
+                    heightInchesController: _heightInchesController,
+                    heightCmController: _heightCmController,
                   ),
                   _TrackingSelectionPage(
                     preferences: _preferences,
@@ -162,32 +257,50 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
                     profileNameController: _profileNameController,
                     profileType: _profileType,
                     preferences: _preferences,
+                    measurementSystem: _measurementSystem,
+                    heightCm: _heightCm,
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
+
+            Container(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.lg,
+              ),
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                border: Border(
+                  top: BorderSide(
+                    color: colors.outlineVariant.withValues(alpha: 0.35),
+                  ),
+                ),
+              ),
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: _isSaving ? null : _nextPage,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(
-                            _currentPage == _pageCount - 1
-                                ? 'Start Tracking'
-                                : 'Continue',
-                          ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
                   ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          _currentPage == _pageCount - 1
+                              ? 'Start Tracking'
+                              : 'Continue',
+                          style: const TextStyle(
+                            fontSize: AppTypography.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -211,7 +324,8 @@ class _OnboardingHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
+    final progress = (currentPage + 1) / pageCount;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -222,27 +336,51 @@ class _OnboardingHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back)),
-          const Spacer(),
-          Row(
-            children: [
-              for (var index = 0; index < pageCount; index++)
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: index == currentPage ? 18 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: index == currentPage
-                        ? colorScheme.primary
-                        : colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
+          IconButton(
+            onPressed: onBack,
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
+
+          const SizedBox(width: AppSpacing.sm),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'SETUP',
+                      style: TextStyle(
+                        fontSize: AppTypography.micro,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.9,
+                        color: colors.primary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${currentPage + 1} / $pageCount',
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: colors.primary.withValues(alpha: 0.10),
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
-          const Spacer(),
-          const SizedBox(width: 48),
         ],
       ),
     );
@@ -254,119 +392,136 @@ class _ProfileSetupPage extends StatelessWidget {
     required this.nameController,
     required this.selectedType,
     required this.onTypeChanged,
+    required this.measurementSystem,
+    required this.onMeasurementSystemChanged,
+    required this.heightFeetController,
+    required this.heightInchesController,
+    required this.heightCmController,
   });
 
   final TextEditingController nameController;
   final ProfileType selectedType;
   final ValueChanged<ProfileType> onTypeChanged;
 
+  final MeasurementSystem measurementSystem;
+  final ValueChanged<MeasurementSystem> onMeasurementSystemChanged;
+
+  final TextEditingController heightFeetController;
+  final TextEditingController heightInchesController;
+  final TextEditingController heightCmController;
+
   @override
   Widget build(BuildContext context) {
     return _OnboardingPageLayout(
-      icon: Icons.person_add_alt_1_outlined,
-      title: 'Let’s create your first profile.',
+      eyebrow: 'YOUR PROFILE',
+      icon: Icons.person_outline_rounded,
+      title: 'Set up your profile.',
       subtitle:
-          'Profiles keep protocols, weight, inventory, and history completely separate.',
+          'Ghost uses your profile to keep protocols, progress, inventory, and history organized.',
       children: [
+        const _FieldLabel(
+          title: 'Profile name',
+          subtitle: 'This is how Ghost will address this profile.',
+        ),
+        const SizedBox(height: AppSpacing.sm),
+
         TextField(
           controller: nameController,
           autofocus: true,
           textCapitalization: TextCapitalization.words,
-          textInputAction: TextInputAction.done,
+          textInputAction: TextInputAction.next,
           decoration: const InputDecoration(
-            labelText: 'Profile name',
-            hintText: 'Frank',
-            border: OutlineInputBorder(),
+            hintText: 'Name',
+            prefixIcon: Icon(Icons.person_outline_rounded),
           ),
         ),
+
         const SizedBox(height: AppSpacing.lg),
-        const Text(
-          'This profile is for',
-          style: TextStyle(
-            fontSize: AppTypography.title,
-            fontWeight: FontWeight.bold,
-          ),
+
+        const _FieldLabel(
+          title: 'Profile type',
+          subtitle: 'Choose who this profile belongs to.',
         ),
         const SizedBox(height: AppSpacing.sm),
-        for (final type in ProfileType.values) ...[
-          _OnboardingProfileTypeTile(
-            type: type,
-            selected: selectedType == type,
-            onTap: () => onTypeChanged(type),
-          ),
-          if (type != ProfileType.values.last)
-            const SizedBox(height: AppSpacing.sm),
-        ],
-      ],
-    );
-  }
-}
 
-class _OnboardingProfileTypeTile extends StatelessWidget {
-  const _OnboardingProfileTypeTile({
-    required this.type,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final ProfileType type;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.button),
-        child: Ink(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: selected
-                ? colors.primaryContainer
-                : colors.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(AppRadius.button),
-            border: Border.all(
-              color: selected ? colors.primary : colors.outlineVariant,
-            ),
-          ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? colors.primary.withValues(alpha: 0.12)
-                      : colors.surfaceContainerHighest,
-                  shape: BoxShape.circle,
+              for (
+                var index = 0;
+                index < ProfileType.values.length;
+                index++
+              ) ...[
+                _ProfileTypeChip(
+                  type: ProfileType.values[index],
+                  selected: selectedType == ProfileType.values[index],
+                  onTap: () => onTypeChanged(ProfileType.values[index]),
                 ),
-                child: Icon(
-                  _profileTypeIcon(type),
-                  color: selected ? colors.primary : colors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Text(
-                  type.label,
-                  style: const TextStyle(
-                    fontSize: AppTypography.body,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Icon(
-                selected ? Icons.check_circle : Icons.radio_button_unchecked,
-                color: selected ? colors.primary : colors.onSurfaceVariant,
-              ),
+                if (index < ProfileType.values.length - 1)
+                  const SizedBox(width: AppSpacing.sm),
+              ],
             ],
           ),
         ),
-      ),
+
+        const SizedBox(height: AppSpacing.lg),
+
+        const _FieldLabel(
+          title: 'Height',
+          subtitle:
+              'Used for BMI and future body-composition insights. Stored internally in centimeters.',
+        ),
+        const SizedBox(height: AppSpacing.sm),
+
+        _MeasurementToggle(
+          value: measurementSystem,
+          onChanged: onMeasurementSystemChanged,
+        ),
+
+        const SizedBox(height: AppSpacing.md),
+
+        if (measurementSystem == MeasurementSystem.imperial)
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: heightFeetController,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Feet',
+                    hintText: '6',
+                    suffixText: 'ft',
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: TextField(
+                  controller: heightInchesController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Inches',
+                    hintText: '0',
+                    suffixText: 'in',
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          TextField(
+            controller: heightCmController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Height',
+              hintText: '180',
+              suffixText: 'cm',
+            ),
+          ),
+      ],
     );
   }
 }
@@ -383,18 +538,22 @@ class _TrackingSelectionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _OnboardingPageLayout(
-      icon: Icons.tune_outlined,
-      title: 'Let’s personalize your tracker.',
-      subtitle: 'Choose what you want Ghost to keep track of.',
+      eyebrow: 'TRACKING',
+      icon: Icons.tune_rounded,
+      title: 'Choose what matters.',
+      subtitle:
+          'Protocols are always available. Turn on the additional tracking you want to use.',
       children: [
         const _LockedTrackingTile(
           icon: Icons.medication_outlined,
           title: 'Protocols',
+          subtitle: 'Schedules, doses, cycles, reminders, and history.',
         ),
         const SizedBox(height: AppSpacing.sm),
         _TrackingSwitchTile(
           icon: Icons.monitor_weight_outlined,
           title: 'Weight',
+          subtitle: 'Track weight history, trends, and BMI.',
           value: preferences.trackWeight,
           onChanged: (value) {
             onChanged(preferences.copyWith(trackWeight: value));
@@ -404,6 +563,7 @@ class _TrackingSelectionPage extends StatelessWidget {
         _TrackingSwitchTile(
           icon: Icons.photo_camera_outlined,
           title: 'Progress Photos',
+          subtitle: 'Build visual progress sessions over time.',
           value: preferences.trackPhotos,
           onChanged: (value) {
             onChanged(preferences.copyWith(trackPhotos: value));
@@ -413,6 +573,7 @@ class _TrackingSelectionPage extends StatelessWidget {
         _TrackingSwitchTile(
           icon: Icons.notes_outlined,
           title: 'Notes & Symptoms',
+          subtitle: 'Log symptoms, notes, and protocol-related observations.',
           value: preferences.trackNotes,
           onChanged: (value) {
             onChanged(preferences.copyWith(trackNotes: value));
@@ -440,14 +601,16 @@ class _CustomizeTrackingPage extends StatelessWidget {
         preferences.trackNotes;
 
     return _OnboardingPageLayout(
-      icon: Icons.settings_suggest_outlined,
-      title: 'Customize your routine.',
+      eyebrow: 'ROUTINE',
+      icon: Icons.calendar_month_outlined,
+      title: 'Build your routine.',
       subtitle: hasOptionalTracking
-          ? 'Choose how often you want to check in.'
-          : 'You can enable more tracking options later in Settings.',
+          ? 'Set a simple check-in cadence. You can change it later.'
+          : 'Protocols are ready. Additional tracking can be enabled later in Settings.',
       children: [
         if (!hasOptionalTracking) const _NothingSelectedCard(),
-        if (preferences.trackWeight) ...[
+
+        if (preferences.trackWeight)
           _FrequencyCard(
             icon: Icons.monitor_weight_outlined,
             title: 'Weight',
@@ -457,28 +620,30 @@ class _CustomizeTrackingPage extends StatelessWidget {
               onChanged(preferences.copyWith(weightFrequency: frequency));
             },
           ),
-        ],
+
         if (preferences.trackWeight && preferences.trackPhotos)
           const SizedBox(height: AppSpacing.md),
-        if (preferences.trackPhotos) ...[
+
+        if (preferences.trackPhotos)
           _FrequencyCard(
             icon: Icons.photo_camera_outlined,
             title: 'Progress Photos',
-            subtitle: 'How often do you want new photos?',
+            subtitle: 'How often do you want a new progress session?',
             value: preferences.photoFrequency,
             onChanged: (frequency) {
               onChanged(preferences.copyWith(photoFrequency: frequency));
             },
           ),
-        ],
+
         if ((preferences.trackWeight || preferences.trackPhotos) &&
             preferences.trackNotes)
           const SizedBox(height: AppSpacing.md),
+
         if (preferences.trackNotes)
           const _EnabledTrackingCard(
             icon: Icons.notes_outlined,
             title: 'Notes & Symptoms',
-            subtitle: 'Add notes whenever you need them.',
+            subtitle: 'Log these whenever you need them.',
           ),
       ],
     );
@@ -490,54 +655,69 @@ class _FinishSetupPage extends StatelessWidget {
     required this.profileNameController,
     required this.profileType,
     required this.preferences,
+    required this.measurementSystem,
+    required this.heightCm,
   });
 
   final TextEditingController profileNameController;
   final ProfileType profileType;
   final TrackingPreferences preferences;
+  final MeasurementSystem measurementSystem;
+  final double? heightCm;
 
   @override
   Widget build(BuildContext context) {
     final profileName = profileNameController.text.trim();
 
     return _OnboardingPageLayout(
-      icon: Icons.check_circle_outline,
-      title: 'You’re all set.',
+      eyebrow: 'READY',
+      icon: Icons.check_rounded,
+      title: 'Ghost is ready.',
       subtitle:
-          'Your profile and tracker are ready. You can change these choices anytime.',
+          'Review your setup. Everything here can be changed later from Settings.',
       children: [
-        _SummaryRow(
-          icon: _profileTypeIcon(profileType),
-          title: 'Profile',
-          value: profileName.isEmpty ? 'Not set' : profileName,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        const _SummaryRow(
-          icon: Icons.medication_outlined,
-          title: 'Protocols',
-          value: 'Enabled',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _SummaryRow(
-          icon: Icons.monitor_weight_outlined,
-          title: 'Weight',
-          value: preferences.trackWeight
-              ? _frequencyLabel(preferences.weightFrequency)
-              : 'Off',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _SummaryRow(
-          icon: Icons.photo_camera_outlined,
-          title: 'Progress Photos',
-          value: preferences.trackPhotos
-              ? _frequencyLabel(preferences.photoFrequency)
-              : 'Off',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _SummaryRow(
-          icon: Icons.notes_outlined,
-          title: 'Notes & Symptoms',
-          value: preferences.trackNotes ? 'Enabled' : 'Off',
+        _SummaryCard(
+          children: [
+            _SummaryRow(
+              icon: _profileTypeIcon(profileType),
+              title: 'Profile',
+              value: profileName.isEmpty ? 'Not set' : profileName,
+            ),
+            const _SummaryDivider(),
+            _SummaryRow(
+              icon: Icons.height_rounded,
+              title: 'Height',
+              value: _heightLabel(heightCm, measurementSystem),
+            ),
+            const _SummaryDivider(),
+            const _SummaryRow(
+              icon: Icons.medication_outlined,
+              title: 'Protocols',
+              value: 'Enabled',
+            ),
+            const _SummaryDivider(),
+            _SummaryRow(
+              icon: Icons.monitor_weight_outlined,
+              title: 'Weight',
+              value: preferences.trackWeight
+                  ? _frequencyLabel(preferences.weightFrequency)
+                  : 'Off',
+            ),
+            const _SummaryDivider(),
+            _SummaryRow(
+              icon: Icons.photo_camera_outlined,
+              title: 'Progress Photos',
+              value: preferences.trackPhotos
+                  ? _frequencyLabel(preferences.photoFrequency)
+                  : 'Off',
+            ),
+            const _SummaryDivider(),
+            _SummaryRow(
+              icon: Icons.notes_outlined,
+              title: 'Notes & Symptoms',
+              value: preferences.trackNotes ? 'Enabled' : 'Off',
+            ),
+          ],
         ),
       ],
     );
@@ -546,12 +726,14 @@ class _FinishSetupPage extends StatelessWidget {
 
 class _OnboardingPageLayout extends StatelessWidget {
   const _OnboardingPageLayout({
+    required this.eyebrow,
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.children,
   });
 
+  final String eyebrow;
   final IconData icon;
   final String title;
   final String subtitle;
@@ -559,45 +741,73 @@ class _OnboardingPageLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.lg,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 30, color: colorScheme.onPrimaryContainer),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.09),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Icon(icon, size: AppIcon.lg, color: colors.primary),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                eyebrow,
+                style: TextStyle(
+                  fontSize: AppTypography.micro,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
+                  color: colors.primary,
+                ),
+              ),
+            ],
           ),
+
           const SizedBox(height: AppSpacing.lg),
+
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.bold,
-              height: 1.15,
+            style: TextStyle(
+              fontSize: 28,
+              height: 1.10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.65,
+              color: colors.onSurface,
             ),
           ),
+
           const SizedBox(height: AppSpacing.sm),
+
           Text(
             subtitle,
             style: TextStyle(
               fontSize: AppTypography.body,
-              height: 1.4,
-              color: colorScheme.onSurfaceVariant,
+              height: 1.5,
+              color: colors.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
+
+          const SizedBox(height: 26),
+
           ...children,
         ],
       ),
@@ -605,22 +815,123 @@ class _OnboardingPageLayout extends StatelessWidget {
   }
 }
 
-class _LockedTrackingTile extends StatelessWidget {
-  const _LockedTrackingTile({required this.icon, required this.title});
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel({required this.title, required this.subtitle});
 
-  final IconData icon;
   final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    return Card(
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: Icon(Icons.check_circle, color: colorScheme.primary),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: AppTypography.body,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            height: 1.35,
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MeasurementToggle extends StatelessWidget {
+  const _MeasurementToggle({required this.value, required this.onChanged});
+
+  final MeasurementSystem value;
+  final ValueChanged<MeasurementSystem> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<MeasurementSystem>(
+      segments: const [
+        ButtonSegment(
+          value: MeasurementSystem.imperial,
+          label: Text('Imperial'),
+        ),
+        ButtonSegment(value: MeasurementSystem.metric, label: Text('Metric')),
+      ],
+      selected: {value},
+      onSelectionChanged: (selection) {
+        onChanged(selection.first);
+      },
+    );
+  }
+}
+
+class _ProfileTypeChip extends StatelessWidget {
+  const _ProfileTypeChip({
+    required this.type,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ProfileType type;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return ChoiceChip(
+      avatar: Icon(
+        _profileTypeIcon(type),
+        size: 17,
+        color: selected ? colors.primary : colors.onSurfaceVariant,
       ),
+      label: Text(type.label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      side: BorderSide(
+        color: selected
+            ? colors.primary.withValues(alpha: 0.65)
+            : colors.outlineVariant,
+      ),
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.w700,
+        color: selected ? colors.primary : colors.onSurface,
+      ),
+    );
+  }
+}
+
+class _LockedTrackingTile extends StatelessWidget {
+  const _LockedTrackingTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return _TrackingTileShell(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      trailing: Icon(Icons.check_circle_rounded, color: colors.primary),
+      emphasized: true,
     );
   }
 }
@@ -629,23 +940,110 @@ class _TrackingSwitchTile extends StatelessWidget {
   const _TrackingSwitchTile({
     required this.icon,
     required this.title,
+    required this.subtitle,
     required this.value,
     required this.onChanged,
   });
 
   final IconData icon;
   final String title;
+  final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: SwitchListTile(
-        secondary: Icon(icon),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        value: value,
-        onChanged: onChanged,
+    return _TrackingTileShell(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      emphasized: value,
+      trailing: Switch(value: value, onChanged: onChanged),
+      onTap: () => onChanged(!value),
+    );
+  }
+}
+
+class _TrackingTileShell extends StatelessWidget {
+  const _TrackingTileShell({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    this.onTap,
+    this.emphasized = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+  final VoidCallback? onTap;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Ink(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: emphasized
+                ? colors.primary.withValues(alpha: 0.07)
+                : Theme.of(context).cardTheme.color ?? colors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(
+              color: emphasized
+                  ? colors.primary.withValues(alpha: 0.28)
+                  : colors.outlineVariant.withValues(alpha: 0.60),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.09),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: Icon(icon, size: AppIcon.md, color: colors.primary),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: AppTypography.body,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        height: 1.35,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              trailing,
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -668,36 +1066,61 @@ class _FrequencyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: AppTypography.title,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              subtitle,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _FrequencySelector(value: value, onChanged: onChanged),
-          ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color ?? colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.60),
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.09),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: Icon(icon, size: AppIcon.sm, color: colors.primary),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: AppTypography.body,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _FrequencySelector(value: value, onChanged: onChanged),
+        ],
       ),
     );
   }
@@ -716,15 +1139,14 @@ class _EnabledTrackingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    return Card(
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle),
-        trailing: Icon(Icons.check_circle, color: colorScheme.primary),
-      ),
+    return _TrackingTileShell(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      emphasized: true,
+      trailing: Icon(Icons.check_circle_rounded, color: colors.primary),
     );
   }
 }
@@ -734,22 +1156,32 @@ class _NothingSelectedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: colorScheme.primary),
-            const SizedBox(width: AppSpacing.md),
-            const Expanded(
-              child: Text(
-                'Protocols will still be available. You can turn on weight, photos, or notes later.',
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, color: colors.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              'Protocols will still be available. Weight, photos, and notes can be enabled later in Settings.',
+              style: TextStyle(
+                fontSize: AppTypography.caption,
+                height: 1.4,
+                color: colors.onSurfaceVariant,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -763,17 +1195,55 @@ class _FrequencySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<TrackingFrequency>(
-      segments: const [
-        ButtonSegment(value: TrackingFrequency.daily, label: Text('Daily')),
-        ButtonSegment(value: TrackingFrequency.weekly, label: Text('Weekly')),
-        ButtonSegment(value: TrackingFrequency.monthly, label: Text('Monthly')),
-      ],
-      selected: {value},
-      onSelectionChanged: (selection) {
-        onChanged(selection.first);
-      },
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<TrackingFrequency>(
+        segments: const [
+          ButtonSegment(value: TrackingFrequency.daily, label: Text('Daily')),
+          ButtonSegment(value: TrackingFrequency.weekly, label: Text('Weekly')),
+          ButtonSegment(
+            value: TrackingFrequency.monthly,
+            label: Text('Monthly'),
+          ),
+        ],
+        selected: {value},
+        onSelectionChanged: (selection) {
+          onChanged(selection.first);
+        },
+      ),
     );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color ?? colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.60),
+        ),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _SummaryDivider extends StatelessWidget {
+  const _SummaryDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 1, indent: 58);
   }
 }
 
@@ -790,35 +1260,43 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    return Row(
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            shape: BoxShape.circle,
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 13,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: 0.09),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Icon(icon, size: AppIcon.sm, color: colors.primary),
           ),
-          child: Icon(icon, size: 21, color: colorScheme.onPrimaryContainer),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: colorScheme.primary,
+          Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              fontWeight: FontWeight.w800,
+              color: colors.primary,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -831,12 +1309,28 @@ String _frequencyLabel(TrackingFrequency frequency) {
   };
 }
 
+String _heightLabel(double? heightCm, MeasurementSystem measurementSystem) {
+  if (heightCm == null) {
+    return 'Not set';
+  }
+
+  if (measurementSystem == MeasurementSystem.metric) {
+    return '${heightCm.toStringAsFixed(1)} cm';
+  }
+
+  final totalInches = heightCm / 2.54;
+  final feet = totalInches ~/ 12;
+  final inches = (totalInches - (feet * 12)).round();
+
+  return '$feet ft $inches in';
+}
+
 IconData _profileTypeIcon(ProfileType type) {
   return switch (type) {
-    ProfileType.self => Icons.person,
-    ProfileType.familyMember => Icons.people,
-    ProfileType.child => Icons.child_care,
-    ProfileType.pet => Icons.pets,
-    ProfileType.other => Icons.account_circle,
+    ProfileType.self => Icons.person_outline_rounded,
+    ProfileType.familyMember => Icons.people_outline_rounded,
+    ProfileType.child => Icons.child_care_outlined,
+    ProfileType.pet => Icons.pets_outlined,
+    ProfileType.other => Icons.account_circle_outlined,
   };
 }

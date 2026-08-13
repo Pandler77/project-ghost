@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 import '../models/profile.dart';
 import '../models/profile_module.dart';
 import '../theme/app_theme.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_avatar_picker_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import '../widgets/app_color_picker.dart';
 
 class CreateProfileScreen extends StatefulWidget {
   const CreateProfileScreen({super.key});
@@ -19,23 +24,13 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
   ProfileType _selectedType = ProfileType.self;
   int? _selectedColorValue;
   int? _selectedAvatarId;
+  String? _avatarImagePath;
+
+  final ImagePicker _imagePicker = ImagePicker();
 
   final Set<ProfileModule> _selectedModules = {
     ...ProfileModuleDetails.defaultModules,
   };
-
-  static const List<int?> _profileColors = [
-    null,
-    0xFF6750A4,
-    0xFF3F51B5,
-    0xFF1976D2,
-    0xFF00897B,
-    0xFF2E7D32,
-    0xFFF57C00,
-    0xFFC62828,
-    0xFFAD1457,
-    0xFF6D4C41,
-  ];
 
   @override
   void initState() {
@@ -64,6 +59,108 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
 
     setState(() {
       _selectedAvatarId = selectedAvatarId;
+    });
+  }
+
+  Future<void> _chooseProfilePhoto() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text('Take Photo'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _pickProfilePhoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _pickProfilePhoto(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.account_circle_outlined),
+                title: const Text('Choose Avatar'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _chooseAvatar();
+                },
+              ),
+              if (_avatarImagePath != null || _selectedAvatarId != null)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline),
+                  title: const Text('Remove Photo / Avatar'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+
+                    setState(() {
+                      _avatarImagePath = null;
+                      _selectedAvatarId = null;
+                    });
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickProfilePhoto(ImageSource source) async {
+    final pickedImage = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 90,
+    );
+
+    if (pickedImage == null) {
+      return;
+    }
+
+    final sourceFile = File(pickedImage.path);
+
+    if (!await sourceFile.exists()) {
+      return;
+    }
+
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+
+    final profilePhotoDirectory = Directory(
+      path.join(documentsDirectory.path, 'profile_photos'),
+    );
+
+    if (!await profilePhotoDirectory.exists()) {
+      await profilePhotoDirectory.create(recursive: true);
+    }
+
+    final extension = path.extension(pickedImage.path).isEmpty
+        ? '.jpg'
+        : path.extension(pickedImage.path);
+
+    final fileName =
+        'profile_${DateTime.now().microsecondsSinceEpoch}$extension';
+
+    final savedFile = await sourceFile.copy(
+      path.join(profilePhotoDirectory.path, fileName),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _avatarImagePath = savedFile.path;
+
+      // A real photo overrides the preset avatar.
+      _selectedAvatarId = null;
     });
   }
 
@@ -97,6 +194,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
         type: _selectedType,
         colorValue: _selectedColorValue,
         iconCodePoint: _selectedAvatarId,
+        avatarImagePath: _avatarImagePath,
         enabledModules: Set<ProfileModule>.from(_selectedModules),
       ),
     );
@@ -115,6 +213,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
       type: _selectedType,
       iconCodePoint: _selectedAvatarId,
       colorValue: _selectedColorValue,
+      avatarImagePath: _avatarImagePath,
       enabledModules: _selectedModules,
     );
 
@@ -169,12 +268,12 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 OutlinedButton.icon(
-                  onPressed: _chooseAvatar,
-                  icon: const Icon(Icons.account_circle_outlined),
+                  onPressed: _chooseProfilePhoto,
+                  icon: const Icon(Icons.add_a_photo_outlined),
                   label: Text(
-                    _selectedAvatarId == null
-                        ? 'Choose Avatar'
-                        : 'Change Avatar',
+                    _avatarImagePath == null && _selectedAvatarId == null
+                        ? 'Add Profile Photo'
+                        : 'Change Photo',
                   ),
                 ),
                 if (_selectedAvatarId != null) ...[
@@ -240,21 +339,14 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.md,
-              children: [
-                for (final colorValue in _profileColors)
-                  _ColorOption(
-                    colorValue: colorValue,
-                    selected: _selectedColorValue == colorValue,
-                    onTap: () {
-                      setState(() {
-                        _selectedColorValue = colorValue;
-                      });
-                    },
-                  ),
-              ],
+            AppColorPicker(
+              selectedColorValue: _selectedColorValue,
+              allowDefault: true,
+              onColorChanged: (value) {
+                setState(() {
+                  _selectedColorValue = value;
+                });
+              },
             ),
             const SizedBox(height: AppSpacing.lg),
             const Text(
@@ -375,63 +467,6 @@ class _ProfileTypeTile extends StatelessWidget {
   }
 }
 
-class _ColorOption extends StatelessWidget {
-  const _ColorOption({
-    required this.colorValue,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final int? colorValue;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    final color = colorValue == null
-        ? colors.primaryContainer
-        : Color(colorValue!);
-
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: colorValue == null
-          ? 'Default profile color'
-          : 'Profile color option',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          width: 46,
-          height: 46,
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: selected ? colors.primary : colors.outlineVariant,
-              width: selected ? 3 : 1,
-            ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            child: selected
-                ? Icon(
-                    Icons.check,
-                    size: 20,
-                    color: colorValue == null
-                        ? colors.onPrimaryContainer
-                        : Colors.white,
-                  )
-                : null,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class CreateProfileResult {
   const CreateProfileResult({
     required this.name,
@@ -439,12 +474,14 @@ class CreateProfileResult {
     required this.enabledModules,
     this.colorValue,
     this.iconCodePoint,
+    this.avatarImagePath,
   });
 
   final String name;
   final ProfileType type;
   final int? colorValue;
   final int? iconCodePoint;
+  final String? avatarImagePath;
   final Set<ProfileModule> enabledModules;
 }
 

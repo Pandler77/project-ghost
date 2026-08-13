@@ -6,6 +6,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../models/protocol.dart';
 import 'reminder_schedule_service.dart';
+import 'settings_service.dart';
 
 class NotificationService {
   NotificationService._();
@@ -22,9 +23,10 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  final ValueNotifier<String?> protocolNavigation = ValueNotifier<String?>(
-    null,
-  );
+  final SettingsService _settingsService = SettingsService();
+
+  final ValueNotifier<String?> protocolNavigation =
+      ValueNotifier<String?>(null);
 
   String? get pendingProtocolId => protocolNavigation.value;
 
@@ -61,13 +63,16 @@ class NotificationService {
   }
 
   Future<void> _loadLaunchNotification() async {
-    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+    final launchDetails =
+        await _plugin.getNotificationAppLaunchDetails();
 
     if (launchDetails?.didNotificationLaunchApp != true) {
       return;
     }
 
-    _handlePayload(launchDetails?.notificationResponse?.payload);
+    _handlePayload(
+      launchDetails?.notificationResponse?.payload,
+    );
   }
 
   Future<void> _createAndroidChannel() async {
@@ -96,7 +101,11 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin
         >()
-        ?.requestPermissions(alert: true, badge: true, sound: true);
+        ?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
 
     return androidGranted ?? iosGranted ?? true;
   }
@@ -116,7 +125,12 @@ class NotificationService {
   }) async {
     await cancelProtocolReminders(protocol.id);
 
-    if (!protocol.reminderEnabled) {
+    final preferences =
+        await _settingsService.getNotificationPreferences();
+
+    if (!preferences.notificationsEnabled ||
+        !preferences.protocolRemindersEnabled ||
+        !protocol.reminderEnabled) {
       return;
     }
 
@@ -129,6 +143,11 @@ class NotificationService {
     final currentTime = tz.TZDateTime.now(tz.local);
 
     for (final reminder in reminders) {
+      if (reminder.kind == ReminderKind.followUp &&
+          !preferences.missedDoseFollowUpsEnabled) {
+        continue;
+      }
+
       final notificationTime = tz.TZDateTime(
         tz.local,
         reminder.notificationTime.year,
@@ -150,7 +169,8 @@ class NotificationService {
         notificationTime,
         _notificationDetails,
         payload: _payloadFor(reminder),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode:
+            AndroidScheduleMode.inexactAllowWhileIdle,
       );
     }
   }
@@ -161,8 +181,19 @@ class NotificationService {
   }) async {
     await _cancelAllProtocolReminders();
 
+    final preferences =
+        await _settingsService.getNotificationPreferences();
+
+    if (!preferences.notificationsEnabled ||
+        !preferences.protocolRemindersEnabled) {
+      return;
+    }
+
     for (final protocol in protocols) {
-      await scheduleProtocolReminders(protocol, from: from);
+      await scheduleProtocolReminders(
+        protocol,
+        from: from,
+      );
     }
   }
 
@@ -170,27 +201,40 @@ class NotificationService {
     List<Protocol> protocols, {
     DateTime? from,
   }) {
-    return synchronizeProtocolReminders(protocols, from: from);
+    return synchronizeProtocolReminders(
+      protocols,
+      from: from,
+    );
   }
 
   Future<void> _cancelAllProtocolReminders() async {
-    final pending = await _plugin.pendingNotificationRequests();
+    final pending =
+        await _plugin.pendingNotificationRequests();
 
     for (final request in pending) {
       final payload = request.payload;
-      if (payload != null && payload.startsWith('ghost:protocol:')) {
+
+      if (payload != null &&
+          payload.startsWith('ghost:protocol:')) {
         await _plugin.cancel(request.id);
       }
     }
   }
 
-  Future<void> cancelProtocolReminders(String protocolId) async {
-    final pending = await _plugin.pendingNotificationRequests();
-    final payloadPrefix = 'ghost:protocol:$protocolId|';
+  Future<void> cancelProtocolReminders(
+    String protocolId,
+  ) async {
+    final pending =
+        await _plugin.pendingNotificationRequests();
+
+    final payloadPrefix =
+        'ghost:protocol:$protocolId|';
 
     for (final request in pending) {
       final payload = request.payload;
-      if (payload != null && payload.startsWith(payloadPrefix)) {
+
+      if (payload != null &&
+          payload.startsWith(payloadPrefix)) {
         await _plugin.cancel(request.id);
       }
     }
@@ -200,21 +244,34 @@ class NotificationService {
     required String protocolId,
     required DateTime scheduledDoseTime,
   }) async {
-    final pending = await _plugin.pendingNotificationRequests();
-    final payloadPrefix = 'ghost:protocol:$protocolId|';
-    final occurrence = scheduledDoseTime.millisecondsSinceEpoch.toString();
+    final pending =
+        await _plugin.pendingNotificationRequests();
+
+    final payloadPrefix =
+        'ghost:protocol:$protocolId|';
+
+    final occurrence =
+        scheduledDoseTime.millisecondsSinceEpoch.toString();
 
     for (final request in pending) {
       final payload = request.payload;
+
       if (payload == null) {
         continue;
       }
 
-      final matchesProtocol = payload.startsWith(payloadPrefix);
-      final matchesOccurrence = payload.contains('|occurrence:$occurrence|');
-      final isFollowUp = payload.contains('|kind:followUp');
+      final matchesProtocol =
+          payload.startsWith(payloadPrefix);
 
-      if (matchesProtocol && matchesOccurrence && isFollowUp) {
+      final matchesOccurrence =
+          payload.contains('|occurrence:$occurrence|');
+
+      final isFollowUp =
+          payload.contains('|kind:followUp');
+
+      if (matchesProtocol &&
+          matchesOccurrence &&
+          isFollowUp) {
         await _plugin.cancel(request.id);
       }
     }
@@ -264,18 +321,23 @@ class NotificationService {
 
     for (final codeUnit in value.codeUnits) {
       hash ^= codeUnit;
-      hash = (hash * 0x01000193) & 0x7FFFFFFF;
+      hash =
+          (hash * 0x01000193) & 0x7FFFFFFF;
     }
 
     return hash;
   }
 
-  void _onNotificationPressed(NotificationResponse response) {
+  void _onNotificationPressed(
+    NotificationResponse response,
+  ) {
     _handlePayload(response.payload);
   }
 
   void _handlePayload(String? payload) {
-    final protocolId = _protocolIdFromPayload(payload);
+    final protocolId =
+        _protocolIdFromPayload(payload);
+
     if (protocolId != null) {
       protocolNavigation.value = protocolId;
     }
@@ -284,31 +346,42 @@ class NotificationService {
   String? _protocolIdFromPayload(String? payload) {
     const prefix = 'ghost:protocol:';
 
-    if (payload == null || !payload.startsWith(prefix)) {
+    if (payload == null ||
+        !payload.startsWith(prefix)) {
       return null;
     }
 
     final separatorIndex = payload.indexOf('|');
+
     if (separatorIndex == -1) {
       return null;
     }
 
-    final protocolId = payload.substring(prefix.length, separatorIndex);
-    return protocolId.isEmpty ? null : protocolId;
+    final protocolId =
+        payload.substring(
+          prefix.length,
+          separatorIndex,
+        );
+
+    return protocolId.isEmpty
+        ? null
+        : protocolId;
   }
 
-  static const NotificationDetails _notificationDetails = NotificationDetails(
-    android: AndroidNotificationDetails(
-      _channelId,
-      _channelName,
-      channelDescription: 'Notifications for scheduled protocol reminders.',
-      importance: Importance.high,
-      priority: Priority.high,
-    ),
-    iOS: DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    ),
-  );
+  static const NotificationDetails _notificationDetails =
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription:
+              'Notifications for scheduled protocol reminders.',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      );
 }

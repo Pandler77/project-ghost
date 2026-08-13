@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/inventory_preset.dart';
 import '../../../models/protocol.dart';
 import '../../../services/inventory_preset_service.dart';
+import '../../../theme/app_theme.dart';
 import '../widgets/search_protocol_field.dart';
 import '../widgets/step_header.dart';
 
@@ -24,7 +25,6 @@ class ProtocolStep extends StatefulWidget {
 
 class _ProtocolStepState extends State<ProtocolStep> {
   final TextEditingController _searchController = TextEditingController();
-
   String _searchQuery = '';
 
   @override
@@ -42,13 +42,10 @@ class _ProtocolStepState extends State<ProtocolStep> {
 
     return widget.protocols.where((protocol) {
       final preset = InventoryPresetService.instance.findByProtocol(protocol);
-
       final matchesName = protocol.name.toLowerCase().contains(query);
-
       final matchesAlias =
           preset?.aliases.any((alias) => alias.toLowerCase().contains(query)) ??
           false;
-
       return matchesName || matchesAlias;
     }).toList();
   }
@@ -65,9 +62,9 @@ class _ProtocolStepState extends State<ProtocolStep> {
           subtitle:
               'Choose an existing protocol. Ghost will use smart defaults when available.',
           currentStep: 1,
-          totalSteps: 6,
+          totalSteps: 7,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.lg),
         SearchProtocolField(
           controller: _searchController,
           onChanged: (value) {
@@ -77,16 +74,15 @@ class _ProtocolStepState extends State<ProtocolStep> {
           },
           onClear: () {
             _searchController.clear();
-
             setState(() {
               _searchQuery = '';
             });
           },
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpacing.md),
         if (filteredProtocols.isEmpty)
           const _NoMatchingProtocols()
-        else ...[
+        else
           for (final protocol in filteredProtocols) ...[
             _ProtocolChoiceCard(
               protocol: protocol,
@@ -96,9 +92,8 @@ class _ProtocolStepState extends State<ProtocolStep> {
                 widget.onProtocolSelected(protocol);
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
           ],
-        ],
       ],
     );
   }
@@ -119,45 +114,52 @@ class _ProtocolChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
+    final accent = Color(protocol.colorValue);
+    final baseColor = Theme.of(context).cardTheme.color ?? colors.surface;
 
     final subtitle = preset == null
         ? 'Custom setup'
         : '${preset!.containerType} • '
-              '${_formatNumber(preset!.defaultSize)} '
-              '${preset!.defaultUnit}';
+            '${_formatNumber(preset!.defaultSize)} '
+            '${preset!.defaultUnit}';
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         onTap: onTap,
         child: Ink(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
             color: isSelected
-                ? colorScheme.primaryContainer
-                : colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18),
+                ? accent.withValues(alpha: 0.10)
+                : baseColor,
+            borderRadius: BorderRadius.circular(AppRadius.card),
             border: Border.all(
               color: isSelected
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant,
-              width: isSelected ? 2 : 1,
+                  ? accent.withValues(alpha: 0.75)
+                  : colors.outlineVariant.withValues(alpha: 0.60),
+              width: isSelected ? 1.5 : 1,
             ),
           ),
           child: Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(14),
+                  color: accent.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
-                child: Icon(_iconForPreset(preset), color: colorScheme.primary),
+                child: Icon(
+                  _iconForPreset(preset),
+                  color: accent,
+                  size: AppIcon.md,
+                ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,22 +167,28 @@ class _ProtocolChoiceCard extends StatelessWidget {
                     Text(
                       protocol.name,
                       style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
+                        fontSize: AppTypography.body,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       subtitle,
-                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
-              if (isSelected)
-                Icon(Icons.check_circle, color: colorScheme.primary)
-              else
-                const Icon(Icons.chevron_right),
+              const SizedBox(width: AppSpacing.sm),
+              Icon(
+                isSelected
+                    ? Icons.check_circle_rounded
+                    : Icons.chevron_right_rounded,
+                color: isSelected ? accent : colors.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -201,7 +209,6 @@ class _ProtocolChoiceCard extends StatelessWidget {
     if (value == value.roundToDouble()) {
       return value.toInt().toString();
     }
-
     return value.toString();
   }
 }
@@ -211,27 +218,43 @@ class _NoMatchingProtocols extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40),
-      child: Center(
-        child: Column(
-          children: [
-            const Icon(Icons.search_off_outlined, size: 48),
-            const SizedBox(height: 12),
-            const Text(
-              'No matching protocols',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Ghost Supply can only be attached to protocols already created in Ghost.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color ?? colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.60),
         ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.search_off_outlined,
+            size: 42,
+            color: colors.primary,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            'No matching protocols',
+            style: TextStyle(
+              fontSize: AppTypography.body,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Ghost Supply can only be attached to protocols already created in Ghost.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

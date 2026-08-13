@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/protocol.dart';
 import '../../models/protocol_status.dart';
 import '../../theme/app_theme.dart';
-import '../../theme/protocol_colors.dart';
+import '../../widgets/app_color_picker.dart';
 
 class EditAppearanceStatusScreen extends StatefulWidget {
   const EditAppearanceStatusScreen({required this.protocol, super.key});
@@ -61,19 +61,17 @@ class _EditAppearanceStatusScreenState
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                for (final colorValue in ProtocolColors.available)
-                  _ProtocolColorChoice(
-                    colorValue: colorValue,
-                    isSelected: _selectedColorValue == colorValue,
-                    onTap: () {
-                      setState(() => _selectedColorValue = colorValue);
-                    },
-                  ),
-              ],
+            AppColorPicker(
+              selectedColorValue: _selectedColorValue,
+              onColorChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+
+                setState(() {
+                  _selectedColorValue = value;
+                });
+              },
             ),
             const SizedBox(height: AppSpacing.lg),
             const Text(
@@ -115,54 +113,6 @@ class _EditAppearanceStatusScreenState
               child: FilledButton(onPressed: _save, child: const Text('Save')),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProtocolColorChoice extends StatelessWidget {
-  const _ProtocolColorChoice({
-    required this.colorValue,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final int colorValue;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Color(colorValue);
-
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      label: 'Select protocol color',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          width: 42,
-          height: 42,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isSelected
-                  ? Theme.of(context).colorScheme.onSurface
-                  : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            child: isSelected
-                ? const Icon(Icons.check, color: Colors.white, size: 20)
-                : null,
-          ),
         ),
       ),
     );

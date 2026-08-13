@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../models/measurement_system.dart';
 import '../models/weight_record.dart';
 import '../theme/app_theme.dart';
+import '../utils/weight_display.dart';
 
 class WeightCard extends StatelessWidget {
   const WeightCard({
     required this.currentWeight,
     required this.startingWeight,
     required this.weightRecords,
+    required this.measurementSystem,
     required this.onLogWeight,
     required this.onOpenHistory,
     super.key,
@@ -16,6 +19,7 @@ class WeightCard extends StatelessWidget {
   final double currentWeight;
   final double startingWeight;
   final List<WeightRecord> weightRecords;
+  final MeasurementSystem measurementSystem;
   final VoidCallback onLogWeight;
   final VoidCallback onOpenHistory;
 
@@ -23,10 +27,27 @@ class WeightCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    final displayedCurrentWeight = WeightDisplay.displayValue(
+      currentWeight,
+      measurementSystem,
+    );
+
+    final displayedStartingWeight = WeightDisplay.displayValue(
+      startingWeight,
+      measurementSystem,
+    );
+
     final weightChange = currentWeight - startingWeight;
+
+    final displayedWeightChange = WeightDisplay.displayValue(
+      weightChange.abs(),
+      measurementSystem,
+    );
+
     final hasLostWeight = weightChange < 0;
     final hasGainedWeight = weightChange > 0;
-    final changeAmount = weightChange.abs();
+
+    final unit = WeightDisplay.unit(measurementSystem);
 
     final trendIcon = hasLostWeight
         ? Icons.south_east
@@ -35,35 +56,23 @@ class WeightCard extends StatelessWidget {
         : Icons.horizontal_rule;
 
     final changeText = hasLostWeight
-        ? '${changeAmount.toStringAsFixed(1)} lb lost'
+        ? '${displayedWeightChange.toStringAsFixed(1)} $unit lost'
         : hasGainedWeight
-        ? '${changeAmount.toStringAsFixed(1)} lb gained'
+        ? '${displayedWeightChange.toStringAsFixed(1)} $unit gained'
         : 'No change';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'WEIGHT',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.1,
-                ),
-              ),
-            ),
-            TextButton(onPressed: onLogWeight, child: const Text('Log')),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
         Card(
           elevation: 1,
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.card),
+            side: BorderSide(
+              color: colorScheme.outline.withValues(alpha: 0.45),
+              width: 1.35,
+            ),
           ),
           child: InkWell(
             onTap: onOpenHistory,
@@ -76,28 +85,45 @@ class WeightCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RichText(
-                          text: TextSpan(
-                            style: DefaultTextStyle.of(context).style,
-                            children: [
-                              TextSpan(
-                                text: currentWeight.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: RichText(
+                            maxLines: 1,
+                            text: TextSpan(
+                              style: DefaultTextStyle.of(context).style,
+                              children: [
+                                TextSpan(
+                                  text: displayedCurrentWeight.toStringAsFixed(
+                                    1,
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              TextSpan(
-                                text: ' lb',
-                                style: TextStyle(
-                                  fontSize: AppTypography.body,
-                                  color: colorScheme.onSurfaceVariant,
+                                TextSpan(
+                                  text: ' $unit',
+                                  style: TextStyle(
+                                    fontSize: AppTypography.body,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.xs),
+
+                        const SizedBox(height: AppSpacing.sm),
+
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: colorScheme.primary.withValues(alpha: 0.45),
+                        ),
+
+                        const SizedBox(height: AppSpacing.sm),
+
                         Row(
                           children: [
                             Icon(
@@ -109,27 +135,40 @@ class WeightCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 changeText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: AppTypography.caption,
-                                  color: colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.primary,
                                 ),
                               ),
                             ),
                           ],
                         ),
+
                         const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'Started at '
-                          '${startingWeight.toStringAsFixed(1)} lb',
-                          style: TextStyle(
-                            fontSize: AppTypography.caption,
-                            color: colorScheme.onSurfaceVariant,
+
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Starting Weight: '
+                            '${displayedStartingWeight.toStringAsFixed(1)} '
+                            '$unit',
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: AppTypography.caption,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
+
                   const SizedBox(width: AppSpacing.md),
+
                   Expanded(
                     flex: 5,
                     child: SizedBox(
@@ -143,7 +182,9 @@ class WeightCard extends StatelessWidget {
                       ),
                     ),
                   ),
+
                   const SizedBox(width: AppSpacing.xs),
+
                   Icon(
                     Icons.chevron_right,
                     color: colorScheme.onSurfaceVariant,

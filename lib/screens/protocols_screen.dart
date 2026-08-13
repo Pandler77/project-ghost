@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/display_preferences.dart';
 import '../models/protocol.dart';
 import '../models/protocol_status.dart';
 import '../theme/app_theme.dart';
@@ -24,6 +25,7 @@ class ProtocolsScreen extends StatefulWidget {
     required this.onProtocolsChanged,
     required this.onProtocolAdded,
     required this.onProtocolUpdated,
+    required this.displayPreferences,
     super.key,
   });
 
@@ -31,6 +33,7 @@ class ProtocolsScreen extends StatefulWidget {
   final VoidCallback onProtocolsChanged;
   final Future<void> Function(Protocol protocol) onProtocolAdded;
   final Future<void> Function(Protocol protocol) onProtocolUpdated;
+  final DisplayPreferences displayPreferences;
 
   @override
   State<ProtocolsScreen> createState() => _ProtocolsScreenState();
@@ -41,6 +44,7 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
 
   String _searchQuery = '';
   ProtocolStatus? _statusFilter;
+
   ProtocolSortOption _sortOption = ProtocolSortOption.nameAscending;
 
   Future<void> _showSortMenu(BuildContext context) async {
@@ -139,6 +143,7 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
     }
 
     setState(() {});
+
     widget.onProtocolsChanged();
   }
 
@@ -198,86 +203,300 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
     return int.tryParse(protocol.id) ?? 0;
   }
 
+  int get _activeProtocolCount {
+    return widget.protocols.where((protocol) {
+      return protocol.status == ProtocolStatus.active;
+    }).length;
+  }
+
   @override
-Widget build(BuildContext context) {
-  final filteredProtocols = _filteredProtocols();
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
-  return SafeArea(
-    child: ListView(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      children: [
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Manage what you are currently tracking.',
-          style: TextStyle(
-            fontSize: AppTypography.caption,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _openAddProtocol,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Protocol'),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          height: 48,
-          child: ProtocolSearchBar(
-            controller: _searchController,
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
-            },
-            onClear: () {
-              _searchController.clear();
+    final filteredProtocols = _filteredProtocols();
 
-              setState(() {
-                _searchQuery = '';
-              });
-            },
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.md,
+          110,
+        ),
+        children: [
+          _ProtocolsHeader(
+            activeCount: _activeProtocolCount,
+            totalCount: widget.protocols.length,
+            onAddProtocol: _openAddProtocol,
           ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        ProtocolFilterChips(
-          selectedStatus: _statusFilter,
-          onStatusChanged: (status) {
-            setState(() {
-              _statusFilter = status;
-            });
-          },
-          onSortPressed: () {
-            _showSortMenu(context);
-          },
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (widget.protocols.isEmpty)
-          const EmptyProtocolsState()
-        else if (filteredProtocols.isEmpty)
-          const NoMatchingProtocolsState(
-            onClearFilters: null,
-          )
-        else
-          for (
-            var index = 0;
-            index < filteredProtocols.length;
-            index++
-          ) ...[
-            ProtocolCard(
-              protocol: filteredProtocols[index],
-              onPressed: () {
-                _openProtocolDetails(
-                  filteredProtocols[index],
-                );
+
+          const SizedBox(height: AppSpacing.lg),
+
+          SizedBox(
+            height: 46,
+            child: ProtocolSearchBar(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              onClear: () {
+                _searchController.clear();
+
+                setState(() {
+                  _searchQuery = '';
+                });
               },
             ),
-            if (index < filteredProtocols.length - 1)
-              const SizedBox(height: AppSpacing.sm),
+          ),
+
+          const SizedBox(height: AppSpacing.sm),
+
+          ProtocolFilterChips(
+            selectedStatus: _statusFilter,
+            onStatusChanged: (status) {
+              setState(() {
+                _statusFilter = status;
+              });
+            },
+            onSortPressed: () {
+              _showSortMenu(context);
+            },
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          if (widget.protocols.isEmpty)
+            const EmptyProtocolsState()
+          else if (filteredProtocols.isEmpty)
+            Column(
+              children: [
+                const NoMatchingProtocolsState(onClearFilters: null),
+
+                const SizedBox(height: AppSpacing.sm),
+
+                TextButton(
+                  onPressed: () {
+                    _searchController.clear();
+
+                    setState(() {
+                      _searchQuery = '';
+                      _statusFilter = null;
+                    });
+                  },
+                  child: const Text('Clear filters'),
+                ),
+              ],
+            )
+          else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${filteredProtocols.length} '
+                    '${filteredProtocols.length == 1 ? 'protocol' : 'protocols'}',
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      fontWeight: FontWeight.w700,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: AppSpacing.sm),
+
+            for (var index = 0; index < filteredProtocols.length; index++) ...[
+              ProtocolCard(
+                protocol: filteredProtocols[index],
+                displayPreferences: widget.displayPreferences,
+                onPressed: () {
+                  _openProtocolDetails(filteredProtocols[index]);
+                },
+              ),
+
+              if (index < filteredProtocols.length - 1)
+                SizedBox(
+                  height: widget.displayPreferences.compactMode
+                      ? AppSpacing.xs
+                      : AppSpacing.sm,
+                ),
+            ],
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProtocolsHeader extends StatelessWidget {
+  const _ProtocolsHeader({
+    required this.activeCount,
+    required this.totalCount,
+    required this.onAddProtocol,
+  });
+
+  final int activeCount;
+  final int totalCount;
+  final VoidCallback onAddProtocol;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final brightness = Theme.of(context).brightness;
+
+    final subtitle = totalCount == 0
+        ? 'Nothing being tracked yet'
+        : activeCount == 1
+        ? '1 active protocol'
+        : '$activeCount active protocols';
+
+    final gradientColors = brightness == Brightness.dark
+        ? [
+            colors.primary.withValues(alpha: 0.28),
+            colors.primaryContainer.withValues(alpha: 0.12),
+          ]
+        : [
+            colors.primary.withValues(alpha: 0.15),
+            colors.primaryContainer.withValues(alpha: 0.55),
+          ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color: colors.primary.withValues(alpha: 0.22),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Protocols',
+                  style: TextStyle(
+                    fontSize: AppTypography.pageTitle,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.xs),
+
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w500,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+
+                if (totalCount > 0) ...[
+                  const SizedBox(height: AppSpacing.xs),
+
+                  Text(
+                    '$totalCount total',
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      fontWeight: FontWeight.w600,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(width: AppSpacing.md),
+
+          DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.primary.withValues(
+                    alpha: brightness == Brightness.dark ? 0.06 : 0.28,
+                  ),
+                  blurRadius: brightness == Brightness.dark ? 12 : 16,
+                  spreadRadius: brightness == Brightness.dark ? 0 : 1,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onAddProtocol,
+                borderRadius: BorderRadius.circular(AppRadius.button),
+                child: Ink(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 11,
+                  ),
+                  decoration: BoxDecoration(
+                    color: brightness == Brightness.dark
+                        ? colors.primary.withValues(alpha: 0.08)
+                        : null,
+                    gradient: brightness == Brightness.dark
+                        ? null
+                        : LinearGradient(
+                            colors: [
+                              colors.primary,
+                              colors.primary.withValues(alpha: 0.82),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                    border: Border.all(
+                      color: brightness == Brightness.dark
+                          ? colors.primary.withValues(alpha: 0.42)
+                          : Colors.white.withValues(alpha: 0.28),
+                      width: brightness == Brightness.dark ? 1.2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add_circle_outline_rounded,
+                        size: 19,
+                        color: brightness == Brightness.dark
+                            ? colors.primary
+                            : Colors.white,
+                      ),
+                      const SizedBox(width: 7),
+                      Text(
+                        'Add Protocol',
+                        style: TextStyle(
+                          fontSize: AppTypography.caption,
+                          fontWeight: FontWeight.w800,
+                          color: brightness == Brightness.dark
+                              ? colors.primary
+                              : Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

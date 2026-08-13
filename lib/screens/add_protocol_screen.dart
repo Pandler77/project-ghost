@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../models/cycle_unit.dart';
+import '../models/injection_site.dart';
 import '../models/protocol.dart';
 import '../models/protocol_category.dart';
 import '../models/protocol_preset.dart';
 import '../models/protocol_schedule.dart';
+import '../models/protocol_type.dart';
+import '../models/rotation_mode.dart';
 import '../services/protocol_preset_service.dart';
 import '../theme/app_theme.dart';
-import '../theme/protocol_colors.dart';
+import '../widgets/app_color_picker.dart';
 import '../widgets/ios_time_picker.dart';
 import '../widgets/protocol_editor/protocol_editor.dart';
 import '../widgets/wizard_step_indicator.dart';
+import 'calculator_hub_screen.dart';
 
 enum ScheduleOption { daily, weekly, everyXDays, specificDays, monthly }
 
@@ -56,6 +60,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
   ProtocolCategory? _selectedCategory;
   ProtocolPreset? _selectedPreset;
+  ProtocolType? _selectedProtocolType;
 
   String? _selectedUnit;
   bool _useCustomUnit = false;
@@ -71,6 +76,11 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   DateTime _selectedStartDate = DateTime.now();
   int _selectedColorValue = Protocol.defaultColorValue;
 
+  bool _useCyclesSelected = false;
+  bool _useRotationSelected = false;
+  bool _useGhostSupplySelected = false;
+  RotationMode _rotationMode = RotationMode.sequential;
+  final Set<InjectionSite> _enabledInjectionSites = {};
   bool? _useCycle;
   DateTime _cycleStartDate = DateTime.now();
   CycleUnit _cycleOnUnit = CycleUnit.weeks;
@@ -95,55 +105,175 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final stepTitle = switch (_currentStep) {
+      0 => 'Category',
+      1 => 'Name',
+      2 => 'Administration',
+      3 => 'Dose',
+      4 => 'Schedule',
+      5 => 'Start',
+      6 => 'Features',
+      7 => 'Setup',
+      8 => 'Reminders',
+      9 => 'Review',
+      _ => '',
+    };
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Protocol'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: _handleBack,
         ),
+        title: const Text(
+          'Add Protocol',
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.2),
+        ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              WizardStepIndicator(
-                currentStep: _currentStep,
-                totalSteps: 8,
-                label: 'Step ${_currentStep + 1} of 8',
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                0,
               ),
-              const SizedBox(height: AppSpacing.lg),
-              Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer.withValues(alpha: 0.24),
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: 0.14),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.primary.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                          ),
+                          child: Text(
+                            'STEP ${_currentStep + 1} OF 10',
+                            style: TextStyle(
+                              fontSize: AppTypography.micro,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.7,
+                              color: colors.primary,
+                            ),
+                          ),
+                        ),
+
+                        const Spacer(),
+
+                        Text(
+                          stepTitle,
+                          style: TextStyle(
+                            fontSize: AppTypography.caption,
+                            fontWeight: FontWeight.w700,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: AppSpacing.md),
+
+                    WizardStepIndicator(
+                      currentStep: _currentStep,
+                      totalSteps: 10,
+                      label: '',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                ),
                 child: switch (_currentStep) {
                   0 => _buildCategoryStep(context),
                   1 => _buildNameStep(context),
-                  2 => _buildDoseStep(context),
-                  3 => _buildScheduleStep(context),
-                  4 => _buildTimeStep(context),
-                  5 => _buildCycleStep(context),
-                  6 => _buildReminderStep(context),
-                  7 => _buildReviewStep(context),
+                  2 => _buildAdministrationStep(context),
+                  3 => _buildDoseStep(context),
+                  4 => _buildScheduleStep(context),
+                  5 => _buildTimeStep(context),
+                  6 => _buildGhostFeaturesStep(context),
+                  7 => _buildFeatureSetupStep(context),
+                  8 => _buildReminderStep(context),
+                  9 => _buildReviewStep(context),
                   _ => const SizedBox.shrink(),
                 },
               ),
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _canContinue() ? _handleContinue : null,
-                  child: Text(
-                    _currentStep == 0
-                        ? 'Continue'
-                        : _currentStep == 7
-                        ? 'Save Protocol'
-                        : 'Next',
+            ),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.md,
+              ),
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                border: Border(
+                  top: BorderSide(
+                    color: colors.outlineVariant.withValues(alpha: 0.55),
                   ),
                 ),
               ),
-            ],
-          ),
+              child: FilledButton(
+                onPressed: _canContinue() ? _handleContinue : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _currentStep == 9
+                          ? 'Save Protocol'
+                          : _currentStep == 0
+                          ? 'Continue'
+                          : 'Next',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+
+                    if (_currentStep < 9) ...[
+                      const SizedBox(width: 7),
+                      const Icon(Icons.arrow_forward_rounded, size: 18),
+                    ] else ...[
+                      const SizedBox(width: 7),
+                      const Icon(Icons.check_rounded, size: 18),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -161,7 +291,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   }
 
   void _handleContinue() {
-    if (_currentStep < 7) {
+    if (_currentStep < 9) {
       setState(() {
         _currentStep++;
       });
@@ -183,11 +313,14 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         return _nameController.text.trim().isNotEmpty;
 
       case 2:
+        return _selectedProtocolType != null;
+
+      case 3:
         final dose = double.tryParse(_doseController.text.trim());
 
         return dose != null && dose > 0 && _currentUnit.isNotEmpty;
 
-      case 3:
+      case 4:
         switch (_selectedSchedule) {
           case ScheduleOption.daily:
             return true;
@@ -210,30 +343,40 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
             return false;
         }
 
-      case 4:
+      case 5:
         return true;
 
-      case 5:
-        if (_useCycle == null) {
+      case 6:
+        return true;
+
+      case 7:
+        if (_useCyclesSelected) {
+          final onDuration = int.tryParse(
+            _cycleOnDurationController.text.trim(),
+          );
+
+          final offDuration = int.tryParse(
+            _cycleOffDurationController.text.trim(),
+          );
+
+          final cycleIsValid =
+              onDuration != null &&
+              onDuration > 0 &&
+              offDuration != null &&
+              offDuration >= 0;
+
+          if (!cycleIsValid) {
+            return false;
+          }
+        }
+
+        if (_useRotationSelected && _enabledInjectionSites.length < 2) {
           return false;
         }
 
-        if (_useCycle == false) {
-          return true;
-        }
+        return true;
 
-        final onDuration = int.tryParse(_cycleOnDurationController.text.trim());
-
-        final offDuration = int.tryParse(
-          _cycleOffDurationController.text.trim(),
-        );
-
-        return onDuration != null &&
-            onDuration > 0 &&
-            offDuration != null &&
-            offDuration >= 0;
-
-      case 6:
+      case 8:
         if (_reminderEnabled == null) {
           return false;
         }
@@ -244,7 +387,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
         return true;
 
-      case 7:
+      case 9:
         return true;
 
       default:
@@ -269,7 +412,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'What are you adding?',
+          'What are you tracking?',
           style: TextStyle(
             fontSize: AppTypography.title,
             fontWeight: FontWeight.bold,
@@ -288,8 +431,9 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           child: ListView(
             children: [
               _CategoryTile(
-                title: 'Peptide',
-                subtitle: 'Peptides and research compounds',
+                title: 'Peptides & Research',
+                subtitle:
+                    'Peptides, research compounds, blends, and adjacent protocols',
                 icon: Icons.science_outlined,
                 isSelected: _selectedCategory == ProtocolCategory.peptide,
                 onTap: () {
@@ -297,30 +441,44 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
                 },
               ),
               _CategoryTile(
-                title: 'Prescription',
-                subtitle: 'Prescribed medications',
+                title: 'Hormones & TRT',
+                subtitle:
+                    'Testosterone, growth hormone, fertility, and hormone protocols',
+                icon: Icons.monitor_heart_outlined,
+                isSelected:
+                    _selectedCategory == ProtocolCategory.hormonesAndTrt,
+                onTap: () {
+                  _selectCategory(ProtocolCategory.hormonesAndTrt);
+                },
+              ),
+              _CategoryTile(
+                title: 'Medication',
+                subtitle: 'Prescription and over-the-counter medications',
                 icon: Icons.medication_outlined,
-                isSelected: _selectedCategory == ProtocolCategory.prescription,
+                isSelected: _selectedCategory == ProtocolCategory.medication,
                 onTap: () {
-                  _selectCategory(ProtocolCategory.prescription);
+                  _selectCategory(ProtocolCategory.medication);
                 },
               ),
               _CategoryTile(
-                title: 'Supplement',
-                subtitle: 'Supplements and over-the-counter products',
+                title: 'Supplements & Vitamins',
+                subtitle: 'Supplements, vitamins, minerals, and nutrition',
                 icon: Icons.local_florist_outlined,
-                isSelected: _selectedCategory == ProtocolCategory.supplement,
+                isSelected:
+                    _selectedCategory ==
+                    ProtocolCategory.supplementsAndVitamins,
                 onTap: () {
-                  _selectCategory(ProtocolCategory.supplement);
+                  _selectCategory(ProtocolCategory.supplementsAndVitamins);
                 },
               ),
               _CategoryTile(
-                title: 'Vitamin',
-                subtitle: 'Vitamins and minerals',
-                icon: Icons.health_and_safety_outlined,
-                isSelected: _selectedCategory == ProtocolCategory.vitamin,
+                title: 'Other & Wellness',
+                subtitle:
+                    'Wellness products and protocols that do not fit elsewhere',
+                icon: Icons.category_outlined,
+                isSelected: _selectedCategory == ProtocolCategory.otherWellness,
                 onTap: () {
-                  _selectCategory(ProtocolCategory.vitamin);
+                  _selectCategory(ProtocolCategory.otherWellness);
                 },
               ),
               _CategoryTile(
@@ -387,7 +545,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
               _selectedPreset = exactMatch;
 
               if (exactMatch != null) {
-                _applyPresetUnit(exactMatch.defaultUnit);
+                _applyPresetDefaults(exactMatch);
               }
             });
           },
@@ -445,7 +603,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
                               offset: preset.name.length,
                             );
 
-                            _applyPresetUnit(preset.defaultUnit);
+                            _applyPresetDefaults(preset);
                           });
                         },
                       );
@@ -454,6 +612,103 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           ),
         ] else
           const Spacer(),
+      ],
+    );
+  }
+
+  Widget _buildAdministrationStep(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListView(
+      children: [
+        const Text(
+          'How is it taken?',
+          style: TextStyle(
+            fontSize: AppTypography.title,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Choose the administration method. Ghost will only show features that apply.',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        _AdministrationTile(
+          title: 'Injection',
+          subtitle: 'Subcutaneous, intramuscular, or other injections',
+          icon: Icons.vaccines_outlined,
+          isSelected: _selectedProtocolType == ProtocolType.injection,
+          onTap: () {
+            setState(() {
+              _selectedProtocolType = ProtocolType.injection;
+            });
+          },
+        ),
+
+        _AdministrationTile(
+          title: 'Oral',
+          subtitle: 'Tablets, capsules, liquids, and powders',
+          icon: Icons.medication_outlined,
+          isSelected: _selectedProtocolType == ProtocolType.oral,
+          onTap: () {
+            setState(() {
+              _selectedProtocolType = ProtocolType.oral;
+            });
+          },
+        ),
+
+        _AdministrationTile(
+          title: 'Topical',
+          subtitle: 'Creams, gels, patches, and skin applications',
+          icon: Icons.spa_outlined,
+          isSelected: _selectedProtocolType == ProtocolType.topical,
+          onTap: () {
+            setState(() {
+              _selectedProtocolType = ProtocolType.topical;
+            });
+          },
+        ),
+
+        _AdministrationTile(
+          title: 'Nasal',
+          subtitle: 'Nasal sprays and intranasal products',
+          icon: Icons.air_outlined,
+          isSelected: _selectedProtocolType == ProtocolType.nasal,
+          onTap: () {
+            setState(() {
+              _selectedProtocolType = ProtocolType.nasal;
+            });
+          },
+        ),
+
+        _AdministrationTile(
+          title: 'Sublingual',
+          subtitle: 'Placed under the tongue',
+          icon: Icons.water_drop_outlined,
+          isSelected: _selectedProtocolType == ProtocolType.sublingual,
+          onTap: () {
+            setState(() {
+              _selectedProtocolType = ProtocolType.sublingual;
+            });
+          },
+        ),
+
+        _AdministrationTile(
+          title: 'Other',
+          subtitle: 'Any method not listed above',
+          icon: Icons.more_horiz,
+          isSelected: _selectedProtocolType == ProtocolType.other,
+          onTap: () {
+            setState(() {
+              _selectedProtocolType = ProtocolType.other;
+            });
+          },
+        ),
       ],
     );
   }
@@ -543,11 +798,68 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         if (_selectedPreset?.defaultUnit != null && !_useCustomUnit) ...[
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Suggested unit based on '
-            '${_selectedPreset!.name}.',
+            'Suggested unit based on ${_selectedPreset!.name}.',
             style: TextStyle(
               fontSize: AppTypography.caption,
               color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        if (_selectedProtocolType == ProtocolType.injection) ...[
+          const SizedBox(height: AppSpacing.lg),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _openCalculator,
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              child: Ink(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(AppRadius.button),
+                  border: Border.all(color: colorScheme.outlineVariant),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                      ),
+                      child: Icon(
+                        Icons.calculate_outlined,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Need help calculating?',
+                            style: TextStyle(
+                              fontSize: AppTypography.body,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Open Ghost Calculator',
+                            style: TextStyle(fontSize: AppTypography.caption),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -811,50 +1123,229 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     );
   }
 
-  Widget _buildCycleStep(BuildContext context) {
+  Widget _buildGhostFeaturesStep(BuildContext context) {
+    final isInjection = _selectedProtocolType == ProtocolType.injection;
+
     return ListView(
       children: [
-        ProtocolCycleEditor(
-          useCycle: _useCycle,
-          cycleStartDate: _cycleStartDate,
-          onDurationController: _cycleOnDurationController,
-          onUnit: _cycleOnUnit,
-          offDurationController: _cycleOffDurationController,
-          offUnit: _cycleOffUnit,
-          repeatCycle: _repeatCycle,
-          onUseCycleChanged: (value) {
-            setState(() {
-              _useCycle = value;
+        const Text(
+          'Ghost Features',
+          style: TextStyle(
+            fontSize: AppTypography.title,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Select the extra tools Ghost should use for this protocol.',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        if (isInjection)
+          _FeatureSelectionTile(
+            title: 'Use Cycles',
+            subtitle: 'Run during planned on and off periods.',
+            value: _useCyclesSelected,
+            onChanged: (value) {
+              setState(() {
+                _useCyclesSelected = value;
+                _useCycle = value;
 
-              if (value) {
-                _cycleStartDate = _selectedStartDate;
-              }
-            });
-          },
-          onCycleStartDateChanged: (date) {
+                if (value) {
+                  _cycleStartDate = _selectedStartDate;
+                }
+              });
+            },
+          ),
+        if (isInjection)
+          _FeatureSelectionTile(
+            title: 'Injection Site Rotation',
+            subtitle: 'Suggest sites and keep an injection history.',
+            value: _useRotationSelected,
+            onChanged: (value) {
+              setState(() {
+                _useRotationSelected = value;
+
+                if (!value) {
+                  _enabledInjectionSites.clear();
+                  _rotationMode = RotationMode.sequential;
+                }
+              });
+            },
+          ),
+        _FeatureSelectionTile(
+          title: 'Ghost Supply',
+          subtitle: 'Track inventory and receive reorder reminders.',
+          value: _useGhostSupplySelected,
+          onChanged: (value) {
             setState(() {
-              _cycleStartDate = date;
+              _useGhostSupplySelected = value;
             });
-          },
-          onOnUnitChanged: (unit) {
-            setState(() {
-              _cycleOnUnit = unit;
-            });
-          },
-          onOffUnitChanged: (unit) {
-            setState(() {
-              _cycleOffUnit = unit;
-            });
-          },
-          onRepeatCycleChanged: (value) {
-            setState(() {
-              _repeatCycle = value;
-            });
-          },
-          onValuesChanged: () {
-            setState(() {});
           },
         ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureSetupStep(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final hasSelectedFeature =
+        _useCyclesSelected || _useRotationSelected || _useGhostSupplySelected;
+
+    if (!hasSelectedFeature) {
+      return ListView(
+        children: [
+          const Text(
+            'Feature Setup',
+            style: TextStyle(
+              fontSize: AppTypography.title,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'No additional setup is needed for the selected features.',
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle_outline, color: colorScheme.primary),
+                const SizedBox(width: AppSpacing.md),
+                const Expanded(
+                  child: Text(
+                    'Everything is ready. Continue to reminders.',
+                    style: TextStyle(
+                      fontSize: AppTypography.body,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView(
+      children: [
+        const Text(
+          'Feature Setup',
+          style: TextStyle(
+            fontSize: AppTypography.title,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Configure the Ghost features selected for this protocol.',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        if (_useCyclesSelected) ...[
+          ProtocolCycleEditor(
+            showCycleChoice: false,
+            useCycle: true,
+            cycleStartDate: _cycleStartDate,
+            onDurationController: _cycleOnDurationController,
+            onUnit: _cycleOnUnit,
+            offDurationController: _cycleOffDurationController,
+            offUnit: _cycleOffUnit,
+            repeatCycle: _repeatCycle,
+            onUseCycleChanged: (_) {},
+            onCycleStartDateChanged: (date) {
+              setState(() {
+                _cycleStartDate = date;
+              });
+            },
+            onOnUnitChanged: (unit) {
+              setState(() {
+                _cycleOnUnit = unit;
+              });
+            },
+            onOffUnitChanged: (unit) {
+              setState(() {
+                _cycleOffUnit = unit;
+              });
+            },
+            onRepeatCycleChanged: (value) {
+              setState(() {
+                _repeatCycle = value;
+              });
+            },
+            onValuesChanged: () {
+              setState(() {});
+            },
+          ),
+        ],
+        if (_useGhostSupplySelected) ...[
+          if (_useCyclesSelected || _useRotationSelected)
+            const SizedBox(height: AppSpacing.lg),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.inventory_2_outlined, color: colorScheme.primary),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    'Ghost Supply will be available for this protocol after it is saved. '
+                    'You can configure container type, quantity, and alerts from Ghost Supply.',
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      height: 1.4,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (_useCyclesSelected && _useRotationSelected)
+          const SizedBox(height: AppSpacing.lg),
+        if (_useRotationSelected)
+          InjectionRotationEditor(
+            rotationMode: _rotationMode,
+            enabledSites: _enabledInjectionSites,
+            onRotationModeChanged: (mode) {
+              setState(() {
+                _rotationMode = mode;
+              });
+            },
+            onSiteChanged: (site, enabled) {
+              setState(() {
+                if (enabled) {
+                  _enabledInjectionSites.add(site);
+                } else {
+                  _enabledInjectionSites.remove(site);
+                }
+              });
+            },
+          ),
       ],
     );
   }
@@ -1117,7 +1608,9 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         const SizedBox(height: AppSpacing.lg),
         _ReviewCard(
           title: _nameController.text.trim(),
-          category: _categoryLabel(_selectedCategory!),
+          subtitle:
+              '${_categoryLabel(_selectedCategory!)} • ${_selectedProtocolType!.label}',
+          colorValue: _selectedColorValue,
           rows: [
             _ReviewRowData(label: 'Dose', value: _formattedDose),
             _ReviewRowData(label: 'Schedule', value: _scheduleSummary()),
@@ -1126,7 +1619,15 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
               label: 'Starts',
               value: _formatDate(_selectedStartDate),
             ),
-            _ReviewRowData(label: 'Cycle', value: _cycleReviewSummary()),
+            if (_useCyclesSelected)
+              _ReviewRowData(label: 'Cycle', value: _cycleReviewSummary()),
+            if (_useRotationSelected)
+              _ReviewRowData(
+                label: 'Rotation',
+                value: _rotationReviewSummary(),
+              ),
+            if (_useGhostSupplySelected)
+              const _ReviewRowData(label: 'Ghost Supply', value: 'Enabled'),
             _ReviewRowData(label: 'Reminder', value: _reminderReviewSummary()),
             if (_reminderEnabled == true && _missedDoseReminderEnabled == true)
               _ReviewRowData(
@@ -1135,7 +1636,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
               ),
           ],
         ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.lg),
         const Text(
           'Protocol color',
           style: TextStyle(
@@ -1145,32 +1646,28 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Used for Calendar and schedule markers. Colors may be reused.',
+          'Use quick colors or choose a custom color for easy calendar recognition.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            for (final colorValue in ProtocolColors.available)
-              _ProtocolColorChoice(
-                colorValue: colorValue,
-                isSelected: _selectedColorValue == colorValue,
-                onTap: () {
-                  setState(() {
-                    _selectedColorValue = colorValue;
-                  });
-                },
-              ),
-          ],
+        AppColorPicker(
+          selectedColorValue: _selectedColorValue,
+          onColorChanged: (value) {
+            if (value == null) {
+              return;
+            }
+
+            setState(() {
+              _selectedColorValue = value;
+            });
+          },
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
-          'You can pause or edit this protocol later from the Protocols tab.',
+          'You can pause, edit, or recolor this protocol later from the Protocols tab.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1193,6 +1690,13 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     setState(() {
       _selectedTime = selected;
     });
+  }
+
+  Future<void> _openCalculator() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => const CalculatorHubScreen()),
+    );
   }
 
   Future<void> _chooseStartDate() async {
@@ -1218,26 +1722,31 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     return Protocol(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: _nameController.text.trim(),
+      category: _selectedCategory!,
+      type: _selectedProtocolType!,
       dose: _formattedDose,
       schedule: _createSchedule(),
       colorValue: _selectedColorValue,
-      useCycle: _useCycle == true,
-      cycleStartDate: _useCycle == true
+      useCycle: _useCyclesSelected && _useCycle == true,
+      cycleStartDate: _useCyclesSelected && _useCycle == true
           ? DateTime(
               _cycleStartDate.year,
               _cycleStartDate.month,
               _cycleStartDate.day,
             )
           : null,
-      cycleOnDuration: _useCycle == true
+      cycleOnDuration: _useCyclesSelected && _useCycle == true
           ? int.parse(_cycleOnDurationController.text.trim())
           : 1,
       cycleOnUnit: _cycleOnUnit,
-      cycleOffDuration: _useCycle == true
+      cycleOffDuration: _useCyclesSelected && _useCycle == true
           ? int.parse(_cycleOffDurationController.text.trim())
           : 0,
       cycleOffUnit: _cycleOffUnit,
-      repeatCycle: _useCycle == true && _repeatCycle,
+      repeatCycle: _useCyclesSelected && _useCycle == true && _repeatCycle,
+      rotationEnabled: _useRotationSelected,
+      rotationMode: _rotationMode,
+      enabledInjectionSites: Set<InjectionSite>.from(_enabledInjectionSites),
       reminderEnabled: _reminderEnabled == true,
       reminderMinutesBefore: _reminderEnabled == true
           ? _reminderMinutesBefore
@@ -1314,6 +1823,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         _selectedPreset = null;
         _selectedUnit = null;
         _useCustomUnit = false;
+        _selectedProtocolType = null;
 
         _selectedSchedule = null;
         _selectedWeeklyDay = null;
@@ -1338,6 +1848,15 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       _selectedUnit = null;
       _useCustomUnit = true;
       _customUnitController.text = unit;
+    }
+  }
+
+  void _applyPresetDefaults(ProtocolPreset preset) {
+    _applyPresetUnit(preset.defaultUnit);
+
+    final protocolType = preset.defaultProtocolType;
+    if (protocolType != null) {
+      _selectedProtocolType = protocolType;
     }
   }
 
@@ -1378,41 +1897,20 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   }
 
   String _searchHint(ProtocolCategory category) {
-    switch (category) {
-      case ProtocolCategory.peptide:
-        return 'Search peptides';
-
-      case ProtocolCategory.prescription:
-        return 'Search medications';
-
-      case ProtocolCategory.supplement:
-        return 'Search supplements';
-
-      case ProtocolCategory.vitamin:
-        return 'Search vitamins';
-
-      case ProtocolCategory.custom:
-        return 'Enter a custom name';
-    }
+    return switch (category) {
+      ProtocolCategory.peptide => 'Search peptides and research',
+      ProtocolCategory.hormonesAndTrt => 'Search hormones and TRT',
+      ProtocolCategory.medication => 'Search medications',
+      ProtocolCategory.supplementsAndVitamins =>
+        'Search supplements and vitamins',
+      ProtocolCategory.otherWellness => 'Search wellness products',
+      ProtocolCategory.researchCompound => 'Search research compounds',
+      ProtocolCategory.custom => 'Enter a custom name',
+    };
   }
 
   String _categoryLabel(ProtocolCategory category) {
-    switch (category) {
-      case ProtocolCategory.peptide:
-        return 'Peptide';
-
-      case ProtocolCategory.prescription:
-        return 'Prescription';
-
-      case ProtocolCategory.supplement:
-        return 'Supplement';
-
-      case ProtocolCategory.vitamin:
-        return 'Vitamin';
-
-      case ProtocolCategory.custom:
-        return 'Custom';
-    }
+    return category.label;
   }
 
   String _scheduleSummary() {
@@ -1455,20 +1953,28 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         '$offDuration ${_unitLabel(_cycleOffUnit, offDuration)} off • Repeats';
   }
 
+  String _rotationReviewSummary() {
+    final modeLabel = _rotationMode.label;
+    final siteCount = _enabledInjectionSites.length;
+
+    return '$modeLabel • $siteCount '
+        '${siteCount == 1 ? 'site' : 'sites'}';
+  }
+
   String _reminderReviewSummary() {
     if (_reminderEnabled != true) {
-      return 'No';
+      return 'Disabled';
     }
 
     if (_reminderMinutesBefore == 0) {
-      return 'Yes • At scheduled time';
+      return 'Reminder enabled\nAt scheduled time';
     }
 
     if (_reminderMinutesBefore == 60) {
-      return 'Yes • 1 hour before';
+      return 'Reminder enabled\n1 hour before';
     }
 
-    return 'Yes • $_reminderMinutesBefore minutes before';
+    return 'Reminder enabled\n$_reminderMinutesBefore minutes before';
   }
 
   String _missedReminderReviewSummary() {
@@ -1545,7 +2051,22 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   }
 
   String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   bool _isSameDay(DateTime first, DateTime second) {
@@ -1557,6 +2078,33 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
 class _CategoryTile extends StatelessWidget {
   const _CategoryTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SelectionTile(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      isSelected: isSelected,
+      onTap: onTap,
+    );
+  }
+}
+
+class _AdministrationTile extends StatelessWidget {
+  const _AdministrationTile({
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -1626,62 +2174,116 @@ class _SelectionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
+
+    final baseColor = Theme.of(context).cardTheme.color ?? colors.surface;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.button),
           onTap: onTap,
-          child: Ink(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: isSelected
-                  ? colorScheme.primary.withValues(alpha: 0.10)
-                  : colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(AppRadius.button),
+                  ? colors.primary.withValues(alpha: 0.10)
+                  : baseColor,
+              borderRadius: BorderRadius.circular(AppRadius.card),
               border: Border.all(
                 color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.outlineVariant,
+                    ? colors.primary.withValues(alpha: 0.75)
+                    : colors.outlineVariant.withValues(alpha: 0.60),
+                width: isSelected ? 1.4 : 1,
               ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: colors.primary.withValues(alpha: 0.10),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
             ),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  size: AppIcon.md,
-                  color: isSelected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colors.primary.withValues(alpha: 0.14)
+                        : colors.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    icon,
+                    size: AppIcon.md,
+                    color: isSelected
+                        ? colors.primary
+                        : colors.onSurfaceVariant,
+                  ),
                 ),
+
                 const SizedBox(width: AppSpacing.md),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: AppTypography.body,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w800,
+                          color: isSelected ? colors.primary : colors.onSurface,
                         ),
                       ),
+
                       const SizedBox(height: AppSpacing.xs),
+
                       Text(
                         subtitle,
                         style: TextStyle(
                           fontSize: AppTypography.caption,
-                          color: colorScheme.onSurfaceVariant,
+                          height: 1.3,
+                          color: colors.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
-                if (isSelected)
-                  Icon(Icons.check_circle, color: colorScheme.primary),
+
+                const SizedBox(width: AppSpacing.sm),
+
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isSelected ? colors.primary : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected
+                          ? colors.primary
+                          : colors.outlineVariant,
+                    ),
+                  ),
+                  child: isSelected
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 17,
+                          color: Colors.white,
+                        )
+                      : null,
+                ),
               ],
             ),
           ),
@@ -1709,7 +2311,7 @@ class _PresetTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.button),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         onTap: onTap,
         child: Ink(
           padding: const EdgeInsets.symmetric(
@@ -1719,8 +2321,8 @@ class _PresetTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSelected
                 ? colorScheme.primary.withValues(alpha: 0.10)
-                : colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(AppRadius.button),
+                : Theme.of(context).cardTheme.color ?? colorScheme.surface,
+            borderRadius: BorderRadius.circular(AppRadius.card),
             border: Border.all(
               color: isSelected
                   ? colorScheme.primary
@@ -1958,39 +2560,70 @@ class _ReminderChoiceChip extends StatelessWidget {
 class _ReviewCard extends StatelessWidget {
   const _ReviewCard({
     required this.title,
-    required this.category,
+    required this.subtitle,
+    required this.colorValue,
     required this.rows,
   });
 
   final String title;
-  final String category;
+  final String subtitle;
+  final int colorValue;
   final List<_ReviewRowData> rows;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+        color: colorScheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: AppTypography.title,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            category,
-            style: TextStyle(
-              fontSize: AppTypography.caption,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Color(colorValue),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colorScheme.outlineVariant),
+                ),
+                child: const Icon(
+                  Icons.palette_outlined,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: AppTypography.title,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.md),
           for (var index = 0; index < rows.length; index++) ...[
@@ -1998,21 +2631,23 @@ class _ReviewCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  width: 88,
+                  width: 94,
                   child: Text(
                     rows[index].label,
                     style: TextStyle(
                       fontSize: AppTypography.caption,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     rows[index].value,
                     style: const TextStyle(
                       fontSize: AppTypography.body,
                       fontWeight: FontWeight.w600,
+                      height: 1.35,
                     ),
                   ),
                 ),
@@ -2060,47 +2695,85 @@ class _CustomNameMessage extends StatelessWidget {
   }
 }
 
-class _ProtocolColorChoice extends StatelessWidget {
-  const _ProtocolColorChoice({
-    required this.colorValue,
-    required this.isSelected,
-    required this.onTap,
+class _FeatureSelectionTile extends StatelessWidget {
+  const _FeatureSelectionTile({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
   });
 
-  final int colorValue;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(colorValue);
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      label: 'Select protocol color',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          width: 42,
-          height: 42,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isSelected
-                  ? Theme.of(context).colorScheme.onSurface
-                  : Colors.transparent,
-              width: 2,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            onChanged(!value);
+          },
+          borderRadius: BorderRadius.circular(AppRadius.button),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.sm,
             ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            child: isSelected
-                ? const Icon(Icons.check, color: Colors.white, size: 20)
-                : null,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              border: Border.all(
+                color: value ? colorScheme.primary : colorScheme.outlineVariant,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  value: value,
+                  onChanged: (newValue) {
+                    onChanged(newValue ?? false);
+                  },
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      top: AppSpacing.sm,
+                      bottom: AppSpacing.sm,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: AppTypography.body,
+                            fontWeight: FontWeight.w700,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: AppTypography.caption,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

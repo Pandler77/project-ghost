@@ -6,6 +6,8 @@ import '../services/profile_avatar_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_avatar_picker_screen.dart';
+import '../services/profile_service.dart';
+import '../widgets/app_color_picker.dart';
 
 enum EditProfileAction { saved, deleted }
 
@@ -32,6 +34,9 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final ProfileAvatarService _avatarService = ProfileAvatarService();
+  final ProfileService _profileService = ProfileService();
+
+  late Profile _persistedProfile;
 
   late final TextEditingController _nameController;
 
@@ -42,20 +47,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final Set<ProfileModule> _selectedModules;
 
   bool _isSavingPhoto = false;
-  bool _didSave = false;
-
-  static const List<int?> _profileColors = [
-    null,
-    0xFF6750A4,
-    0xFF3F51B5,
-    0xFF1976D2,
-    0xFF00897B,
-    0xFF2E7D32,
-    0xFFF57C00,
-    0xFFC62828,
-    0xFFAD1457,
-    0xFF6D4C41,
-  ];
 
   @override
   void initState() {
@@ -68,22 +59,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _selectedAvatarId = widget.profile.iconCodePoint;
     _selectedAvatarImagePath = widget.profile.avatarImagePath;
     _selectedModules = {...widget.profile.enabledModules};
+    _persistedProfile = widget.profile;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-
-    final pendingPath = _selectedAvatarImagePath;
-    final originalPath = widget.profile.avatarImagePath;
-
-    if (!_didSave &&
-        pendingPath != null &&
-        pendingPath.isNotEmpty &&
-        pendingPath != originalPath) {
-      _avatarService.deleteAvatar(pendingPath);
-    }
-
     super.dispose();
   }
 
@@ -100,10 +81,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    setState(() {
-      _selectedAvatarId = selectedAvatarId;
-      _selectedAvatarImagePath = null;
-    });
+    final previousPhotoPath = _persistedProfile.avatarImagePath;
+
+    final updatedProfile = _persistedProfile.copyWith(
+      iconCodePoint: selectedAvatarId,
+      avatarImagePath: null,
+      updatedAt: DateTime.now(),
+    );
+
+    try {
+      await _profileService.updateProfile(updatedProfile);
+
+      if (previousPhotoPath != null && previousPhotoPath.isNotEmpty) {
+        await _avatarService.deleteAvatar(previousPhotoPath);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _persistedProfile = updatedProfile;
+        _selectedAvatarId = selectedAvatarId;
+        _selectedAvatarImagePath = null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update profile icon: $error')),
+      );
+    }
   }
 
   Future<void> _choosePhotoSource() async {
@@ -166,22 +176,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     if (action == _PhotoAction.remove) {
-      final currentPath = _selectedAvatarImagePath;
-      final originalPath = widget.profile.avatarImagePath;
+      final previousPhotoPath = _persistedProfile.avatarImagePath;
 
-      if (currentPath != null &&
-          currentPath.isNotEmpty &&
-          currentPath != originalPath) {
-        await _avatarService.deleteAvatar(currentPath);
+      final updatedProfile = _persistedProfile.copyWith(
+        avatarImagePath: null,
+        updatedAt: DateTime.now(),
+      );
+
+      try {
+        await _profileService.updateProfile(updatedProfile);
+
+        if (previousPhotoPath != null && previousPhotoPath.isNotEmpty) {
+          await _avatarService.deleteAvatar(previousPhotoPath);
+        }
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _persistedProfile = updatedProfile;
+          _selectedAvatarImagePath = null;
+        });
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not remove profile photo: $error')),
+        );
       }
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _selectedAvatarImagePath = null;
-      });
 
       return;
     }
@@ -199,14 +224,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return;
       }
 
-      final previousPendingPath = _selectedAvatarImagePath;
-      final originalPath = widget.profile.avatarImagePath;
+      final previousPhotoPath = _persistedProfile.avatarImagePath;
 
-      if (previousPendingPath != null &&
-          previousPendingPath.isNotEmpty &&
-          previousPendingPath != originalPath &&
-          previousPendingPath != path) {
-        await _avatarService.deleteAvatar(previousPendingPath);
+      final updatedProfile = _persistedProfile.copyWith(
+        avatarImagePath: path,
+        iconCodePoint: null,
+        updatedAt: DateTime.now(),
+      );
+
+      await _profileService.updateProfile(updatedProfile);
+
+      if (previousPhotoPath != null &&
+          previousPhotoPath.isNotEmpty &&
+          previousPhotoPath != path) {
+        await _avatarService.deleteAvatar(previousPhotoPath);
       }
 
       if (!mounted) {
@@ -214,7 +245,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
 
       setState(() {
+        _persistedProfile = updatedProfile;
         _selectedAvatarImagePath = path;
+        _selectedAvatarId = null;
       });
     } catch (error) {
       if (!mounted) {
@@ -233,10 +266,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  void _resetBuiltInAvatar() {
-    setState(() {
-      _selectedAvatarId = null;
-    });
+  Future<void> _resetBuiltInAvatar() async {
+    final updatedProfile = _persistedProfile.copyWith(
+      iconCodePoint: null,
+      updatedAt: DateTime.now(),
+    );
+
+    try {
+      await _profileService.updateProfile(updatedProfile);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _persistedProfile = updatedProfile;
+        _selectedAvatarId = null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not reset profile icon: $error')),
+      );
+    }
   }
 
   Future<void> _save() async {
@@ -256,30 +311,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    final originalPhotoPath = widget.profile.avatarImagePath;
-    final updatedPhotoPath = _selectedAvatarImagePath;
-
-    if (originalPhotoPath != null &&
-        originalPhotoPath.isNotEmpty &&
-        originalPhotoPath != updatedPhotoPath) {
-      await _avatarService.deleteAvatar(originalPhotoPath);
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    final updatedProfile = widget.profile.copyWith(
+    final updatedProfile = _persistedProfile.copyWith(
       name: name,
       type: _selectedType,
       iconCodePoint: _selectedAvatarId,
       colorValue: _selectedColorValue,
-      avatarImagePath: updatedPhotoPath,
+      avatarImagePath: _selectedAvatarImagePath,
       enabledModules: Set<ProfileModule>.from(_selectedModules),
       updatedAt: DateTime.now(),
     );
-
-    _didSave = true;
 
     Navigator.pop(
       context,
@@ -336,21 +376,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    await _avatarService.deleteAvatar(widget.profile.avatarImagePath);
-
-    final pendingPath = _selectedAvatarImagePath;
-
-    if (pendingPath != null &&
-        pendingPath.isNotEmpty &&
-        pendingPath != widget.profile.avatarImagePath) {
-      await _avatarService.deleteAvatar(pendingPath);
-    }
+    await _avatarService.deleteAvatar(_persistedProfile.avatarImagePath);
 
     if (!mounted) {
       return;
     }
-
-    _didSave = true;
 
     Navigator.pop(
       context,
@@ -366,14 +396,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ? widget.profile.name
         : _nameController.text.trim();
 
-    final previewProfile = widget.profile.copyWith(
+    final previewProfile = _persistedProfile.copyWith(
       name: previewName,
       type: _selectedType,
       iconCodePoint: _selectedAvatarId,
       colorValue: _selectedColorValue,
       avatarImagePath: _selectedAvatarImagePath,
       enabledModules: Set<ProfileModule>.from(_selectedModules),
-      updatedAt: widget.profile.updatedAt,
+      updatedAt: _persistedProfile.updatedAt,
     );
 
     return Scaffold(
@@ -511,21 +541,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             const SizedBox(height: AppSpacing.md),
 
-            Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.md,
-              children: [
-                for (final colorValue in _profileColors)
-                  _ColorOption(
-                    colorValue: colorValue,
-                    selected: _selectedColorValue == colorValue,
-                    onTap: () {
-                      setState(() {
-                        _selectedColorValue = colorValue;
-                      });
-                    },
-                  ),
-              ],
+            AppColorPicker(
+              selectedColorValue: _selectedColorValue,
+              allowDefault: true,
+              onColorChanged: (value) {
+                setState(() {
+                  _selectedColorValue = value;
+                });
+              },
             ),
 
             const SizedBox(height: AppSpacing.lg),
@@ -672,63 +695,6 @@ class _ProfileTypeTile extends StatelessWidget {
                 color: selected ? colors.primary : colors.onSurfaceVariant,
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ColorOption extends StatelessWidget {
-  const _ColorOption({
-    required this.colorValue,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final int? colorValue;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    final color = colorValue == null
-        ? colors.primaryContainer
-        : Color(colorValue!);
-
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: colorValue == null
-          ? 'Default profile color'
-          : 'Profile color option',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          width: 46,
-          height: 46,
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: selected ? colors.primary : colors.outlineVariant,
-              width: selected ? 3 : 1,
-            ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            child: selected
-                ? Icon(
-                    Icons.check,
-                    size: 20,
-                    color: colorValue == null
-                        ? colors.onPrimaryContainer
-                        : Colors.white,
-                  )
-                : null,
           ),
         ),
       ),

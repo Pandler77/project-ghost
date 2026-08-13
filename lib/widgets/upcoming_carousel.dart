@@ -79,16 +79,7 @@ class _UpcomingCarouselState extends State<UpcomingCarousel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'UPCOMING',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.1,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (upcomingDays.isEmpty)
+          if (upcomingDays.isEmpty)
           const _EmptyUpcomingState()
         else ...[
           SizedBox(

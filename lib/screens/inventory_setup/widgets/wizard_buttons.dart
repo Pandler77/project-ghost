@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_theme.dart';
+
 class WizardButtons extends StatelessWidget {
   const WizardButtons({
     required this.onNext,
@@ -12,7 +14,6 @@ class WizardButtons extends StatelessWidget {
 
   final VoidCallback? onBack;
   final VoidCallback onNext;
-
   final String nextLabel;
   final bool isNextEnabled;
   final bool isLoading;
@@ -25,21 +26,47 @@ class WizardButtons extends StatelessWidget {
           Expanded(
             child: OutlinedButton(
               onPressed: isLoading ? null : onBack,
-              child: const Text('Back'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.button),
+                ),
+              ),
+              child: const Text(
+                'Back',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm),
         ],
         Expanded(
+          flex: 2,
           child: FilledButton(
             onPressed: isNextEnabled && !isLoading ? onNext : null,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.button),
+              ),
+            ),
             child: isLoading
                 ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Text(nextLabel),
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        nextLabel,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.arrow_forward_rounded, size: 18),
+                    ],
+                  ),
           ),
         ),
       ],

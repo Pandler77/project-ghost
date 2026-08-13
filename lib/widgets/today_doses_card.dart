@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/cycle_status.dart';
+import '../models/display_preferences.dart';
 import '../models/dose.dart';
 import '../theme/app_theme.dart';
 
@@ -7,11 +9,13 @@ class TodayDosesCard extends StatefulWidget {
   const TodayDosesCard({
     required this.doses,
     required this.onDosePressed,
+    required this.displayPreferences,
     super.key,
   });
 
   final List<Dose> doses;
-  final void Function(Dose dose) onDosePressed;
+  final Future<void> Function(Dose dose) onDosePressed;
+  final DisplayPreferences displayPreferences;
 
   @override
   State<TodayDosesCard> createState() => _TodayDosesCardState();
@@ -22,18 +26,13 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
 
   @override
   Widget build(BuildContext context) {
-    final completedDoses = widget.doses
-        .where((dose) => dose.isCompleted)
+    final resolvedDoses = widget.doses
+        .where((dose) => dose.isResolved)
         .toList();
 
     final pendingDoses = widget.doses
-        .where((dose) => !dose.isCompleted)
+        .where((dose) => !dose.isResolved)
         .toList();
-
-    final completedCount = completedDoses.length;
-    final totalCount = widget.doses.length;
-
-    final progress = totalCount == 0 ? 0.0 : completedCount / totalCount;
 
     return AnimatedSize(
       duration: const Duration(milliseconds: 250),
@@ -42,33 +41,6 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionHeader(
-            completedCount: completedCount,
-            totalCount: totalCount,
-          ),
-
-          const SizedBox(height: AppSpacing.sm),
-
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: progress),
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeOutCubic,
-              builder: (context, animatedProgress, child) {
-                return LinearProgressIndicator(
-                  value: animatedProgress,
-                  minHeight: 5,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest,
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.md),
-
           if (widget.doses.isEmpty)
             const _EmptyTodayState()
           else ...[
@@ -79,32 +51,20 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                   '${pendingDoses[index].scheduledFor.microsecondsSinceEpoch}',
                 ),
                 dose: pendingDoses[index],
-                onPressed: () {
-                  final isLastPending = pendingDoses.length == 1;
-
-                  widget.onDosePressed(pendingDoses[index]);
-
-                  if (isLastPending) {
-                    setState(() {
-                      _showCompleted = false;
-                    });
-                  }
+                displayPreferences: widget.displayPreferences,
+                onPressed: () async {
+                  await widget.onDosePressed(pendingDoses[index]);
                 },
               ),
               if (index < pendingDoses.length - 1)
                 const SizedBox(height: AppSpacing.sm),
             ],
 
-            if (pendingDoses.isEmpty) ...[
-              const SizedBox(height: AppSpacing.sm),
-              const _FinishedTodayBanner(),
-            ],
-
-            if (completedDoses.isNotEmpty) ...[
+            if (resolvedDoses.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
 
               _CompletedHeader(
-                count: completedDoses.length,
+                count: resolvedDoses.length,
                 isExpanded: _showCompleted,
                 onPressed: () {
                   setState(() {
@@ -123,16 +83,16 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                     const SizedBox(height: AppSpacing.sm),
                     for (
                       var index = 0;
-                      index < completedDoses.length;
+                      index < resolvedDoses.length;
                       index++
                     ) ...[
                       _CompletedDoseRow(
-                        dose: completedDoses[index],
-                        onRemove: () {
-                          widget.onDosePressed(completedDoses[index]);
+                        dose: resolvedDoses[index],
+                        onPressed: () async {
+                          await widget.onDosePressed(resolvedDoses[index]);
                         },
                       ),
-                      if (index < completedDoses.length - 1)
+                      if (index < resolvedDoses.length - 1)
                         const SizedBox(height: AppSpacing.sm),
                     ],
                   ],
@@ -143,49 +103,6 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.completedCount,
-    required this.totalCount,
-  });
-
-  final int completedCount;
-  final int totalCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final remainingCount = totalCount - completedCount;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        const Expanded(
-          child: Text(
-            'TODAY',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.1,
-            ),
-          ),
-        ),
-        Text(
-          totalCount == 0
-              ? 'Nothing due'
-              : remainingCount == 0
-              ? 'Complete'
-              : '$remainingCount remaining',
-          style: TextStyle(
-            fontSize: AppTypography.caption,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -205,45 +122,17 @@ class _EmptyTodayState extends StatelessWidget {
   }
 }
 
-class _FinishedTodayBanner extends StatelessWidget {
-  const _FinishedTodayBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(AppRadius.button),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.check_circle, color: colorScheme.primary),
-          const SizedBox(width: AppSpacing.sm),
-          const Expanded(
-            child: Text(
-              'Everything is complete for today.',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PendingDoseRow extends StatefulWidget {
   const _PendingDoseRow({
     required this.dose,
     required this.onPressed,
+    required this.displayPreferences,
     super.key,
   });
 
   final Dose dose;
-  final VoidCallback onPressed;
+  final Future<void> Function() onPressed;
+  final DisplayPreferences displayPreferences;
 
   @override
   State<_PendingDoseRow> createState() => _PendingDoseRowState();
@@ -261,19 +150,32 @@ class _PendingDoseRowState extends State<_PendingDoseRow> {
       _isCompleting = true;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 650));
-
-    if (!mounted) {
-      return;
+    try {
+      await widget.onPressed();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCompleting = false;
+        });
+      }
     }
-
-    widget.onPressed();
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final protocolColor = Color(widget.dose.protocolColorValue);
+    final cycleStatus = widget.dose.cycleStatus;
+
+    final cyclePrimary = _cyclePrimaryText(
+      cycleStatus,
+      widget.displayPreferences,
+    );
+
+    final cycleSecondary = _cycleSecondaryText(
+      cycleStatus,
+      widget.displayPreferences,
+    );
 
     return Container(
       width: double.infinity,
@@ -313,22 +215,20 @@ class _PendingDoseRowState extends State<_PendingDoseRow> {
                     color: colorScheme.onSurface,
                   ),
                 ),
-                if (widget.dose.hasCycleStatus) ...[
+                if (cyclePrimary.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Cycle: '
-                    '${widget.dose.cyclePrimaryLabel!}',
+                    'Cycle: $cyclePrimary',
                     style: TextStyle(
                       fontSize: AppTypography.caption,
                       fontWeight: FontWeight.w700,
                       color: colorScheme.primary,
                     ),
                   ),
-                  if (widget.dose.cycleSecondaryLabel?.trim().isNotEmpty ==
-                      true) ...[
+                  if (cycleSecondary.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
-                      widget.dose.cycleSecondaryLabel!,
+                      cycleSecondary,
                       style: TextStyle(
                         fontSize: AppTypography.caption,
                         fontWeight: FontWeight.w600,
@@ -347,31 +247,37 @@ class _PendingDoseRowState extends State<_PendingDoseRow> {
               return ScaleTransition(scale: animation, child: child);
             },
             child: _isCompleting
-                ? FilledButton.icon(
-                    key: const ValueKey('taken-confirmed'),
-                    onPressed: null,
-                    style: FilledButton.styleFrom(
-                      disabledBackgroundColor: protocolColor,
-                      disabledForegroundColor: Colors.white,
-                      minimumSize: const Size(92, 42),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                ? SizedBox(
+                    key: const ValueKey('dose-loading'),
+                    width: 96,
+                    height: 42,
+                    child: OutlinedButton(
+                      onPressed: null,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color: protocolColor.withValues(alpha: 0.75),
+                        ),
+                      ),
+                      child: const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     ),
-                    icon: const Icon(Icons.check_rounded, size: 19),
-                    label: const Text('Taken'),
                   )
                 : OutlinedButton(
-                    key: const ValueKey('taken-pending'),
+                    key: const ValueKey('take-dose'),
                     onPressed: _markTaken,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: colorScheme.onSurface,
                       side: BorderSide(
                         color: protocolColor.withValues(alpha: 0.75),
                       ),
-                      minimumSize: const Size(82, 42),
+                      minimumSize: const Size(96, 42),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                     ),
                     child: const Text(
-                      'Taken',
+                      'Take Dose',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -419,17 +325,24 @@ class _CompletedHeader extends StatelessWidget {
 }
 
 class _CompletedDoseRow extends StatelessWidget {
-  const _CompletedDoseRow({required this.dose, required this.onRemove});
+  const _CompletedDoseRow({
+    required this.dose,
+    required this.onPressed,
+  });
 
   final Dose dose;
-  final VoidCallback onRemove;
+  final Future<void> Function() onPressed;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final protocolColor = Color(dose.protocolColorValue);
 
-    final completionText = dose.completedAt == null
+    final completionText = dose.isSkipped
+        ? dose.completedAt == null
+              ? 'Skipped'
+              : 'Skipped at ${_formatTime(dose.completedAt!)}'
+        : dose.completedAt == null
         ? 'Taken'
         : 'Taken at ${_formatTime(dose.completedAt!)}';
 
@@ -448,7 +361,10 @@ class _CompletedDoseRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.check_circle, color: protocolColor),
+          Icon(
+            dose.isSkipped ? Icons.remove_circle_outline : Icons.check_circle,
+            color: protocolColor,
+          ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
@@ -462,21 +378,179 @@ class _CompletedDoseRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  '${dose.amount} • $completionText',
-                  style: TextStyle(
-                    fontSize: AppTypography.caption,
-                    color: colorScheme.onSurface,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${dose.amount} • $completionText',
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    if (dose.hasInjectionSite) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 14,
+                            color: protocolColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              dose.injectionSiteLabel!,
+                              style: TextStyle(
+                                fontSize: AppTypography.caption,
+                                fontWeight: FontWeight.w600,
+                                color: protocolColor,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
           ),
-          TextButton(onPressed: onRemove, child: const Text('Undo')),
+          TextButton(
+            onPressed: () async {
+              await onPressed();
+            },
+            child: const Text('Details'),
+          ),
         ],
       ),
     );
   }
+}
+
+String _cyclePrimaryText(
+  CycleStatus? status,
+  DisplayPreferences preferences,
+) {
+  if (status == null || !status.isCycled || !preferences.showCycleStatus) {
+    return '';
+  }
+
+  if (status.isBeforeStart) {
+    return 'Starts soon';
+  }
+
+  if (status.phaseLabel == 'Cycle complete') {
+    return 'Cycle complete';
+  }
+
+  if (!status.isActive) {
+    return 'Off cycle';
+  }
+
+  final totalDays = status.totalDaysInCurrentPhase;
+  final currentDay = status.dayInCurrentPhase;
+
+  if (totalDays <= 0 || currentDay <= 0) {
+    return 'On cycle';
+  }
+
+  if (totalDays >= 7) {
+    final currentWeek = ((currentDay - 1) ~/ 7) + 1;
+    final totalWeeks = (totalDays / 7).ceil();
+    return 'Week $currentWeek of $totalWeeks';
+  }
+
+  return 'Day $currentDay of $totalDays';
+}
+
+String _cycleSecondaryText(
+  CycleStatus? status,
+  DisplayPreferences preferences,
+) {
+  if (status == null || !status.isCycled || !preferences.showCycleStatus) {
+    return '';
+  }
+
+  final parts = <String>[];
+
+  if (status.isBeforeStart) {
+    final startDate = status.nextTransitionDate;
+
+    if (startDate != null && preferences.showCycleResumeDate) {
+      parts.add('Starts ${_formatCycleDate(startDate)}');
+    }
+
+    if (preferences.showCycleRemainingDays) {
+      parts.add(_remainingCycleText(status.daysRemainingInCurrentPhase));
+    }
+
+    return parts.join(' • ');
+  }
+
+  if (status.phaseLabel == 'Cycle complete') {
+    return 'This cycle has ended';
+  }
+
+  if (status.isActive) {
+    final transitionDate = status.nextTransitionDate;
+
+    if (transitionDate != null && preferences.showCycleEndDate) {
+      final endDate = transitionDate.subtract(const Duration(days: 1));
+      parts.add('Ends ${_formatCycleDate(endDate)}');
+    }
+
+    if (preferences.showCycleRemainingDays) {
+      final remaining = status.daysRemainingInCurrentPhase;
+      parts.add(
+        remaining <= 0
+            ? 'Last active day'
+            : _remainingCycleText(remaining),
+      );
+    }
+
+    return parts.join(' • ');
+  }
+
+  final resumeDate = status.nextTransitionDate;
+
+  if (resumeDate != null && preferences.showCycleResumeDate) {
+    parts.add('Resumes ${_formatCycleDate(resumeDate)}');
+  }
+
+  if (preferences.showCycleRemainingDays) {
+    parts.add(_remainingCycleText(status.daysRemainingInCurrentPhase));
+  }
+
+  return parts.join(' • ');
+}
+
+String _remainingCycleText(int days) {
+  if (days <= 0) {
+    return 'Last Day';
+  }
+
+  return '$days ${days == 1 ? 'Day' : 'Days'} Remaining';
+}
+
+String _formatCycleDate(DateTime date) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  return '${months[date.month - 1]} ${date.day}';
 }
 
 String _formatTime(DateTime time) {

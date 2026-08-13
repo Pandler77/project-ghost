@@ -1,13 +1,18 @@
 import 'cycle_unit.dart';
 import 'dose_unit.dart';
+import 'injection_site.dart';
 import 'protocol_schedule.dart';
 import 'protocol_status.dart';
+import 'protocol_type.dart';
+import 'rotation_mode.dart';
 import 'schedule_type.dart';
+import 'protocol_category.dart';
 
 class Protocol {
   Protocol({
     String? id,
     required this.name,
+    this.type = ProtocolType.injection,
 
     // Temporary legacy support lets existing screens continue using:
     // dose: '3 mg'
@@ -25,24 +30,33 @@ class Protocol {
     this.cycleOffDuration = 0,
     this.cycleOffUnit = CycleUnit.weeks,
     this.repeatCycle = false,
+    this.rotationEnabled = false,
+    this.rotationMode = RotationMode.sequential,
+    Set<InjectionSite>? enabledInjectionSites,
     this.reminderEnabled = false,
     this.reminderMinutesBefore = 0,
     this.missedDoseReminderEnabled = false,
     this.missedDoseReminderMinutesAfter = 60,
+    this.category = ProtocolCategory.custom,
   }) : assert(
          dose != null || doseAmount != null,
          'Either dose or doseAmount must be provided.',
        ),
        id = id ?? name,
        doseAmount = doseAmount ?? _parseDoseAmount(dose),
-       doseUnit = doseUnit ?? _parseDoseUnit(dose);
+       doseUnit = doseUnit ?? _parseDoseUnit(dose),
+       enabledInjectionSites = Set.unmodifiable(
+         enabledInjectionSites ?? const <InjectionSite>{},
+       );
 
   static const int defaultColorValue = 0xFF6750A4;
-
   static const Object _unset = Object();
 
   final String id;
   final String name;
+
+  /// Describes how the medication or protocol is administered.
+  final ProtocolType type;
 
   /// Structured numeric dose used for calculations and validation.
   final double doseAmount;
@@ -63,10 +77,17 @@ class Protocol {
   final CycleUnit cycleOffUnit;
   final bool repeatCycle;
 
+  final bool rotationEnabled;
+  final RotationMode rotationMode;
+  final Set<InjectionSite> enabledInjectionSites;
+
   final bool reminderEnabled;
   final int reminderMinutesBefore;
   final bool missedDoseReminderEnabled;
   final int missedDoseReminderMinutesAfter;
+  final ProtocolCategory category;
+
+  bool get isInjection => type == ProtocolType.injection;
 
   /// Keeps existing UI references such as protocol.dose working.
   String get dose => '${_formatAmount(doseAmount)} ${doseUnit.label}';
@@ -74,6 +95,8 @@ class Protocol {
   Protocol copyWith({
     String? id,
     String? name,
+    ProtocolType? type,
+    ProtocolCategory? category,
 
     // Temporary legacy support.
     String? dose,
@@ -90,17 +113,23 @@ class Protocol {
     int? cycleOffDuration,
     CycleUnit? cycleOffUnit,
     bool? repeatCycle,
+    bool? rotationEnabled,
+    RotationMode? rotationMode,
+    Set<InjectionSite>? enabledInjectionSites,
     bool? reminderEnabled,
     int? reminderMinutesBefore,
     bool? missedDoseReminderEnabled,
     int? missedDoseReminderMinutesAfter,
   }) {
     final parsedLegacyAmount = dose == null ? null : _parseDoseAmount(dose);
+
     final parsedLegacyUnit = dose == null ? null : _parseDoseUnit(dose);
 
     return Protocol(
       id: id ?? this.id,
       name: name ?? this.name,
+      type: type ?? this.type,
+      category: category ?? this.category,
       doseAmount: doseAmount ?? parsedLegacyAmount ?? this.doseAmount,
       doseUnit: doseUnit ?? parsedLegacyUnit ?? this.doseUnit,
       schedule: schedule ?? this.schedule,
@@ -115,6 +144,10 @@ class Protocol {
       cycleOffDuration: cycleOffDuration ?? this.cycleOffDuration,
       cycleOffUnit: cycleOffUnit ?? this.cycleOffUnit,
       repeatCycle: repeatCycle ?? this.repeatCycle,
+      rotationEnabled: rotationEnabled ?? this.rotationEnabled,
+      rotationMode: rotationMode ?? this.rotationMode,
+      enabledInjectionSites:
+          enabledInjectionSites ?? this.enabledInjectionSites,
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       reminderMinutesBefore:
           reminderMinutesBefore ?? this.reminderMinutesBefore,
@@ -129,11 +162,13 @@ class Protocol {
     return {
       'id': id,
       'name': name,
+      'protocol_type': type.storageValue,
+      'protocol_category': category.storageValue,
 
       // Legacy column retained temporarily for older app versions/data.
       'dose': dose,
 
-      // New structured columns.
+      // Structured dose columns.
       'dose_amount': doseAmount,
       'dose_unit': doseUnit.storageValue,
 
@@ -158,6 +193,11 @@ class Protocol {
       'cycle_off_duration': cycleOffDuration,
       'cycle_off_unit': cycleOffUnit.storageValue,
       'repeat_cycle': repeatCycle ? 1 : 0,
+
+      // Injection rotation settings
+      'rotation_enabled': rotationEnabled ? 1 : 0,
+      'rotation_mode': rotationMode.storageValue,
+      'enabled_injection_sites': _encodeInjectionSites(enabledInjectionSites),
 
       // Reminder settings
       'reminder_enabled': reminderEnabled ? 1 : 0,
@@ -212,13 +252,20 @@ class Protocol {
     final storedCycleStartDate = map['cycle_start_date'] as String?;
 
     final storedDoseAmount = (map['dose_amount'] as num?)?.toDouble();
+
     final storedDoseUnit = map['dose_unit'] as String?;
+
     final legacyDose = map['dose'] as String?;
 
     return Protocol(
       id: map['id'] as String,
       name: map['name'] as String,
-
+      type: ProtocolTypeDetails.fromStorageValue(
+        map['protocol_type'] as String?,
+      ),
+      category: ProtocolCategoryDetails.fromStorageValue(
+        map['protocol_category'] as String?,
+      ),
       // New records use structured values.
       // Older records fall back to parsing the original dose string.
       doseAmount: storedDoseAmount ?? _parseDoseAmount(legacyDose),
@@ -244,6 +291,13 @@ class Protocol {
         fallback: CycleUnit.weeks,
       ),
       repeatCycle: (map['repeat_cycle'] as num?)?.toInt() == 1,
+      rotationEnabled: (map['rotation_enabled'] as num?)?.toInt() == 1,
+      rotationMode: RotationModeDetails.fromStorageValue(
+        map['rotation_mode'] as String?,
+      ),
+      enabledInjectionSites: _decodeInjectionSites(
+        map['enabled_injection_sites'] as String?,
+      ),
       reminderEnabled: (map['reminder_enabled'] as num?)?.toInt() == 1,
       reminderMinutesBefore:
           (map['reminder_minutes_before'] as num?)?.toInt() ?? 0,
@@ -291,5 +345,25 @@ class Protocol {
     }
 
     return value.split(',').map((day) => int.parse(day)).toSet();
+  }
+
+  static String _encodeInjectionSites(Set<InjectionSite> sites) {
+    final values = sites.map((site) => site.storageValue).toList()..sort();
+
+    return values.join(',');
+  }
+
+  static Set<InjectionSite> _decodeInjectionSites(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return {};
+    }
+
+    final sites = value
+        .split(',')
+        .map((item) => InjectionSiteDetails.fromStorageValue(item.trim()))
+        .whereType<InjectionSite>()
+        .toSet();
+
+    return sites;
   }
 }

@@ -1,13 +1,25 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 import '../models/daily_protocol_item.dart';
 import '../models/dose_record.dart';
+import '../models/injection_log.dart';
+import '../models/injection_site.dart';
 import '../models/protocol.dart';
 import '../models/weight_record.dart';
 import '../services/app_data_service.dart';
 import '../services/protocol_schedule_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/daily/edit_day_sheet.dart';
+import 'daily_notes_symptoms_screen.dart';
+import '../models/symptom_entry.dart';
+import '../services/symptom_service.dart';
+import '../models/progress_photo.dart';
+import '../models/progress_photo_session.dart';
+import '../services/progress_photo_service.dart';
+import 'progress_photo_session_screen.dart';
+import '../models/measurement_system.dart';
+import '../utils/weight_display.dart';
 
 class DailyTimelineScreen extends StatefulWidget {
   const DailyTimelineScreen({
@@ -15,6 +27,7 @@ class DailyTimelineScreen extends StatefulWidget {
     required this.protocols,
     required this.dataService,
     required this.onDataChanged,
+    required this.measurementSystem,
     super.key,
   });
 
@@ -22,6 +35,7 @@ class DailyTimelineScreen extends StatefulWidget {
   final List<Protocol> protocols;
   final AppDataService dataService;
   final VoidCallback onDataChanged;
+  final MeasurementSystem measurementSystem;
 
   @override
   State<DailyTimelineScreen> createState() => _DailyTimelineScreenState();
@@ -31,11 +45,19 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
     with SingleTickerProviderStateMixin {
   final ProtocolScheduleService _scheduleService =
       const ProtocolScheduleService();
+  final SymptomService _symptomService = SymptomService();
+  final ProgressPhotoService _progressPhotoService = ProgressPhotoService();
+
+  List<ProgressPhotoSession> _photoSessions = [];
+  Map<String, List<ProgressPhoto>> _photosBySessionId = {};
+
+  List<SymptomEntry> _symptomEntries = [];
 
   late final TabController _tabController;
 
   WeightRecord? _weightRecord;
   List<DailyProtocolItem> _protocolItems = [];
+  Map<String, InjectionLog> _injectionLogsByDoseRecordId = {};
 
   bool _isLoading = true;
   String? _loadError;
@@ -65,11 +87,27 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
       final results = await Future.wait([
         widget.dataService.getWeightRecordForDate(widget.date),
         widget.dataService.getDoseRecordsForDate(widget.date),
+        widget.dataService.getAllInjectionLogs(),
+        _symptomService.getEntriesForDate(widget.date),
+        _progressPhotoService.getSessionsForDate(widget.date),
       ]);
 
       final weightRecord = results[0] as WeightRecord?;
-
       final doseRecords = results[1] as List<DoseRecord>;
+      final injectionLogs = results[2] as List<InjectionLog>;
+      final symptomEntries = results[3] as List<SymptomEntry>;
+      final photoSessions = results[4] as List<ProgressPhotoSession>;
+
+      final injectionLogsByDoseRecordId = <String, InjectionLog>{
+        for (final log in injectionLogs) log.doseRecordId: log,
+      };
+
+      final photosBySessionId = <String, List<ProgressPhoto>>{};
+
+      for (final session in photoSessions) {
+        photosBySessionId[session.id] = await _progressPhotoService
+            .getPhotosForSession(session.id);
+      }
 
       final recordsByDose = <String, DoseRecord>{
         for (final record in doseRecords)
@@ -105,7 +143,11 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
       setState(() {
         _weightRecord = weightRecord;
         _protocolItems = items;
+        _injectionLogsByDoseRecordId = injectionLogsByDoseRecordId;
+        _symptomEntries = symptomEntries;
         _isLoading = false;
+        _photoSessions = photoSessions;
+        _photosBySessionId = photosBySessionId;
       });
     } catch (error) {
       if (!mounted) {
@@ -129,6 +171,7 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
           date: widget.date,
           protocolItems: _protocolItems,
           weightRecord: _weightRecord,
+          measurementSystem: widget.measurementSystem,
           onSave: (result) {
             Navigator.pop(sheetContext, result);
           },
@@ -311,11 +354,17 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
 
         const SizedBox(height: AppSpacing.lg),
 
-        _ProtocolsSection(items: _protocolItems),
+        _ProtocolsSection(
+          items: _protocolItems,
+          injectionLogsByDoseRecordId: _injectionLogsByDoseRecordId,
+        ),
 
         const SizedBox(height: AppSpacing.lg),
 
-        _WeightSection(record: _weightRecord),
+        _WeightSection(
+          record: _weightRecord,
+          measurementSystem: widget.measurementSystem,
+        ),
 
         const SizedBox(height: AppSpacing.lg),
 
@@ -328,19 +377,37 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
         ),
 
         SizedBox(
-          height: 220,
+          height: 320,
           child: TabBarView(
             controller: _tabController,
-            children: const [
-              _EmptyTabContent(
-                icon: Icons.notes_outlined,
-                title: 'No notes or symptoms',
-                message: 'Notes and symptom tracking will appear here.',
+            children: [
+              _NotesSymptomsTab(
+                date: widget.date,
+                protocols: widget.protocols,
+                entries: _symptomEntries,
+                onChanged: _loadDay,
               ),
-              _EmptyTabContent(
-                icon: Icons.photo_library_outlined,
-                title: 'No progress photos',
-                message: 'Progress photo sessions will appear here.',
+              _PhotosTab(
+                sessions: _photoSessions,
+                photosBySessionId: _photosBySessionId,
+                measurementSystem: widget.measurementSystem,
+                onOpenSession: (session) async {
+                  await Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProgressPhotoSessionScreen(
+                        session: session,
+                        measurementSystem: widget.measurementSystem,
+                      ),
+                    ),
+                  );
+
+                  if (!mounted) {
+                    return;
+                  }
+
+                  await _loadDay();
+                },
               ),
             ],
           ),
@@ -379,9 +446,13 @@ class _DateHeader extends StatelessWidget {
 }
 
 class _ProtocolsSection extends StatelessWidget {
-  const _ProtocolsSection({required this.items});
+  const _ProtocolsSection({
+    required this.items,
+    required this.injectionLogsByDoseRecordId,
+  });
 
   final List<DailyProtocolItem> items;
+  final Map<String, InjectionLog> injectionLogsByDoseRecordId;
 
   @override
   Widget build(BuildContext context) {
@@ -397,7 +468,12 @@ class _ProtocolsSection extends StatelessWidget {
           : Column(
               children: [
                 for (var index = 0; index < items.length; index++) ...[
-                  _ProtocolRow(item: items[index]),
+                  _ProtocolRow(
+                    item: items[index],
+                    injectionLog: items[index].record == null
+                        ? null
+                        : injectionLogsByDoseRecordId[items[index].record!.id],
+                  ),
                   if (index < items.length - 1)
                     const Divider(height: AppSpacing.lg),
                 ],
@@ -408,9 +484,10 @@ class _ProtocolsSection extends StatelessWidget {
 }
 
 class _ProtocolRow extends StatelessWidget {
-  const _ProtocolRow({required this.item});
+  const _ProtocolRow({required this.item, required this.injectionLog});
 
   final DailyProtocolItem item;
+  final InjectionLog? injectionLog;
 
   @override
   Widget build(BuildContext context) {
@@ -418,14 +495,20 @@ class _ProtocolRow extends StatelessWidget {
 
     final isTaken = item.isTaken;
     final displayedAmount = item.displayedAmount;
+    final isSkipped = item.record?.status == DoseRecordStatus.skipped;
+    final isMissed = item.record?.status == DoseRecordStatus.missed;
 
     final statusText = isTaken
         ? item.record?.completedAt == null
               ? 'Taken'
-              : 'Taken at '
-                    '${_formatDateTime(item.record!.completedAt!)}'
-        : 'Scheduled for '
-              '${_formatDateTime(item.scheduledFor)}';
+              : 'Taken at ${_formatDateTime(item.record!.completedAt!)}'
+        : isSkipped
+        ? item.record?.completedAt == null
+              ? 'Skipped'
+              : 'Skipped at ${_formatDateTime(item.record!.completedAt!)}'
+        : isMissed
+        ? 'Missed'
+        : 'Scheduled for ${_formatDateTime(item.scheduledFor)}';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,10 +529,20 @@ class _ProtocolRow extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    isTaken ? Icons.check_circle : Icons.radio_button_unchecked,
+                    isTaken
+                        ? Icons.check_circle
+                        : isSkipped
+                        ? Icons.remove_circle_outline
+                        : isMissed
+                        ? Icons.error_outline
+                        : Icons.radio_button_unchecked,
                     size: 19,
                     color: isTaken
                         ? const Color(0xFF34C759)
+                        : isSkipped
+                        ? const Color(0xFFFFA726)
+                        : isMissed
+                        ? Theme.of(context).colorScheme.error
                         : Theme.of(context).colorScheme.outline,
                   ),
                   const SizedBox(width: AppSpacing.xs),
@@ -477,6 +570,25 @@ class _ProtocolRow extends StatelessWidget {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (isTaken && injectionLog != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    Icon(Icons.location_on_outlined, size: 14, color: color),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        injectionLog!.site.label,
+                        style: TextStyle(
+                          fontSize: AppTypography.caption,
+                          fontWeight: FontWeight.w600,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -486,9 +598,10 @@ class _ProtocolRow extends StatelessWidget {
 }
 
 class _WeightSection extends StatelessWidget {
-  const _WeightSection({required this.record});
+  const _WeightSection({required this.record, required this.measurementSystem});
 
   final WeightRecord? record;
+  final MeasurementSystem measurementSystem;
 
   @override
   Widget build(BuildContext context) {
@@ -502,7 +615,7 @@ class _WeightSection extends StatelessWidget {
               ),
             )
           : Text(
-              '${record!.weight.toStringAsFixed(1)} lb',
+              WeightDisplay.format(record!.weight, measurementSystem),
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
             ),
     );
@@ -543,45 +656,315 @@ class _TimelineSection extends StatelessWidget {
   }
 }
 
-class _EmptyTabContent extends StatelessWidget {
-  const _EmptyTabContent({
-    required this.icon,
-    required this.title,
-    required this.message,
+class _NotesSymptomsTab extends StatelessWidget {
+  const _NotesSymptomsTab({
+    required this.date,
+    required this.protocols,
+    required this.entries,
+    required this.onChanged,
   });
 
-  final IconData icon;
-  final String title;
-  final String message;
+  final DateTime date;
+  final List<Protocol> protocols;
+  final List<SymptomEntry> entries;
+  final Future<void> Function() onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 38, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: AppTypography.body,
-                fontWeight: FontWeight.w600,
+    final colors = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (entries.isEmpty) ...[
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.notes_outlined, size: 38, color: colors.outline),
+                    const SizedBox(height: AppSpacing.sm),
+                    const Text(
+                      'No notes or symptoms',
+                      style: TextStyle(
+                        fontSize: AppTypography.body,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Log symptoms, severity, and notes for this day.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        await Navigator.push<void>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DailyNotesSymptomsScreen(
+                              date: date,
+                              protocols: protocols,
+                            ),
+                          ),
+                        );
+
+                        await onChanged();
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Symptom'),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: AppTypography.caption,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${entries.length} ${entries.length == 1 ? 'symptom' : 'symptoms'} logged',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DailyNotesSymptomsScreen(
+                          date: date,
+                          protocols: protocols,
+                        ),
+                      ),
+                    );
+
+                    await onChanged();
+                  },
+                  child: const Text('View All'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Expanded(
+              child: ListView.separated(
+                itemCount: entries.length,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: AppSpacing.sm),
+                itemBuilder: (context, index) {
+                  final entry = entries[index];
+
+                  return Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                      border: Border.all(color: colors.outlineVariant),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            entry.symptomName,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.primaryContainer,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '${entry.severity}/5',
+                            style: TextStyle(
+                              fontSize: AppTypography.caption,
+                              fontWeight: FontWeight.w700,
+                              color: colors.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PhotosTab extends StatelessWidget {
+  const _PhotosTab({
+    required this.sessions,
+    required this.photosBySessionId,
+    required this.measurementSystem,
+    required this.onOpenSession,
+  });
+
+  final List<ProgressPhotoSession> sessions;
+  final Map<String, List<ProgressPhoto>> photosBySessionId;
+  final MeasurementSystem measurementSystem;
+  final Future<void> Function(ProgressPhotoSession session) onOpenSession;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    if (sessions.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.photo_library_outlined,
+                size: 38,
+                color: colors.outline,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              const Text(
+                'No progress photos',
+                style: TextStyle(
+                  fontSize: AppTypography.body,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Progress photo sessions from this day will appear here.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      itemCount: sessions.length,
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+      itemBuilder: (context, index) {
+        final session = sessions[index];
+        final photos = photosBySessionId[session.id] ?? const [];
+
+        return InkWell(
+          onTap: () {
+            onOpenSession(session);
+          },
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          child: Ink(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: colors.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 92,
+                  height: 92,
+                  child: _PhotoPreviewStack(photos: photos),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Progress Photo Session',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '${photos.length} ${photos.length == 1 ? 'photo' : 'photos'}',
+                        style: TextStyle(
+                          fontSize: AppTypography.caption,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      if (session.weight != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          WeightDisplay.format(
+                            session.weight!,
+                            measurementSystem,
+                          ),
+                          style: TextStyle(
+                            fontSize: AppTypography.caption,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PhotoPreviewStack extends StatelessWidget {
+  const _PhotoPreviewStack({required this.photos});
+
+  final List<ProgressPhoto> photos;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    if (photos.isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.button),
+        ),
+        alignment: Alignment.center,
+        child: Icon(Icons.photo_outlined, color: colors.onSurfaceVariant),
+      );
+    }
+
+    final photo = photos.first;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.button),
+      child: Image.file(
+        File(photo.imagePath),
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) {
+          return Container(
+            color: colors.surfaceContainerHighest,
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: colors.onSurfaceVariant,
+            ),
+          );
+        },
       ),
     );
   }

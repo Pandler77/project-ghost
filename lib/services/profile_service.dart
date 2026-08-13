@@ -1,9 +1,9 @@
 import '../core/database/app_database.dart';
 import '../core/repository/profile_repository.dart';
 import '../models/profile.dart';
+import '../models/profile_module.dart';
 import 'entitlement_service.dart';
 import 'settings_service.dart';
-import '../models/profile_module.dart';
 
 class ProfileService {
   ProfileService({
@@ -40,31 +40,93 @@ class ProfileService {
       return defaultProfile;
     }
 
+    final freeProfile = _resolveFreeProfile(profiles);
+
     final savedProfileId = await _settingsService.getActiveProfileId();
 
     if (savedProfileId != null) {
       for (final profile in profiles) {
-        if (profile.id == savedProfileId) {
+        if (profile.id != savedProfileId) {
+          continue;
+        }
+
+        if (hasPremium || profile.id == freeProfile.id) {
           return profile;
         }
+
+        break;
       }
     }
 
-    final fallbackProfile = profiles.first;
+    await _settingsService.saveActiveProfileId(freeProfile.id);
 
-    await _settingsService.saveActiveProfileId(fallbackProfile.id);
-
-    return fallbackProfile;
+    return freeProfile;
   }
 
   Future<void> setActiveProfile(String profileId) async {
-    final exists = await _repository.profileExists(profileId);
+    final profiles = await _repository.getProfiles();
 
-    if (!exists) {
+    Profile? requestedProfile;
+
+    for (final profile in profiles) {
+      if (profile.id == profileId) {
+        requestedProfile = profile;
+        break;
+      }
+    }
+
+    if (requestedProfile == null) {
       throw StateError('Cannot activate a profile that does not exist.');
     }
 
-    await _settingsService.saveActiveProfileId(profileId);
+    if (!hasPremium) {
+      final freeProfile = _resolveFreeProfile(profiles);
+
+      if (requestedProfile.id != freeProfile.id) {
+        throw const ProfileAccessRequiresPremiumException();
+      }
+    }
+
+    await _settingsService.saveActiveProfileId(requestedProfile.id);
+  }
+
+  Future<bool> canAccessProfile(String profileId) async {
+    if (hasPremium) {
+      return true;
+    }
+
+    final profiles = await _repository.getProfiles();
+
+    if (profiles.isEmpty) {
+      return false;
+    }
+
+    final freeProfile = _resolveFreeProfile(profiles);
+
+    return profileId == freeProfile.id;
+  }
+
+  Future<String?> getFreeProfileId() async {
+    final profiles = await _repository.getProfiles();
+
+    if (profiles.isEmpty) {
+      return null;
+    }
+
+    return _resolveFreeProfile(profiles).id;
+  }
+
+  Profile _resolveFreeProfile(List<Profile> profiles) {
+    for (final profile in profiles) {
+      if (profile.id == AppDatabase.defaultProfileId) {
+        return profile;
+      }
+    }
+
+    final orderedProfiles = [...profiles]
+      ..sort((first, second) => first.createdAt.compareTo(second.createdAt));
+
+    return orderedProfiles.first;
   }
 
   Future<Profile> createProfile({
@@ -72,6 +134,7 @@ class ProfileService {
     required ProfileType type,
     int? iconCodePoint,
     int? colorValue,
+    String? avatarImagePath,
     Set<ProfileModule>? enabledModules,
   }) async {
     final trimmedName = name.trim();
@@ -91,6 +154,7 @@ class ProfileService {
       type: type,
       iconCodePoint: iconCodePoint,
       colorValue: colorValue,
+      avatarImagePath: avatarImagePath,
       enabledModules: enabledModules ?? ProfileModuleDetails.defaultModules,
     );
 
@@ -133,7 +197,11 @@ class ProfileService {
       return;
     }
 
-    await _settingsService.saveActiveProfileId(remainingProfiles.first.id);
+    final fallbackProfile = hasPremium
+        ? remainingProfiles.first
+        : _resolveFreeProfile(remainingProfiles);
+
+    await _settingsService.saveActiveProfileId(fallbackProfile.id);
   }
 }
 
@@ -143,6 +211,15 @@ class ProfileLimitReachedException implements Exception {
   @override
   String toString() {
     return 'Ghost Premium is required to add another profile.';
+  }
+}
+
+class ProfileAccessRequiresPremiumException implements Exception {
+  const ProfileAccessRequiresPremiumException();
+
+  @override
+  String toString() {
+    return 'Ghost Premium is required to access this profile.';
   }
 }
 

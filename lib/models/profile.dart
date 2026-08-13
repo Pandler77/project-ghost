@@ -43,6 +43,9 @@ class Profile {
     this.iconCodePoint,
     this.colorValue,
     this.avatarImagePath,
+    this.startingWeight,
+    this.goalWeight,
+    this.heightCm,
     Set<ProfileModule>? enabledModules,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -61,6 +64,14 @@ class Profile {
   final int? iconCodePoint;
   final int? colorValue;
   final String? avatarImagePath;
+  final double? startingWeight;
+
+  /// Optional target weight for this profile.
+  final double? goalWeight;
+
+  /// Height stored internally in centimeters.
+  final double? heightCm;
+
   final Set<ProfileModule> enabledModules;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -76,6 +87,9 @@ class Profile {
     Object? iconCodePoint = _unset,
     Object? colorValue = _unset,
     Object? avatarImagePath = _unset,
+    Object? startingWeight = _unset,
+    Object? goalWeight = _unset,
+    Object? heightCm = _unset,
     Object? enabledModules = _unset,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -93,6 +107,15 @@ class Profile {
       avatarImagePath: identical(avatarImagePath, _unset)
           ? this.avatarImagePath
           : avatarImagePath as String?,
+      startingWeight: identical(startingWeight, _unset)
+          ? this.startingWeight
+          : startingWeight as double?,
+      goalWeight: identical(goalWeight, _unset)
+          ? this.goalWeight
+          : goalWeight as double?,
+      heightCm: identical(heightCm, _unset)
+          ? this.heightCm
+          : heightCm as double?,
       enabledModules: identical(enabledModules, _unset)
           ? this.enabledModules
           : enabledModules as Set<ProfileModule>,
@@ -109,6 +132,9 @@ class Profile {
       'icon_code_point': iconCodePoint,
       'color_value': colorValue,
       'avatar_image_path': avatarImagePath,
+      'starting_weight': startingWeight,
+      'goal_weight': goalWeight,
+      'height_cm': heightCm,
       'enabled_modules': ProfileModuleDetails.encode(enabledModules),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -123,6 +149,9 @@ class Profile {
       iconCodePoint: (map['icon_code_point'] as num?)?.toInt(),
       colorValue: (map['color_value'] as num?)?.toInt(),
       avatarImagePath: map['avatar_image_path'] as String?,
+      startingWeight: (map['starting_weight'] as num?)?.toDouble(),
+      goalWeight: (map['goal_weight'] as num?)?.toDouble(),
+      heightCm: (map['height_cm'] as num?)?.toDouble(),
       enabledModules: ProfileModuleDetails.decode(
         map['enabled_modules'] as String?,
       ),

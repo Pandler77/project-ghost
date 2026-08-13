@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/number_stepper.dart';
+import '../../../theme/app_theme.dart';
+
+import '../../../models/inventory_batch.dart';
+import '../inventory_setup_screen.dart';
 import '../widgets/step_header.dart';
 
 class CurrentSupplyStep extends StatelessWidget {
@@ -9,7 +12,11 @@ class CurrentSupplyStep extends StatelessWidget {
     required this.containerSize,
     required this.currentAmount,
     required this.unit,
-    required this.onCurrentAmountChanged,
+    required this.source,
+    required this.existingBatches,
+    required this.selectedExistingBatchId,
+    required this.onSourceChanged,
+    required this.onExistingBatchSelected,
     super.key,
   });
 
@@ -18,91 +25,280 @@ class CurrentSupplyStep extends StatelessWidget {
   final double currentAmount;
   final String unit;
 
-  final ValueChanged<double> onCurrentAmountChanged;
+  final ActiveContainerSource source;
+
+  final List<InventoryBatch> existingBatches;
+  final String? selectedExistingBatchId;
+
+  final ValueChanged<ActiveContainerSource> onSourceChanged;
+  final ValueChanged<String> onExistingBatchSelected;
+
+  List<InventoryBatch> get _availableBatches {
+    return existingBatches
+        .where((batch) => batch.quantity > 0)
+        .toList(growable: false);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final containerName = containerType.toLowerCase();
+    final colors = Theme.of(context).colorScheme;
+    final name = containerType.toLowerCase();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         StepHeader(
-          title: 'How much is left?',
+          title: 'Do you currently have one open?',
           subtitle:
-              'Enter the amount remaining in your currently open $containerName.',
+              'If you are already using a $name, tell Ghost where it came from.',
           currentStep: 3,
-          totalSteps: 6,
+          totalSteps: 7,
         ),
-        const SizedBox(height: 24),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: colorScheme.outlineVariant),
+        const SizedBox(height: AppSpacing.lg),
+
+        _SourceCard(
+          title: 'No active $name',
+          subtitle: 'Everything being added is unopened.',
+          icon: Icons.inventory_2_outlined,
+          selected: source == ActiveContainerSource.none,
+          onTap: () {
+            onSourceChanged(ActiveContainerSource.none);
+          },
+        ),
+
+        const SizedBox(height: AppSpacing.sm),
+
+        _SourceCard(
+          title: 'From this inventory',
+          subtitle:
+              'One of the ${_pluralize(name)} you are adding is already open.',
+          icon: Icons.science_outlined,
+          selected: source == ActiveContainerSource.thisBatch,
+          onTap: () {
+            onSourceChanged(ActiveContainerSource.thisBatch);
+          },
+        ),
+
+        if (_availableBatches.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+
+          _SourceCard(
+            title: 'From existing Ghost Supply',
+            subtitle:
+                'The active $name came from inventory you already tracked.',
+            icon: Icons.inventory_outlined,
+            selected: source == ActiveContainerSource.existingBatch,
+            onTap: () {
+              onSourceChanged(ActiveContainerSource.existingBatch);
+            },
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'How this works',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'If the $containerName is unopened, leave this at '
-                '${_formatNumber(containerSize)} $unit.\n\n'
-                'If it has already been used, enter the amount that remains.',
-                style: TextStyle(color: colorScheme.onSurfaceVariant),
-              ),
-            ],
+        ],
+
+        const SizedBox(height: AppSpacing.sm),
+
+        _SourceCard(
+          title: 'A separate / older $name',
+          subtitle:
+              'The active $name is not part of the inventory you are adding.',
+          icon: Icons.call_split_outlined,
+          selected: source == ActiveContainerSource.separate,
+          onTap: () {
+            onSourceChanged(ActiveContainerSource.separate);
+          },
+        ),
+
+        if (source == ActiveContainerSource.existingBatch) ...[
+          const SizedBox(height: AppSpacing.lg),
+
+          const Text(
+            'Which inventory did it come from?',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
-        ),
-        const SizedBox(height: 24),
-        NumberStepper(
-          value: currentAmount,
-          onChanged: onCurrentAmountChanged,
-          minimum: 0,
-          maximum: containerSize,
-          step: _stepForUnit(unit),
-          decimalPlaces: _decimalPlacesForUnit(unit),
-          unit: unit,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          currentAmount <= 0
-              ? 'No open $containerName is currently being tracked.'
-              : '${_formatNumber(currentAmount)} of '
-                    '${_formatNumber(containerSize)} $unit remains.',
-          style: TextStyle(color: colorScheme.onSurfaceVariant),
-        ),
+
+          const SizedBox(height: 6),
+
+          Text(
+            'Select the batch that supplied the active $name.',
+            style: TextStyle(color: colors.onSurfaceVariant),
+          ),
+
+          const SizedBox(height: 14),
+
+          for (final batch in _availableBatches) ...[
+            _ExistingBatchCard(
+              batch: batch,
+              selected: selectedExistingBatchId == batch.id,
+              onTap: () {
+                onExistingBatchSelected(batch.id);
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ],
+
+        if (source != ActiveContainerSource.none) ...[
+          const SizedBox(height: AppSpacing.lg),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: (Theme.of(context).cardTheme.color ?? colors.surface),
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: colors.outlineVariant),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.arrow_forward, color: colors.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _sourceExplanation(name),
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  static double _stepForUnit(String unit) {
-    return switch (unit) {
-      'mcg' => 50,
-      'IU' => 1,
-      'tablets' || 'capsules' || 'pills' || 'softgels' || 'drops' => 1,
-      _ => 0.5,
-    };
+  String _sourceExplanation(String name) {
+    switch (source) {
+      case ActiveContainerSource.none:
+        return '';
+
+      case ActiveContainerSource.thisBatch:
+        return 'Ghost will count one of these ${_pluralize(name)} '
+            'as the active $name and the rest as unopened inventory.';
+
+      case ActiveContainerSource.existingBatch:
+        return 'Ghost will take one $name from the selected existing batch. '
+            'All of the new inventory you are adding will remain unopened.';
+
+      case ActiveContainerSource.separate:
+        return 'Ghost will keep all of this new inventory unopened and '
+            'track the active $name separately.';
+    }
   }
 
-  static int _decimalPlacesForUnit(String unit) {
-    return switch (unit) {
-      'tablets' ||
-      'capsules' ||
-      'pills' ||
-      'softgels' ||
-      'drops' ||
-      'IU' ||
-      'mcg' => 0,
-      _ => 1,
-    };
+  static String _pluralize(String value) {
+    if (value == 'box') {
+      return 'boxes';
+    }
+
+    if (value.endsWith('s')) {
+      return value;
+    }
+
+    return '${value}s';
+  }
+}
+
+class _ExistingBatchCard extends StatelessWidget {
+  const _ExistingBatchCard({
+    required this.batch,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final InventoryBatch batch;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final vendor = batch.vendor?.trim();
+    final lot = batch.batch?.trim();
+
+    final details = <String>[
+      '${_formatNumber(batch.containerSize)} ${batch.unit}',
+      '${batch.quantity} unopened',
+    ];
+
+    if (vendor != null && vendor.isNotEmpty) {
+      details.add(vendor);
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Ink(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: selected
+                ? colors.primary.withValues(alpha: 0.10)
+                : (Theme.of(context).cardTheme.color ?? colors.surface),
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(
+              color: selected ? colors.primary : colors.outlineVariant,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.inventory_2_outlined,
+                color: selected ? colors.primary : colors.onSurfaceVariant,
+              ),
+
+              const SizedBox(width: 14),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      batch.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      details.join(' • '),
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+
+                    if (lot != null && lot.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'Lot $lot',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Icon(
+                selected ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: selected ? colors.primary : colors.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   static String _formatNumber(double value) {
@@ -110,6 +306,89 @@ class CurrentSupplyStep extends StatelessWidget {
       return value.toInt().toString();
     }
 
-    return value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+    return value
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+}
+
+class _SourceCard extends StatelessWidget {
+  const _SourceCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Ink(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: selected
+                ? colors.primary.withValues(alpha: 0.10)
+                : (Theme.of(context).cardTheme.color ?? colors.surface),
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(
+              color: selected ? colors.primary : colors.outlineVariant,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: selected ? colors.primary : colors.onSurfaceVariant,
+              ),
+
+              const SizedBox(width: 14),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Icon(
+                selected ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: selected ? colors.primary : colors.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

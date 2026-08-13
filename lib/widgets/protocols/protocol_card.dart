@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/cycle_status.dart';
+import '../../models/display_preferences.dart';
 import '../../models/protocol.dart';
 import '../../models/protocol_status.dart';
 import '../../models/schedule_type.dart';
@@ -12,6 +13,7 @@ class ProtocolCard extends StatelessWidget {
   const ProtocolCard({
     required this.protocol,
     required this.onPressed,
+    required this.displayPreferences,
     super.key,
   });
 
@@ -21,18 +23,23 @@ class ProtocolCard extends StatelessWidget {
 
   final Protocol protocol;
   final VoidCallback onPressed;
+  final DisplayPreferences displayPreferences;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final protocolColor = Color(protocol.colorValue);
 
+    final useProtocolColor = displayPreferences.showProtocolColors;
+
     final background = switch (protocol.status) {
-      ProtocolStatus.active => protocolColor.withValues(alpha: 0.10),
+      ProtocolStatus.active => useProtocolColor
+          ? protocolColor.withValues(alpha: 0.10)
+          : Theme.of(context).cardTheme.color ?? colorScheme.surface,
       ProtocolStatus.paused => Colors.amber.withValues(alpha: 0.12),
       ProtocolStatus.archived => colorScheme.surfaceContainerHighest.withValues(
-        alpha: 0.65,
-      ),
+          alpha: 0.65,
+        ),
     };
 
     final contentOpacity = protocol.status == ProtocolStatus.archived
@@ -44,28 +51,43 @@ class ProtocolCard extends StatelessWidget {
       DateTime.now(),
     );
 
+    final horizontalPadding = displayPreferences.compactMode
+        ? AppSpacing.sm
+        : AppSpacing.md;
+
+    final verticalPadding = displayPreferences.compactMode ? 9.0 : 14.0;
+
+    final cardRadius = displayPreferences.compactMode
+        ? AppRadius.sm
+        : AppRadius.button;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.button),
+        borderRadius: BorderRadius.circular(cardRadius),
         onTap: onPressed,
         child: Ink(
           decoration: BoxDecoration(
             color: background,
-            borderRadius: BorderRadius.circular(AppRadius.button),
+            borderRadius: BorderRadius.circular(cardRadius),
             border: Border.all(
-              color: protocol.status == ProtocolStatus.active
+              color:
+                  protocol.status == ProtocolStatus.active && useProtocolColor
                   ? protocolColor.withValues(alpha: 0.45)
-                  : Colors.transparent,
+                  : colorScheme.outlineVariant.withValues(
+                      alpha: protocol.status == ProtocolStatus.active
+                          ? 0.55
+                          : 0.0,
+                    ),
               width: 1.25,
             ),
           ),
           child: Opacity(
             opacity: contentOpacity,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: 14,
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: verticalPadding,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,7 +100,7 @@ class ProtocolCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: displayPreferences.compactMode ? 16 : 18,
                             fontWeight: FontWeight.w600,
                             color: colorScheme.onSurface,
                           ),
@@ -88,7 +110,11 @@ class ProtocolCard extends StatelessWidget {
                         _StatusBadge(status: protocol.status),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  SizedBox(
+                    height: displayPreferences.compactMode
+                        ? 2
+                        : AppSpacing.xs,
+                  ),
                   Text(
                     protocol.dose,
                     style: TextStyle(
@@ -106,8 +132,13 @@ class ProtocolCard extends StatelessWidget {
                       color: colorScheme.onSurface,
                     ),
                   ),
-                  if (protocol.useCycle) ...[
-                    const SizedBox(height: AppSpacing.sm),
+                  if (protocol.useCycle &&
+                      displayPreferences.showCycleStatus) ...[
+                    SizedBox(
+                      height: displayPreferences.compactMode
+                          ? AppSpacing.xs
+                          : AppSpacing.sm,
+                    ),
                     Text(
                       'Cycle: ${_cycleStatusFormatter.primaryLabel(cycleStatus)}',
                       style: TextStyle(
@@ -140,12 +171,20 @@ class ProtocolCard extends StatelessWidget {
   String _cycleSecondaryText(CycleStatus status) {
     if (!status.isCycled) return '';
 
+    final parts = <String>[];
+
     if (status.isBeforeStart) {
       final startDate = status.nextTransitionDate;
-      if (startDate == null) return '';
 
-      return 'Starts ${_formatShortDate(startDate)}'
-          ' • ${_remainingText(status.daysRemainingInCurrentPhase)}';
+      if (startDate != null && displayPreferences.showCycleResumeDate) {
+        parts.add('Starts ${_formatShortDate(startDate)}');
+      }
+
+      if (displayPreferences.showCycleRemainingDays) {
+        parts.add(_remainingText(status.daysRemainingInCurrentPhase));
+      }
+
+      return parts.join(' • ');
     }
 
     if (status.phaseLabel == 'Cycle complete') {
@@ -156,21 +195,29 @@ class ProtocolCard extends StatelessWidget {
       final transitionDate = status.nextTransitionDate;
       final days = status.daysRemainingInCurrentPhase;
 
-      if (transitionDate == null) {
-        return days > 0 ? _remainingText(days) : 'Active';
+      if (transitionDate != null && displayPreferences.showCycleEndDate) {
+        final endDate = transitionDate.subtract(const Duration(days: 1));
+        parts.add('Ends: ${_formatShortDate(endDate)}');
       }
 
-      final endDate = transitionDate.subtract(const Duration(days: 1));
+      if (displayPreferences.showCycleRemainingDays) {
+        parts.add(days > 0 ? _remainingText(days) : 'Active');
+      }
 
-      return 'Ends: ${_formatShortDate(endDate)}'
-          ' • ${_remainingText(days)}';
+      return parts.join(' • ');
     }
 
     final resumeDate = status.nextTransitionDate;
-    if (resumeDate == null) return '';
 
-    return 'Resumes ${_formatShortDate(resumeDate)}'
-        ' • ${_remainingText(status.daysRemainingInCurrentPhase)}';
+    if (resumeDate != null && displayPreferences.showCycleResumeDate) {
+      parts.add('Resumes ${_formatShortDate(resumeDate)}');
+    }
+
+    if (displayPreferences.showCycleRemainingDays) {
+      parts.add(_remainingText(status.daysRemainingInCurrentPhase));
+    }
+
+    return parts.join(' • ');
   }
 
   String _remainingText(int days) {

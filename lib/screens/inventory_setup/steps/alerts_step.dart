@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_theme.dart';
 import '../widgets/number_stepper.dart';
 import '../widgets/step_header.dart';
 
@@ -16,15 +17,15 @@ class AlertsStep extends StatelessWidget {
   final String containerType;
   final int lowStockThreshold;
   final int shippingDays;
-
   final ValueChanged<int> onLowStockThresholdChanged;
   final ValueChanged<int> onShippingDaysChanged;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
     final singular = containerType.toLowerCase();
     final plural = _pluralize(singular);
+    final baseColor = Theme.of(context).cardTheme.color ?? colors.surface;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,24 +33,26 @@ class AlertsStep extends StatelessWidget {
         const StepHeader(
           title: 'When should Ghost warn you?',
           subtitle: 'Set your low-supply threshold and typical shipping time.',
-          currentStep: 5,
-          totalSteps: 6,
+          currentStep: 6,
+          totalSteps: 7,
         ),
-        const SizedBox(height: 24),
-
-        Text(
+        const SizedBox(height: AppSpacing.lg),
+        const Text(
           'Low-supply alert',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: AppTypography.body,
+            fontWeight: FontWeight.w800,
+          ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           'Ghost will warn you when this many unopened $plural remain.',
-          style: TextStyle(color: colorScheme.onSurfaceVariant),
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: colors.onSurfaceVariant,
+          ),
         ),
-        const SizedBox(height: 16),
-
+        const SizedBox(height: AppSpacing.md),
         NumberStepper(
           value: lowStockThreshold.toDouble(),
           onChanged: (value) {
@@ -60,22 +63,23 @@ class AlertsStep extends StatelessWidget {
           decimalPlaces: 0,
           unit: lowStockThreshold == 1 ? singular : plural,
         ),
-
-        const SizedBox(height: 28),
-
-        Text(
+        const SizedBox(height: AppSpacing.lg),
+        const Text(
           'Typical shipping time',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: AppTypography.body,
+            fontWeight: FontWeight.w800,
+          ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: AppSpacing.xs),
         Text(
-          'Ghost will use this later to estimate when you should reorder.',
-          style: TextStyle(color: colorScheme.onSurfaceVariant),
+          'Ghost uses this to estimate when you should reorder.',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: colors.onSurfaceVariant,
+          ),
         ),
-        const SizedBox(height: 16),
-
+        const SizedBox(height: AppSpacing.md),
         NumberStepper(
           value: shippingDays.toDouble(),
           onChanged: (value) {
@@ -86,32 +90,50 @@ class AlertsStep extends StatelessWidget {
           decimalPlaces: 0,
           unit: shippingDays == 1 ? 'day' : 'days',
         ),
-
-        const SizedBox(height: 24),
-
+        const SizedBox(height: AppSpacing.lg),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: colorScheme.outlineVariant),
+            color: baseColor,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: 0.60),
+            ),
           ),
-          child: Text(
-            _summaryText(plural: plural, singular: singular),
-            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.notifications_active_outlined, color: colors.primary),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  _summaryText(plural: plural, singular: singular),
+                  style: TextStyle(
+                    fontSize: AppTypography.caption,
+                    height: 1.4,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  String _summaryText({required String singular, required String plural}) {
+  String _summaryText({
+    required String singular,
+    required String plural,
+  }) {
     final containerText = lowStockThreshold == 1
         ? '1 unopened $singular'
         : '$lowStockThreshold unopened $plural';
 
-    final shippingText = shippingDays == 1 ? '1 day' : '$shippingDays days';
+    final shippingText = shippingDays == 1
+        ? '1 day'
+        : '$shippingDays days';
 
     return 'Ghost will warn you when $containerText remain. '
         'Your typical shipping time is $shippingText.';
@@ -121,11 +143,9 @@ class AlertsStep extends StatelessWidget {
     if (value == 'box') {
       return 'boxes';
     }
-
     if (value.endsWith('s')) {
       return value;
     }
-
     return '${value}s';
   }
 }

@@ -6,6 +6,8 @@ import '../models/app_theme_mode.dart';
 import '../models/display_preferences.dart';
 import '../models/home_layout.dart';
 import '../models/home_section.dart';
+import '../models/measurement_system.dart';
+import '../models/notification_preferences.dart';
 import '../models/tracking_preferences.dart';
 
 class SettingsService {
@@ -21,11 +23,15 @@ class SettingsService {
   static const String _photoFrequencyKey = 'photo_frequency';
 
   static const String _displayPreferencesKey = 'display_preferences';
+  static const String _notificationPreferencesKey =
+      'notification_preferences';
 
   static const String _ghostSupplyBetaDismissedKey =
       'ghost_supply_beta_dismissed';
 
   static const String _activeProfileIdKey = 'active_profile_id';
+
+  static const String _measurementSystemKey = 'measurement_system';
 
   final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
@@ -138,7 +144,9 @@ class SettingsService {
     );
   }
 
-  Future<void> saveTrackingPreferences(TrackingPreferences preferences) async {
+  Future<void> saveTrackingPreferences(
+    TrackingPreferences preferences,
+  ) async {
     await Future.wait([
       _preferences.setBool(_trackWeightKey, preferences.trackWeight),
       _preferences.setBool(_trackPhotosKey, preferences.trackPhotos),
@@ -172,7 +180,9 @@ class SettingsService {
   // ------------------------
 
   Future<DisplayPreferences> getDisplayPreferences() async {
-    final savedValue = await _preferences.getString(_displayPreferencesKey);
+    final savedValue = await _preferences.getString(
+      _displayPreferencesKey,
+    );
 
     if (savedValue == null || savedValue.trim().isEmpty) {
       return const DisplayPreferences();
@@ -185,7 +195,9 @@ class SettingsService {
         return const DisplayPreferences();
       }
 
-      return DisplayPreferences.fromMap(Map<String, Object?>.from(decoded));
+      return DisplayPreferences.fromMap(
+        Map<String, Object?>.from(decoded),
+      );
     } catch (_) {
       return const DisplayPreferences();
     }
@@ -201,6 +213,78 @@ class SettingsService {
 
   Future<void> resetDisplayPreferences() async {
     await _preferences.remove(_displayPreferencesKey);
+  }
+
+  // ------------------------
+  // Notification preferences
+  // ------------------------
+
+  Future<NotificationPreferences> getNotificationPreferences() async {
+    final savedValue = await _preferences.getString(
+      _notificationPreferencesKey,
+    );
+
+    if (savedValue == null || savedValue.trim().isEmpty) {
+      return const NotificationPreferences();
+    }
+
+    try {
+      final decoded = jsonDecode(savedValue);
+
+      if (decoded is! Map<String, dynamic>) {
+        return const NotificationPreferences();
+      }
+
+      return NotificationPreferences.fromMap(
+        Map<String, Object?>.from(decoded),
+      );
+    } catch (_) {
+      return const NotificationPreferences();
+    }
+  }
+
+  Future<void> saveNotificationPreferences(
+    NotificationPreferences notificationPreferences,
+  ) async {
+    final encoded = jsonEncode(notificationPreferences.toMap());
+
+    await _preferences.setString(
+      _notificationPreferencesKey,
+      encoded,
+    );
+  }
+
+  Future<void> resetNotificationPreferences() async {
+    await _preferences.remove(_notificationPreferencesKey);
+  }
+
+  // ------------------------
+  // Measurement system
+  // ------------------------
+
+  Future<MeasurementSystem> getMeasurementSystem() async {
+    final savedValue = await _preferences.getString(
+      _measurementSystemKey,
+    );
+
+    return switch (savedValue) {
+      'metric' => MeasurementSystem.metric,
+      'imperial' => MeasurementSystem.imperial,
+      _ => MeasurementSystem.imperial,
+    };
+  }
+
+  Future<void> saveMeasurementSystem(
+    MeasurementSystem measurementSystem,
+  ) async {
+    await _preferences.setString(
+      _measurementSystemKey,
+      measurementSystem.name,
+    );
+  }
+
+  Future<void> resetMeasurementSystem() async {
+    await _preferences.remove(_measurementSystemKey);
   }
 
   // ------------------------
@@ -224,14 +308,44 @@ class SettingsService {
   // ------------------------
 
   Future<bool> getGhostSupplyBetaDismissed() async {
-    return await _preferences.getBool(_ghostSupplyBetaDismissedKey) ?? false;
+    return await _preferences.getBool(
+          _ghostSupplyBetaDismissedKey,
+        ) ??
+        false;
   }
 
-  Future<void> saveGhostSupplyBetaDismissed(bool isDismissed) async {
-    await _preferences.setBool(_ghostSupplyBetaDismissedKey, isDismissed);
+  Future<void> saveGhostSupplyBetaDismissed(
+    bool isDismissed,
+  ) async {
+    await _preferences.setBool(
+      _ghostSupplyBetaDismissedKey,
+      isDismissed,
+    );
   }
 
   Future<void> resetGhostSupplyBetaDismissed() async {
     await _preferences.remove(_ghostSupplyBetaDismissedKey);
+  }
+
+  // ------------------------
+  // Full local reset
+  // ------------------------
+
+  Future<void> resetForFreshStart() async {
+    await Future.wait([
+      _preferences.remove(_themeModeKey),
+      _preferences.remove(_homeLayoutKey),
+      _preferences.remove(_onboardingCompleteKey),
+      _preferences.remove(_trackWeightKey),
+      _preferences.remove(_trackPhotosKey),
+      _preferences.remove(_trackNotesKey),
+      _preferences.remove(_weightFrequencyKey),
+      _preferences.remove(_photoFrequencyKey),
+      _preferences.remove(_displayPreferencesKey),
+      _preferences.remove(_notificationPreferencesKey),
+      _preferences.remove(_ghostSupplyBetaDismissedKey),
+      _preferences.remove(_activeProfileIdKey),
+      _preferences.remove(_measurementSystemKey),
+    ]);
   }
 }

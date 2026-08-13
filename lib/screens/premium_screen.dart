@@ -122,6 +122,15 @@ class PremiumScreen extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
 
             const _PremiumFeatureCard(
+              icon: Icons.compare_outlined,
+              title: 'Progress photo comparison',
+              description:
+                  'Compare progress sessions side by side to see visual changes over time.',
+            ),
+
+            const SizedBox(height: AppSpacing.sm),
+
+            const _PremiumFeatureCard(
               icon: Icons.analytics_outlined,
               title: 'Advanced statistics',
               description:

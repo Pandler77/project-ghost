@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/inventory_batch.dart';
 import '../models/inventory_item.dart';
 import '../models/protocol.dart';
 import '../theme/app_theme.dart';
@@ -8,12 +9,14 @@ class GhostSupplyCard extends StatelessWidget {
   const GhostSupplyCard({
     required this.items,
     required this.protocols,
+    required this.batchesByItemId,
     required this.onTap,
     super.key,
   });
 
   final List<InventoryItem> items;
   final List<Protocol> protocols;
+  final Map<String, List<InventoryBatch>> batchesByItemId;
   final VoidCallback onTap;
 
   @override
@@ -22,7 +25,7 @@ class GhostSupplyCard extends StatelessWidget {
 
     final visibleItems = items.take(3).toList();
 
-    final lowSupplyCount = items.where((item) => item.isLowStock).length;
+    final lowSupplyCount = items.where(_isLowStock).length;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -70,8 +73,10 @@ class GhostSupplyCard extends StatelessWidget {
                 items.isEmpty
                     ? 'No supplies configured.'
                     : lowSupplyCount == 0
-                    ? '${items.length} ${items.length == 1 ? 'supply' : 'supplies'} tracked'
-                    : '$lowSupplyCount ${lowSupplyCount == 1 ? 'supply needs' : 'supplies need'} attention',
+                    ? '${items.length} '
+                          '${items.length == 1 ? 'supply' : 'supplies'} tracked'
+                    : '$lowSupplyCount '
+                          '${lowSupplyCount == 1 ? 'supply needs' : 'supplies need'} attention',
                 style: TextStyle(
                   fontSize: AppTypography.caption,
                   color: colorScheme.onSurfaceVariant,
@@ -85,6 +90,8 @@ class GhostSupplyCard extends StatelessWidget {
                   _SupplyRow(
                     item: visibleItems[index],
                     protocolName: _protocolName(visibleItems[index].protocolId),
+                    batches:
+                        batchesByItemId[visibleItems[index].id] ?? const [],
                   ),
                   if (index < visibleItems.length - 1)
                     const SizedBox(height: AppSpacing.md),
@@ -113,6 +120,34 @@ class GhostSupplyCard extends StatelessWidget {
     );
   }
 
+  List<InventoryBatch> _batchesForItem(InventoryItem item) {
+    return batchesByItemId[item.id] ?? const [];
+  }
+
+  int _unopenedCount(InventoryItem item) {
+    return _batchesForItem(
+      item,
+    ).fold<int>(0, (total, batch) => total + batch.quantity);
+  }
+
+  int _physicalContainerCount(InventoryItem item) {
+    return _unopenedCount(item) + (item.currentAmount > 0 ? 1 : 0);
+  }
+
+  bool _isLowStock(InventoryItem item) {
+    final unopenedAmount = _batchesForItem(
+      item,
+    ).fold<double>(0, (total, batch) => total + batch.totalAmount);
+
+    final totalAmount = item.currentAmount + unopenedAmount;
+
+    if (totalAmount <= 0) {
+      return true;
+    }
+
+    return _physicalContainerCount(item) <= item.lowStockThreshold;
+  }
+
   String _protocolName(String protocolId) {
     for (final protocol in protocols) {
       if (protocol.id == protocolId) {
@@ -125,14 +160,48 @@ class GhostSupplyCard extends StatelessWidget {
 }
 
 class _SupplyRow extends StatelessWidget {
-  const _SupplyRow({required this.item, required this.protocolName});
+  const _SupplyRow({
+    required this.item,
+    required this.protocolName,
+    required this.batches,
+  });
 
   final InventoryItem item;
   final String protocolName;
+  final List<InventoryBatch> batches;
+
+  int get _unopenedCount {
+    return batches.fold<int>(0, (total, batch) => total + batch.quantity);
+  }
+
+  double get _unopenedAmount {
+    return batches.fold<double>(0, (total, batch) => total + batch.totalAmount);
+  }
+
+  double get _totalAmount {
+    return item.currentAmount + _unopenedAmount;
+  }
+
+  int get _physicalContainerCount {
+    return _unopenedCount + (item.currentAmount > 0 ? 1 : 0);
+  }
+
+  bool get _isLowStock {
+    if (_totalAmount <= 0) {
+      return true;
+    }
+
+    return _physicalContainerCount <= item.lowStockThreshold;
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    final containerName = item.containerType.toLowerCase();
+    final unopenedLabel = _unopenedCount == 1
+        ? containerName
+        : _pluralize(containerName);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,7 +214,7 @@ class _SupplyRow extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-            if (item.isLowStock)
+            if (_isLowStock)
               Icon(
                 Icons.warning_amber_rounded,
                 size: 18,
@@ -162,11 +231,19 @@ class _SupplyRow extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           item.currentAmount <= 0
-              ? 'No ${item.containerType.toLowerCase()} open • '
-                    '${item.unopenedQuantity} unopened'
+              ? 'No $containerName open • '
+                    '$_unopenedCount unopened $unopenedLabel'
               : '${_formatNumber(item.currentAmount)} / '
-                    '${_formatNumber(item.vialSize)} ${item.unit} • '
-                    '${item.unopenedQuantity} unopened',
+                    '${_formatNumber(item.vialSize)} ${item.unit} active • '
+                    '$_unopenedCount unopened',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${_formatNumber(_totalAmount)} ${item.unit} total',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: colorScheme.onSurfaceVariant,
@@ -181,7 +258,22 @@ class _SupplyRow extends StatelessWidget {
       return value.toInt().toString();
     }
 
-    return value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+    return value
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+
+  static String _pluralize(String value) {
+    if (value == 'box') {
+      return 'boxes';
+    }
+
+    if (value.endsWith('s')) {
+      return value;
+    }
+
+    return '${value}s';
   }
 }
 

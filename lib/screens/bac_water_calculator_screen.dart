@@ -170,7 +170,10 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('BAC Water'),
+        title: const Text(
+          'BAC Water',
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.2),
+        ),
         actions: [
           IconButton(
             onPressed: _clear,
@@ -181,21 +184,64 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.md,
+            80,
+          ),
           children: [
-            const Text(
-              'Calculate BAC water',
-              style: TextStyle(
-                fontSize: AppTypography.title,
-                fontWeight: FontWeight.bold,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(
+                  color: colorScheme.primary.withValues(alpha: 0.14),
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Choose the dose and syringe line you want, then Ghost will calculate the liquid volume.',
-              style: TextStyle(
-                fontSize: AppTypography.caption,
-                color: colorScheme.onSurfaceVariant,
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Icon(
+                      Icons.water_drop_outlined,
+                      color: colorScheme.primary,
+                      size: AppIcon.md,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Calculate BAC water',
+                          style: TextStyle(
+                            fontSize: AppTypography.title,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Choose your dose and target syringe line. Ghost will calculate the liquid volume.',
+                          style: TextStyle(
+                            fontSize: AppTypography.caption,
+                            height: 1.35,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -244,7 +290,13 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
               child: FilledButton.icon(
                 onPressed: _calculate,
                 icon: const Icon(Icons.calculate_outlined),
-                label: const Text('Calculate'),
+                label: const Text(
+                  'Calculate',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                ),
               ),
             ),
 
@@ -264,8 +316,11 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
+                  color: colorScheme.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(AppRadius.card),
+                  border: Border.all(
+                    color: colorScheme.primary.withValues(alpha: 0.22),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -273,7 +328,7 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
                       'Add',
                       style: TextStyle(
                         fontSize: AppTypography.caption,
-                        color: colorScheme.onPrimaryContainer,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
@@ -281,9 +336,10 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
                       '${_formatNumber(_resultBacMl!, decimalPlaces: 4)} mL',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onPrimaryContainer,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
@@ -292,7 +348,7 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
                       style: TextStyle(
                         fontSize: AppTypography.body,
                         fontWeight: FontWeight.w600,
-                        color: colorScheme.onPrimaryContainer,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -314,9 +370,12 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerLow,
+                  color:
+                      Theme.of(context).cardTheme.color ?? colorScheme.surface,
                   borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: colorScheme.outlineVariant),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.60),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -353,9 +412,12 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerLow,
+                  color:
+                      Theme.of(context).cardTheme.color ?? colorScheme.surface,
                   borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: colorScheme.outlineVariant),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.60),
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,7 +476,9 @@ class _AmountUnitField extends StatelessWidget {
             decoration: InputDecoration(
               labelText: label,
               hintText: hint,
-              border: const OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.card),
+              ),
             ),
           ),
         ),
@@ -422,9 +486,11 @@ class _AmountUnitField extends StatelessWidget {
         Expanded(
           child: DropdownButtonFormField<String>(
             initialValue: selectedUnit,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Unit',
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.button),
+              ),
             ),
             items: const [
               DropdownMenuItem(value: 'mg', child: Text('mg')),
@@ -568,9 +634,11 @@ class _TargetUnitsSelectorState extends State<_TargetUnitsSelector> {
         AppSpacing.md,
       ),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
+        color: Theme.of(context).cardTheme.color ?? colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.60),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -579,7 +647,7 @@ class _TargetUnitsSelectorState extends State<_TargetUnitsSelector> {
             'Target units',
             style: TextStyle(
               fontSize: AppTypography.body,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -969,7 +1037,7 @@ class _ResultRow extends StatelessWidget {
           height: 38,
           decoration: BoxDecoration(
             color: colorScheme.primary.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(AppRadius.button),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Icon(icon, size: AppIcon.sm, color: colorScheme.primary),
         ),

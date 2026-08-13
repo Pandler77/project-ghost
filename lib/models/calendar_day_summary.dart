@@ -6,6 +6,8 @@ class CalendarDaySummary {
     required this.date,
     required this.protocols,
     required this.records,
+    this.hasSymptoms = false,
+    this.hasPhotos = false,
   });
 
   final DateTime date;
@@ -13,6 +15,10 @@ class CalendarDaySummary {
   final List<Protocol> protocols;
 
   final List<DoseRecord> records;
+
+  final bool hasSymptoms;
+
+  final bool hasPhotos;
 
   int get scheduledCount => protocols.length;
 
@@ -34,4 +40,6 @@ class CalendarDaySummary {
       scheduledCount > 0 && completedCount == scheduledCount;
 
   bool get hasCompletion => completedCount > 0;
+
+  bool get hasExtraActivity => hasSymptoms || hasPhotos;
 }

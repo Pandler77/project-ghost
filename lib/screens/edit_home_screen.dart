@@ -46,6 +46,8 @@ class _EditHomeScreenState extends State<EditHomeScreen> {
   bool _isSectionAvailable(HomeSection section) {
     return switch (section) {
       HomeSection.weight => widget.trackingPreferences.trackWeight,
+      HomeSection.progressPhotos => widget.trackingPreferences.trackPhotos,
+      HomeSection.notesSymptoms => widget.trackingPreferences.trackNotes,
       _ => true,
     };
   }

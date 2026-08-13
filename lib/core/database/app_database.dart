@@ -7,13 +7,21 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String databaseName = 'ghost.db';
-  static const int databaseVersion = 13;
+  static const int databaseVersion = 34;
 
   static const String profilesTable = 'profiles';
   static const String protocolsTable = 'protocols';
   static const String doseRecordsTable = 'dose_records';
   static const String weightRecordsTable = 'weight_records';
   static const String inventoryTable = 'inventory';
+  static const String injectionLogsTable = 'injection_logs';
+  static const String inventoryEventsTable = 'inventory_events';
+  static const String inventoryPhotosTable = 'inventory_photos';
+  static const String inventoryBatchesTable = 'inventory_batches';
+  static const String progressPhotosTable = 'progress_photos';
+  static const String progressPhotoSessionsTable = 'progress_photo_sessions';
+  static const String symptomEntriesTable = 'symptom_entries';
+  static const String symptomProtocolLinksTable = 'symptom_protocol_links';
 
   static const String defaultProfileId = 'default-profile';
 
@@ -56,6 +64,14 @@ class AppDatabase {
     await _createInventoryTable(database);
 
     await _createProfileIndexes(database);
+    await _createInjectionLogsTable(database);
+    await _createInventoryEventsTable(database);
+    await _createInventoryPhotosTable(database);
+    await _createInventoryBatchesTable(database);
+    await _createProgressPhotoSessionsTable(database);
+    await _createProgressPhotosTable(database);
+    await _createSymptomEntriesTable(database);
+    await _createSymptomProtocolLinksTable(database);
   }
 
   Future<void> _onUpgrade(
@@ -101,9 +117,9 @@ class AppDatabase {
 
     if (oldVersion < 9) {
       await database.execute('''
-        ALTER TABLE $inventoryTable
-        ADD COLUMN current_container_opened_at TEXT
-      ''');
+    ALTER TABLE $inventoryTable
+    ADD COLUMN current_container_opened_at TEXT
+  ''');
     }
 
     if (oldVersion < 10) {
@@ -116,17 +132,122 @@ class AppDatabase {
 
     if (oldVersion < 12) {
       await database.execute('''
-    ALTER TABLE $profilesTable
-    ADD COLUMN enabled_modules TEXT NOT NULL
-    DEFAULT 'protocols,weight,inventory'
-  ''');
+        ALTER TABLE $profilesTable
+        ADD COLUMN enabled_modules TEXT NOT NULL
+        DEFAULT 'protocols,weight,inventory'
+      ''');
     }
 
     if (oldVersion < 13) {
       await database.execute('''
-    ALTER TABLE $profilesTable
-    ADD COLUMN avatar_image_path TEXT
-  ''');
+        ALTER TABLE $profilesTable
+        ADD COLUMN avatar_image_path TEXT
+      ''');
+    }
+
+    if (oldVersion < 14) {
+      await database.execute('''
+        ALTER TABLE $protocolsTable
+        ADD COLUMN protocol_type TEXT NOT NULL
+        DEFAULT 'injection'
+      ''');
+    }
+
+    if (oldVersion < 15) {
+      await database.execute('''
+        ALTER TABLE $protocolsTable
+        ADD COLUMN rotation_enabled INTEGER NOT NULL
+        DEFAULT 0
+      ''');
+
+      await database.execute('''
+        ALTER TABLE $protocolsTable
+        ADD COLUMN rotation_mode TEXT NOT NULL
+        DEFAULT 'sequential'
+      ''');
+
+      await database.execute('''
+        ALTER TABLE $protocolsTable
+        ADD COLUMN enabled_injection_sites TEXT
+      ''');
+    }
+
+    if (oldVersion < 16) {
+      await _createInjectionLogsTable(database);
+    }
+
+    if (oldVersion < 17) {
+      await _migrateInjectionLogsToDoseRecords(database);
+    }
+
+    if (oldVersion < 18) {
+      await _addInventoryMetadataColumns(database);
+    }
+
+    if (oldVersion < 19) {
+      await _createInventoryEventsTable(database);
+    }
+
+    if (oldVersion < 20) {
+      await _createInventoryPhotosTable(database);
+    }
+
+    if (oldVersion < 21) {
+      await _addSupplyCapacityColumn(database);
+    }
+
+    if (oldVersion < 22) {
+      await _createInventoryBatchesTable(database);
+      await _migrateExistingInventoryToBatches(database);
+    }
+
+    if (oldVersion < 23) {
+      await _addCurrentContainerBatchIdColumn(database);
+    }
+
+    if (oldVersion < 24) {
+      await _addInventoryBatchNameColumn(database);
+    }
+
+    if (oldVersion < 25) {
+      await _addInventoryDisplayNameColumn(database);
+    }
+
+    if (oldVersion < 26) {
+      await _addProtocolCategoryColumn(database);
+    }
+
+    if (oldVersion < 27) {
+      await _addProfileGoalWeightColumn(database);
+    }
+
+    if (oldVersion < 28) {
+      await _addProfileStartingWeightColumn(database);
+    }
+
+    if (oldVersion < 29) {
+      await _createProgressPhotosTable(database);
+    }
+
+    if (oldVersion < 30) {
+      await _addProgressPhotoProfileIdColumn(database);
+    }
+
+    if (oldVersion < 31) {
+      await _createProgressPhotoSessionsTable(database);
+      await _addProgressPhotoSessionIdColumn(database);
+    }
+
+    if (oldVersion < 32) {
+      await _createSymptomEntriesTable(database);
+    }
+
+    if (oldVersion < 33) {
+      await _createSymptomProtocolLinksTable(database);
+    }
+
+    if (oldVersion < 34) {
+      await _addProfileHeightColumn(database);
     }
   }
 
@@ -246,6 +367,84 @@ class AppDatabase {
     ''');
   }
 
+  Future<void> _createProgressPhotosTable(DatabaseExecutor database) async {
+    await database.execute('''
+      CREATE TABLE IF NOT EXISTS $progressPhotosTable (
+        id TEXT PRIMARY KEY,
+
+        profile_id TEXT NOT NULL
+          DEFAULT '$defaultProfileId',
+
+        session_id TEXT NOT NULL,
+
+        image_path TEXT NOT NULL,
+        type TEXT NOT NULL,
+        recorded_at TEXT NOT NULL,
+        weight REAL,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+
+        FOREIGN KEY (profile_id)
+          REFERENCES $profilesTable (id)
+          ON DELETE CASCADE,
+
+        FOREIGN KEY (session_id)
+          REFERENCES $progressPhotoSessionsTable (id)
+          ON DELETE CASCADE
+      )
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_progress_photos_profile_id
+      ON $progressPhotosTable (
+        profile_id
+      )
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_progress_photos_session_id
+      ON $progressPhotosTable (
+        session_id
+      )
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_progress_photos_recorded_at
+      ON $progressPhotosTable (
+        recorded_at
+      )
+    ''');
+  }
+
+  Future<void> _addProgressPhotoSessionIdColumn(Database database) async {
+    final columns = await database.rawQuery(
+      'PRAGMA table_info($progressPhotosTable)',
+    );
+
+    final hasSessionId = columns.any(
+      (column) => column['name'] == 'session_id',
+    );
+
+    if (!hasSessionId) {
+      await database.execute('''
+        ALTER TABLE $progressPhotosTable
+        ADD COLUMN session_id TEXT
+      ''');
+    }
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_progress_photos_session_id
+      ON $progressPhotosTable (
+        session_id
+      )
+    ''');
+  }
+
   Future<void> _createProfilesTable(DatabaseExecutor database) async {
     await database.execute('''
       CREATE TABLE IF NOT EXISTS $profilesTable (
@@ -255,6 +454,9 @@ class AppDatabase {
         icon_code_point INTEGER,
         color_value INTEGER,
         avatar_image_path TEXT,
+        starting_weight REAL,
+        goal_weight REAL,
+        height_cm REAL,
         enabled_modules TEXT NOT NULL
         DEFAULT 'protocols,weight,inventory',
         created_at TEXT NOT NULL,
@@ -281,13 +483,17 @@ class AppDatabase {
 
   Future<void> _createProtocolsTable(DatabaseExecutor database) async {
     await database.execute('''
-      CREATE TABLE $protocolsTable (
+      CREATE TABLE IF NOT EXISTS $protocolsTable (
         id TEXT PRIMARY KEY,
 
         profile_id TEXT NOT NULL
           DEFAULT '$defaultProfileId',
 
         name TEXT NOT NULL,
+        protocol_category TEXT NOT NULL DEFAULT 'custom',
+        protocol_type TEXT NOT NULL
+        DEFAULT 'injection',
+        
         dose TEXT NOT NULL,
         dose_amount REAL,
         dose_unit TEXT,
@@ -318,7 +524,9 @@ class AppDatabase {
           DEFAULT 'weeks',
         repeat_cycle INTEGER NOT NULL
           DEFAULT 0,
-
+        rotation_enabled INTEGER NOT NULL DEFAULT 0,
+        rotation_mode TEXT NOT NULL DEFAULT 'sequential',
+        enabled_injection_sites TEXT,
         reminder_enabled INTEGER NOT NULL
           DEFAULT 0,
         reminder_minutes_before INTEGER NOT NULL
@@ -337,7 +545,7 @@ class AppDatabase {
 
   Future<void> _createDoseRecordsTable(Database database) async {
     await database.execute('''
-      CREATE TABLE $doseRecordsTable (
+      CREATE TABLE IF NOT EXISTS $doseRecordsTable (
         id TEXT PRIMARY KEY,
 
         profile_id TEXT NOT NULL
@@ -361,7 +569,7 @@ class AppDatabase {
     ''');
 
     await database.execute('''
-      CREATE UNIQUE INDEX
+      CREATE UNIQUE INDEX IF NOT EXISTS
       idx_dose_records_protocol_schedule
       ON $doseRecordsTable (
         protocol_id,
@@ -372,7 +580,7 @@ class AppDatabase {
 
   Future<void> _createWeightRecordsTable(Database database) async {
     await database.execute('''
-      CREATE TABLE $weightRecordsTable (
+      CREATE TABLE IF NOT EXISTS $weightRecordsTable (
         id TEXT PRIMARY KEY,
 
         profile_id TEXT NOT NULL
@@ -388,7 +596,7 @@ class AppDatabase {
     ''');
 
     await database.execute('''
-      CREATE INDEX
+      CREATE INDEX IF NOT EXISTS
       idx_weight_records_recorded_at
       ON $weightRecordsTable (
         recorded_at
@@ -398,15 +606,17 @@ class AppDatabase {
 
   Future<void> _createInventoryTable(Database database) async {
     await database.execute('''
-      CREATE TABLE $inventoryTable (
+      CREATE TABLE IF NOT EXISTS $inventoryTable (
         id TEXT PRIMARY KEY,
 
         profile_id TEXT NOT NULL
           DEFAULT '$defaultProfileId',
 
         protocol_id TEXT NOT NULL,
+        display_name TEXT,
         vial_size REAL NOT NULL,
         current_amount REAL NOT NULL,
+        supply_capacity REAL,
         unit TEXT NOT NULL,
 
         container_type TEXT NOT NULL
@@ -422,6 +632,12 @@ class AppDatabase {
           DEFAULT 14,
 
         current_container_opened_at TEXT,
+        current_container_batch_id TEXT,
+        reconstitution_volume_ml REAL,
+        expiration_date TEXT,
+        storage_instructions TEXT,
+        purchase_date TEXT,
+        cost REAL,
         vendor TEXT,
         batch TEXT,
         notes TEXT,
@@ -439,12 +655,60 @@ class AppDatabase {
     ''');
 
     await database.execute('''
-      CREATE INDEX
+      CREATE INDEX IF NOT EXISTS
       idx_inventory_protocol_id
       ON $inventoryTable (
         protocol_id
       )
     ''');
+  }
+
+  Future<void> _createInventoryEventsTable(DatabaseExecutor database) async {
+    await database.execute('''
+    CREATE TABLE IF NOT EXISTS $inventoryEventsTable (
+      id TEXT PRIMARY KEY,
+      inventory_item_id TEXT NOT NULL,
+      protocol_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      amount_changed REAL NOT NULL,
+      amount_after REAL NOT NULL,
+      unopened_quantity_after INTEGER NOT NULL,
+      notes TEXT,
+      occurred_at TEXT NOT NULL,
+
+      FOREIGN KEY (inventory_item_id)
+        REFERENCES $inventoryTable (id)
+        ON DELETE CASCADE,
+
+      FOREIGN KEY (protocol_id)
+        REFERENCES $protocolsTable (id)
+        ON DELETE CASCADE
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_inventory_events_inventory_item_id
+    ON $inventoryEventsTable (
+      inventory_item_id
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_inventory_events_protocol_id
+    ON $inventoryEventsTable (
+      protocol_id
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_inventory_events_occurred_at
+    ON $inventoryEventsTable (
+      occurred_at
+    )
+  ''');
   }
 
   Future<void> _createProfileIndexes(DatabaseExecutor database) async {
@@ -481,6 +745,92 @@ class AppDatabase {
     ''');
   }
 
+  Future<void> _createInjectionLogsTable(DatabaseExecutor database) async {
+    await database.execute('''
+    CREATE TABLE IF NOT EXISTS $injectionLogsTable (
+      id TEXT PRIMARY KEY,
+      protocol_id TEXT NOT NULL,
+      dose_record_id TEXT NOT NULL,
+      site TEXT NOT NULL,
+      logged_at TEXT NOT NULL,
+      notes TEXT,
+
+      FOREIGN KEY (protocol_id)
+        REFERENCES $protocolsTable (id)
+        ON DELETE CASCADE,
+
+      FOREIGN KEY (dose_record_id)
+        REFERENCES $doseRecordsTable (id)
+        ON DELETE CASCADE
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_injection_logs_protocol_id
+    ON $injectionLogsTable (
+      protocol_id
+    )
+  ''');
+
+    await database.execute('''
+    CREATE UNIQUE INDEX IF NOT EXISTS
+    idx_injection_logs_dose_record_id
+    ON $injectionLogsTable (
+      dose_record_id
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_injection_logs_logged_at
+    ON $injectionLogsTable (
+      logged_at
+    )
+  ''');
+  }
+
+  Future<void> _createInventoryBatchesTable(DatabaseExecutor database) async {
+    await database.execute('''
+      CREATE TABLE IF NOT EXISTS $inventoryBatchesTable (
+        id TEXT PRIMARY KEY,
+        inventory_item_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        container_size REAL NOT NULL,
+        unit TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        vendor TEXT,
+        batch TEXT,
+        purchase_date TEXT,
+        expiration_date TEXT,
+        cost REAL,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+
+        FOREIGN KEY (inventory_item_id)
+          REFERENCES $inventoryTable (id)
+          ON DELETE CASCADE
+      )
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_inventory_batches_inventory_item_id
+      ON $inventoryBatchesTable (
+        inventory_item_id
+      )
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_inventory_batches_expiration_date
+      ON $inventoryBatchesTable (
+        expiration_date
+      )
+    ''');
+  }
+
   Future<void> close() async {
     final database = _database;
 
@@ -490,5 +840,460 @@ class AppDatabase {
 
     await database.close();
     _database = null;
+  }
+
+  Future<void> resetDatabase() async {
+    await close();
+
+    final databasesPath = await getDatabasesPath();
+    final databasePath = join(databasesPath, databaseName);
+
+    await deleteDatabase(databasePath);
+  }
+
+  Future<void> _migrateInjectionLogsToDoseRecords(Database database) async {
+    await database.transaction((transaction) async {
+      await transaction.execute('''
+      ALTER TABLE $injectionLogsTable
+      RENAME TO injection_logs_legacy
+    ''');
+
+      await transaction.execute('''
+      DROP INDEX IF EXISTS idx_injection_logs_protocol_id
+    ''');
+
+      await transaction.execute('''
+      DROP INDEX IF EXISTS idx_injection_logs_logged_at
+    ''');
+
+      await transaction.execute('''
+      DROP INDEX IF EXISTS idx_injection_logs_dose_record_id
+    ''');
+
+      await _createInjectionLogsTable(transaction);
+
+      await transaction.execute('''
+      INSERT INTO $injectionLogsTable (
+        id,
+        protocol_id,
+        dose_record_id,
+        site,
+        logged_at,
+        notes
+      )
+      SELECT
+        injection_logs_legacy.id,
+        injection_logs_legacy.protocol_id,
+        $doseRecordsTable.id,
+        injection_logs_legacy.site,
+        injection_logs_legacy.logged_at,
+        injection_logs_legacy.notes
+      FROM injection_logs_legacy
+      INNER JOIN $doseRecordsTable
+        ON $doseRecordsTable.protocol_id =
+          injection_logs_legacy.protocol_id
+        AND $doseRecordsTable.completed_at =
+          injection_logs_legacy.logged_at
+    ''');
+
+      await transaction.execute('''
+      DROP TABLE injection_logs_legacy
+    ''');
+    });
+  }
+
+  Future<void> _addInventoryMetadataColumns(Database database) async {
+    await database.transaction((transaction) async {
+      await transaction.execute('''
+      ALTER TABLE $inventoryTable
+      ADD COLUMN reconstitution_volume_ml REAL
+    ''');
+
+      await transaction.execute('''
+      ALTER TABLE $inventoryTable
+      ADD COLUMN expiration_date TEXT
+    ''');
+
+      await transaction.execute('''
+      ALTER TABLE $inventoryTable
+      ADD COLUMN storage_instructions TEXT
+    ''');
+
+      await transaction.execute('''
+      ALTER TABLE $inventoryTable
+      ADD COLUMN purchase_date TEXT
+    ''');
+
+      await transaction.execute('''
+      ALTER TABLE $inventoryTable
+      ADD COLUMN cost REAL
+    ''');
+    });
+  }
+
+  Future<void> _createInventoryPhotosTable(DatabaseExecutor database) async {
+    await database.execute('''
+    CREATE TABLE IF NOT EXISTS $inventoryPhotosTable (
+      id TEXT PRIMARY KEY,
+      inventory_item_id TEXT NOT NULL,
+      image_path TEXT NOT NULL,
+      caption TEXT,
+      created_at TEXT NOT NULL,
+
+      FOREIGN KEY (inventory_item_id)
+        REFERENCES $inventoryTable (id)
+        ON DELETE CASCADE
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_inventory_photos_inventory_item_id
+    ON $inventoryPhotosTable (
+      inventory_item_id
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_inventory_photos_created_at
+    ON $inventoryPhotosTable (
+      created_at
+    )
+  ''');
+  }
+
+  Future<void> _addSupplyCapacityColumn(Database database) async {
+    await database.transaction((transaction) async {
+      await transaction.execute('''
+      ALTER TABLE $inventoryTable
+      ADD COLUMN supply_capacity REAL
+    ''');
+
+      await transaction.execute('''
+      UPDATE $inventoryTable
+      SET supply_capacity =
+        current_amount + (vial_size * unopened_quantity)
+      WHERE supply_capacity IS NULL
+    ''');
+    });
+  }
+
+  Future<void> _migrateExistingInventoryToBatches(Database database) async {
+    final now = DateTime.now().toIso8601String();
+
+    await database.execute('''
+    INSERT INTO $inventoryBatchesTable (
+      id,
+      inventory_item_id,
+      name,
+      container_size,
+      unit,
+      quantity,
+      vendor,
+      batch,
+      purchase_date,
+      expiration_date,
+      cost,
+      notes,
+      created_at,
+      updated_at
+    )
+    SELECT
+      id || '-initial-batch',
+      id,
+      CAST(vial_size AS TEXT) || ' ' || unit || ' Batch',
+      vial_size,
+      unit,
+      unopened_quantity,
+      vendor,
+      batch,
+      purchase_date,
+      expiration_date,
+      cost,
+      notes,
+      '$now',
+      '$now'
+    FROM $inventoryTable
+    WHERE unopened_quantity > 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM $inventoryBatchesTable
+        WHERE inventory_item_id = $inventoryTable.id
+      )
+  ''');
+  }
+
+  Future<void> _addCurrentContainerBatchIdColumn(Database database) async {
+    await database.execute('''
+      ALTER TABLE $inventoryTable
+      ADD COLUMN current_container_batch_id TEXT
+    ''');
+  }
+
+  Future<void> _addInventoryBatchNameColumn(Database database) async {
+    final columns = await database.rawQuery(
+      'PRAGMA table_info($inventoryBatchesTable)',
+    );
+
+    final hasNameColumn = columns.any((column) => column['name'] == 'name');
+
+    if (!hasNameColumn) {
+      await database.execute('''
+        ALTER TABLE $inventoryBatchesTable
+        ADD COLUMN name TEXT
+      ''');
+    }
+
+    await database.execute('''
+      UPDATE $inventoryBatchesTable
+      SET name =
+        CAST(container_size AS TEXT) || ' ' || unit || ' Batch'
+      WHERE name IS NULL OR TRIM(name) = ''
+    ''');
+  }
+
+  Future<void> _addInventoryDisplayNameColumn(Database database) async {
+    final columns = await database.rawQuery(
+      'PRAGMA table_info($inventoryTable)',
+    );
+
+    final hasDisplayNameColumn = columns.any(
+      (column) => column['name'] == 'display_name',
+    );
+
+    if (!hasDisplayNameColumn) {
+      await database.execute('''
+      ALTER TABLE $inventoryTable
+      ADD COLUMN display_name TEXT
+    ''');
+    }
+  }
+
+  Future<void> _addProtocolCategoryColumn(Database database) async {
+    final columns = await database.rawQuery(
+      'PRAGMA table_info($protocolsTable)',
+    );
+
+    final hasCategoryColumn = columns.any(
+      (column) => column['name'] == 'protocol_category',
+    );
+
+    if (!hasCategoryColumn) {
+      await database.execute('''
+      ALTER TABLE $protocolsTable
+      ADD COLUMN protocol_category TEXT NOT NULL DEFAULT 'custom'
+    ''');
+    }
+  }
+
+  Future<void> _addProfileGoalWeightColumn(Database database) async {
+    final columns = await database.rawQuery(
+      'PRAGMA table_info($profilesTable)',
+    );
+
+    final hasGoalWeightColumn = columns.any(
+      (column) => column['name'] == 'goal_weight',
+    );
+
+    if (!hasGoalWeightColumn) {
+      await database.execute('''
+      ALTER TABLE $profilesTable
+      ADD COLUMN goal_weight REAL
+    ''');
+    }
+  }
+
+  Future<void> _addProfileStartingWeightColumn(Database database) async {
+    final columns = await database.rawQuery(
+      'PRAGMA table_info($profilesTable)',
+    );
+
+    final hasStartingWeightColumn = columns.any(
+      (column) => column['name'] == 'starting_weight',
+    );
+
+    if (!hasStartingWeightColumn) {
+      await database.execute('''
+      ALTER TABLE $profilesTable
+      ADD COLUMN starting_weight REAL
+    ''');
+    }
+  }
+
+  Future<void> _addProfileHeightColumn(Database database) async {
+    final columns = await database.rawQuery(
+      'PRAGMA table_info($profilesTable)',
+    );
+
+    final hasHeightColumn = columns.any(
+      (column) => column['name'] == 'height_cm',
+    );
+
+    if (!hasHeightColumn) {
+      await database.execute('''
+      ALTER TABLE $profilesTable
+      ADD COLUMN height_cm REAL
+    ''');
+    }
+  }
+
+  Future<void> _addProgressPhotoProfileIdColumn(Database database) async {
+    final columns = await database.rawQuery(
+      'PRAGMA table_info($progressPhotosTable)',
+    );
+
+    final hasProfileId = columns.any(
+      (column) => column['name'] == 'profile_id',
+    );
+
+    if (!hasProfileId) {
+      await database.execute('''
+      ALTER TABLE $progressPhotosTable
+      ADD COLUMN profile_id TEXT NOT NULL
+      DEFAULT '$defaultProfileId'
+    ''');
+    }
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_progress_photos_profile_id
+    ON $progressPhotosTable (
+      profile_id
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_progress_photos_recorded_at
+    ON $progressPhotosTable (
+      recorded_at
+    )
+  ''');
+  }
+
+  Future<void> _createProgressPhotoSessionsTable(
+    DatabaseExecutor database,
+  ) async {
+    await database.execute('''
+    CREATE TABLE IF NOT EXISTS $progressPhotoSessionsTable (
+      id TEXT PRIMARY KEY,
+
+      profile_id TEXT NOT NULL
+        DEFAULT '$defaultProfileId',
+
+      recorded_at TEXT NOT NULL,
+      weight REAL,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+
+      FOREIGN KEY (profile_id)
+        REFERENCES $profilesTable (id)
+        ON DELETE CASCADE
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_progress_photo_sessions_profile_id
+    ON $progressPhotoSessionsTable (
+      profile_id
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_progress_photo_sessions_recorded_at
+    ON $progressPhotoSessionsTable (
+      recorded_at
+    )
+  ''');
+  }
+
+  Future<void> _createSymptomEntriesTable(DatabaseExecutor database) async {
+    await database.execute('''
+    CREATE TABLE IF NOT EXISTS $symptomEntriesTable (
+      id TEXT PRIMARY KEY,
+
+      profile_id TEXT NOT NULL
+        DEFAULT '$defaultProfileId',
+
+      symptom_name TEXT NOT NULL,
+      severity INTEGER NOT NULL,
+      notes TEXT,
+      recorded_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+
+      FOREIGN KEY (profile_id)
+        REFERENCES $profilesTable (id)
+        ON DELETE CASCADE
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_symptom_entries_profile_id
+    ON $symptomEntriesTable (
+      profile_id
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_symptom_entries_recorded_at
+    ON $symptomEntriesTable (
+      recorded_at
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_symptom_entries_symptom_name
+    ON $symptomEntriesTable (
+      symptom_name
+    )
+  ''');
+  }
+
+  Future<void> _createSymptomProtocolLinksTable(
+    DatabaseExecutor database,
+  ) async {
+    await database.execute('''
+    CREATE TABLE IF NOT EXISTS $symptomProtocolLinksTable (
+      symptom_entry_id TEXT NOT NULL,
+      protocol_id TEXT NOT NULL,
+
+      PRIMARY KEY (
+        symptom_entry_id,
+        protocol_id
+      ),
+
+      FOREIGN KEY (symptom_entry_id)
+        REFERENCES $symptomEntriesTable (id)
+        ON DELETE CASCADE,
+
+      FOREIGN KEY (protocol_id)
+        REFERENCES $protocolsTable (id)
+        ON DELETE CASCADE
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_symptom_protocol_links_symptom_entry_id
+    ON $symptomProtocolLinksTable (
+      symptom_entry_id
+    )
+  ''');
+
+    await database.execute('''
+    CREATE INDEX IF NOT EXISTS
+    idx_symptom_protocol_links_protocol_id
+    ON $symptomProtocolLinksTable (
+      protocol_id
+    )
+  ''');
   }
 }

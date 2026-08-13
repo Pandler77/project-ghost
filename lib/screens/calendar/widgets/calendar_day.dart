@@ -100,7 +100,9 @@ class CalendarDay extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+
+                  const SizedBox(height: 4),
+
                   Wrap(
                     spacing: 3,
                     runSpacing: 3,
@@ -125,6 +127,29 @@ class CalendarDay extends StatelessWidget {
                         ),
                     ],
                   ),
+
+                  const Spacer(),
+
+                  if (summary.hasExtraActivity)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (summary.hasSymptoms)
+                          Icon(
+                            Icons.notes_outlined,
+                            size: 11,
+                            color: colorScheme.primary,
+                          ),
+                        if (summary.hasSymptoms && summary.hasPhotos)
+                          const SizedBox(width: 3),
+                        if (summary.hasPhotos)
+                          Icon(
+                            Icons.photo_outlined,
+                            size: 11,
+                            color: colorScheme.secondary,
+                          ),
+                      ],
+                    ),
                 ],
               ),
             ),

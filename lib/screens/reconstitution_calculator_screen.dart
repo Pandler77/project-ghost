@@ -163,7 +163,10 @@ class _ReconstitutionCalculatorScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reconstitution'),
+        title: const Text(
+          'Reconstitution',
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.2),
+        ),
         actions: [
           IconButton(
             onPressed: _clear,
@@ -174,21 +177,64 @@ class _ReconstitutionCalculatorScreenState
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.md,
+            80,
+          ),
           children: [
-            const Text(
-              'Calculate syringe units',
-              style: TextStyle(
-                fontSize: AppTypography.title,
-                fontWeight: FontWeight.bold,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(
+                  color: colorScheme.primary.withValues(alpha: 0.14),
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Enter the vial amount, liquid added, and desired dose.',
-              style: TextStyle(
-                fontSize: AppTypography.caption,
-                color: colorScheme.onSurfaceVariant,
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Icon(
+                      Icons.science_outlined,
+                      color: colorScheme.primary,
+                      size: AppIcon.md,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Calculate syringe units',
+                          style: TextStyle(
+                            fontSize: AppTypography.title,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Enter vial strength, liquid added, and your desired dose.',
+                          style: TextStyle(
+                            fontSize: AppTypography.caption,
+                            height: 1.35,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -212,11 +258,13 @@ class _ReconstitutionCalculatorScreenState
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Liquid added',
                 hintText: '2',
                 suffixText: 'mL',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.button),
+                ),
               ),
             ),
 
@@ -241,7 +289,13 @@ class _ReconstitutionCalculatorScreenState
               child: FilledButton.icon(
                 onPressed: _calculate,
                 icon: const Icon(Icons.calculate_outlined),
-                label: const Text('Calculate'),
+                label: const Text(
+                  'Calculate',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                ),
               ),
             ),
 
@@ -251,7 +305,7 @@ class _ReconstitutionCalculatorScreenState
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(AppRadius.button),
+                  borderRadius: BorderRadius.circular(AppRadius.card),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,8 +332,11 @@ class _ReconstitutionCalculatorScreenState
               Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
+                  color: colorScheme.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(AppRadius.card),
+                  border: Border.all(
+                    color: colorScheme.primary.withValues(alpha: 0.22),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -287,7 +344,7 @@ class _ReconstitutionCalculatorScreenState
                       'Draw',
                       style: TextStyle(
                         fontSize: AppTypography.caption,
-                        color: colorScheme.onPrimaryContainer,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
@@ -295,9 +352,10 @@ class _ReconstitutionCalculatorScreenState
                       '${_formatNumber(_resultUnits!)} units',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onPrimaryContainer,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
@@ -306,7 +364,7 @@ class _ReconstitutionCalculatorScreenState
                       style: TextStyle(
                         fontSize: AppTypography.body,
                         fontWeight: FontWeight.w600,
-                        color: colorScheme.onPrimaryContainer,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -334,9 +392,12 @@ class _ReconstitutionCalculatorScreenState
               Container(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerLow,
+                  color:
+                      Theme.of(context).cardTheme.color ?? colorScheme.surface,
                   borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: colorScheme.outlineVariant),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.60),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -403,7 +464,9 @@ class _AmountUnitField extends StatelessWidget {
             decoration: InputDecoration(
               labelText: label,
               hintText: hint,
-              border: const OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.button),
+              ),
             ),
           ),
         ),
@@ -447,9 +510,11 @@ class _SyringeSizeSelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
+        color: Theme.of(context).cardTheme.color ?? colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.60),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -458,7 +523,7 @@ class _SyringeSizeSelector extends StatelessWidget {
             'Syringe size',
             style: TextStyle(
               fontSize: AppTypography.body,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -514,14 +579,14 @@ class _SyringeSizeButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.button),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Ink(
           height: 52,
           decoration: BoxDecoration(
             color: isSelected
                 ? colorScheme.primary.withValues(alpha: 0.10)
                 : colorScheme.surface,
-            borderRadius: BorderRadius.circular(AppRadius.button),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
               color: isSelected
                   ? colorScheme.primary
@@ -582,9 +647,7 @@ class SyringeScaleVisualization extends StatelessWidget {
           style: TextStyle(
             fontSize: AppTypography.body,
             fontWeight: FontWeight.w700,
-            color: exceedsCapacity
-                ? colorScheme.error
-                : colorScheme.onPrimaryContainer,
+            color: exceedsCapacity ? colorScheme.error : colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -597,7 +660,7 @@ class SyringeScaleVisualization extends StatelessWidget {
               maximumUnits: maximumUnits,
               outlineColor: exceedsCapacity
                   ? colorScheme.error
-                  : colorScheme.onPrimaryContainer,
+                  : colorScheme.onSurface,
               liquidColor: exceedsCapacity
                   ? colorScheme.error
                   : colorScheme.primary,
@@ -804,7 +867,7 @@ class _ResultRow extends StatelessWidget {
           height: 38,
           decoration: BoxDecoration(
             color: colorScheme.primary.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(AppRadius.button),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Icon(icon, size: AppIcon.sm, color: colorScheme.primary),
         ),

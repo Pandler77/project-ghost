@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../models/daily_protocol_item.dart';
+import '../../models/measurement_system.dart';
 import '../../models/weight_record.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/weight_display.dart';
 
 class EditDaySheet extends StatefulWidget {
   const EditDaySheet({
     required this.date,
     required this.protocolItems,
     required this.weightRecord,
+    required this.measurementSystem,
     required this.onSave,
     super.key,
   });
@@ -16,6 +19,7 @@ class EditDaySheet extends StatefulWidget {
   final DateTime date;
   final List<DailyProtocolItem> protocolItems;
   final WeightRecord? weightRecord;
+  final MeasurementSystem measurementSystem;
 
   final ValueChanged<EditDayResult> onSave;
 
@@ -34,8 +38,15 @@ class _EditDaySheetState extends State<EditDaySheet> {
   void initState() {
     super.initState();
 
+    final storedWeight = widget.weightRecord?.weight;
+
     _weightController = TextEditingController(
-      text: widget.weightRecord?.weight.toStringAsFixed(1) ?? '',
+      text: storedWeight == null
+          ? ''
+          : WeightDisplay.displayValue(
+              storedWeight,
+              widget.measurementSystem,
+            ).toStringAsFixed(1),
     );
 
     _protocolStates = widget.protocolItems.map((item) {
@@ -85,13 +96,15 @@ class _EditDaySheetState extends State<EditDaySheet> {
     double? weight;
 
     if (!_deleteWeight && weightText.isNotEmpty) {
-      weight = double.tryParse(weightText);
+      final enteredWeight = double.tryParse(weightText);
 
-      if (weight == null || weight <= 0) {
+      if (enteredWeight == null || enteredWeight <= 0) {
         _showValidationMessage('Enter a valid weight.');
 
         return;
       }
+
+      weight = _weightToStoredPounds(enteredWeight, widget.measurementSystem);
     }
 
     final protocolChanges = <EditDayProtocolResult>[];
@@ -134,6 +147,8 @@ class _EditDaySheetState extends State<EditDaySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final weightUnit = WeightDisplay.unit(widget.measurementSystem);
+
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -215,11 +230,14 @@ class _EditDaySheetState extends State<EditDaySheet> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Weight',
-                      suffixText: 'lb',
-                      hintText: '350.0',
-                      border: OutlineInputBorder(),
+                      suffixText: weightUnit,
+                      hintText:
+                          widget.measurementSystem == MeasurementSystem.metric
+                          ? '158.8'
+                          : '350.0',
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   if (widget.weightRecord != null) ...[
@@ -450,7 +468,9 @@ class EditDayResult {
     required this.protocolChanges,
   });
 
+  /// Always returned in pounds for canonical database storage.
   final double? weight;
+
   final bool deleteWeight;
   final List<EditDayProtocolResult> protocolChanges;
 }
@@ -467,6 +487,17 @@ class EditDayProtocolResult {
   final bool isTaken;
   final String actualAmount;
   final TimeOfDay completedTime;
+}
+
+double _weightToStoredPounds(
+  double displayedWeight,
+  MeasurementSystem measurementSystem,
+) {
+  if (measurementSystem == MeasurementSystem.metric) {
+    return displayedWeight / 0.45359237;
+  }
+
+  return displayedWeight;
 }
 
 String _formatDate(DateTime date) {

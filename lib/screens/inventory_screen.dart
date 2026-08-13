@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../models/inventory_item.dart';
 import '../models/protocol.dart';
+import '../models/protocol_category.dart';
 import '../services/app_data_service.dart';
 import '../services/settings_service.dart';
+import '../theme/app_theme.dart';
+import 'inventory_detail_screen.dart';
 import 'inventory_setup/inventory_setup_screen.dart';
+import 'inventory_widgets/inventory_action_sheets.dart';
+import '../models/inventory_batch.dart';
+import 'premium_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({
@@ -25,6 +31,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   final SettingsService _settingsService = SettingsService();
 
   List<InventoryItem> _items = [];
+  final Map<String, List<InventoryBatch>> _batchesByItemId = {};
 
   bool _isLoading = true;
   String? _loadError;
@@ -53,6 +60,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     return _items.where((item) {
       final protocolName = _protocolName(item.protocolId).toLowerCase();
+      final displayName = item.displayName?.toLowerCase() ?? '';
 
       final vendor = item.vendor?.toLowerCase() ?? '';
 
@@ -60,7 +68,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
       final containerType = item.containerType.toLowerCase();
 
-      return protocolName.contains(query) ||
+      return displayName.contains(query) ||
+          protocolName.contains(query) ||
           vendor.contains(query) ||
           batch.contains(query) ||
           containerType.contains(query);
@@ -71,12 +80,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
     try {
       final items = await widget.dataService.getInventoryItems();
 
+      final batchEntries = await Future.wait(
+        items.map((item) async {
+          final batches = await widget.dataService.getInventoryBatchesForItem(
+            item.id,
+          );
+          return MapEntry(item.id, batches);
+        }),
+      );
+
+      final batchesByItemId = <String, List<InventoryBatch>>{
+        for (final entry in batchEntries) entry.key: entry.value,
+      };
+
       if (!mounted) {
         return;
       }
 
       setState(() {
         _items = items;
+        _batchesByItemId
+          ..clear()
+          ..addAll(batchesByItemId);
         _isLoading = false;
         _loadError = null;
       });
@@ -151,6 +176,235 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
+  Future<void> _addStock(InventoryItem item) async {
+    final result = await showModalBottomSheet<AddStockResult>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) {
+        return AddStockSheet(
+          containerType: item.containerType,
+          unit: item.unit,
+          defaultContainerSize: item.vialSize,
+        );
+      },
+    );
+
+    if (result == null || !mounted) {
+      return;
+    }
+
+    try {
+      await widget.dataService.addInventoryStock(
+        item: item,
+        batchName: result.batchName,
+        containerSize: result.containerSize,
+        quantity: result.quantity,
+        vendor: result.vendor,
+        batchNumber: result.batch,
+        purchaseDate: result.purchaseDate,
+        expirationDate: result.expirationDate,
+        cost: result.cost,
+        notes: result.notes,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      await _loadInventory();
+    } catch (error) {
+      _showActionError('Could not add stock', error);
+    }
+  }
+
+  Future<void> _adjustInventory(InventoryItem item) async {
+    final result = await showModalBottomSheet<InventoryAdjustmentResult>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) {
+        return InventoryAdjustmentSheet(item: item);
+      },
+    );
+
+    if (result == null || !mounted) {
+      return;
+    }
+
+    try {
+      final correctedItem = item.copyWith(
+        vialSize: result.containerSize,
+        updatedAt: DateTime.now(),
+      );
+
+      await widget.dataService.manuallyAdjustInventory(
+        item: correctedItem,
+        currentAmount: result.currentAmount,
+        unopenedQuantity: item.unopenedQuantity,
+        notes: result.notes,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      await _loadInventory();
+    } catch (error) {
+      _showActionError('Could not adjust inventory', error);
+    }
+  }
+
+  Future<void> _openNewVial(InventoryItem item) async {
+    if (item.currentAmount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Finish or adjust the current '
+            '${item.containerType.toLowerCase()} before opening another.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final availableBatches = _batchesForItem(
+      item,
+    ).where((batch) => batch.quantity > 0).toList(growable: false);
+
+    if (availableBatches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('There is no unopened inventory available.'),
+        ),
+      );
+      return;
+    }
+
+    InventoryBatch? selectedBatch;
+
+    if (availableBatches.length == 1) {
+      selectedBatch = availableBatches.first;
+    } else {
+      selectedBatch = await showModalBottomSheet<InventoryBatch>(
+        context: context,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (sheetContext) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Choose a batch',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Select the named batch you are opening from.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                for (
+                  var index = 0;
+                  index < availableBatches.length;
+                  index++
+                ) ...[
+                  _BatchPickerTile(
+                    batch: availableBatches[index],
+                    onTap: () {
+                      Navigator.pop(sheetContext, availableBatches[index]);
+                    },
+                  ),
+                  if (index < availableBatches.length - 1)
+                    const SizedBox(height: AppSpacing.sm),
+                ],
+              ],
+            ),
+          );
+        },
+      );
+    }
+
+    if (selectedBatch == null || !mounted) {
+      return;
+    }
+
+    final shouldOpen = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text('Open ${selectedBatch!.name}?'),
+          content: Text(
+            '${_formatNumber(selectedBatch.containerSize)} '
+            '${selectedBatch.unit} • '
+            '${selectedBatch.quantity} unopened\n\n'
+            'Ghost will open one from this batch and leave '
+            '${selectedBatch.quantity - 1} unopened.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Open'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldOpen != true || !mounted) {
+      return;
+    }
+
+    try {
+      final updatedItem = await widget.dataService.openNewInventoryVial(
+        item: item,
+        batchId: selectedBatch.id,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (updatedItem == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('The selected vial could not be opened.'),
+          ),
+        );
+        return;
+      }
+
+      await _loadInventory();
+    } catch (error) {
+      _showActionError('Could not open a new vial', error);
+    }
+  }
+
+  void _showActionError(String message, Object error) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$message: $error')));
+  }
+
   Future<void> _deleteItem(InventoryItem item) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -202,6 +456,56 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return 'Unknown Protocol';
   }
 
+  Protocol? _protocolForId(String protocolId) {
+    for (final protocol in widget.protocols) {
+      if (protocol.id == protocolId) {
+        return protocol;
+      }
+    }
+
+    return null;
+  }
+
+  List<InventoryBatch> _batchesForItem(InventoryItem item) {
+    return _batchesByItemId[item.id] ?? const [];
+  }
+
+  int _unopenedCountForItem(InventoryItem item) {
+    return _batchesForItem(
+      item,
+    ).fold<int>(0, (total, batch) => total + batch.quantity);
+  }
+
+  Future<void> _openDetail(InventoryItem item) async {
+    final protocol = _protocolForId(item.protocolId);
+
+    if (protocol == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The linked protocol could not be found.'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InventoryDetailScreen(
+          item: item,
+          protocol: protocol,
+          dataService: widget.dataService,
+        ),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadInventory();
+  }
+
   String _formatNumber(double value) {
     if (value == value.roundToDouble()) {
       return value.toInt().toString();
@@ -221,11 +525,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     if (!widget.dataService.hasPremium) {
-      return const _PremiumInventoryPreview();
+      return _PremiumInventoryPreview(dataService: widget.dataService);
     }
-
     return Scaffold(
-      appBar: AppBar(title: const _GhostSupplyTitle()),
+      appBar: AppBar(
+        title: const _GhostSupplyTitle(),
+      ),
       body: SafeArea(child: _buildBody()),
     );
   }
@@ -250,7 +555,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
               const SizedBox(height: 8),
               Text(_loadError!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               FilledButton(
                 onPressed: () {
                   setState(() {
@@ -270,11 +575,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     if (_items.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          48,
+        ),
         children: [
           if (_showBetaInformation) ...[
             _GhostSupplyBetaInformation(onDismiss: _dismissBetaInformation),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
           ],
           _EmptyInventoryState(
             onAddPressed: () {
@@ -290,11 +600,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return RefreshIndicator(
       onRefresh: _loadInventory,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          48,
+        ),
         children: [
           if (_showBetaInformation) ...[
             _GhostSupplyBetaInformation(onDismiss: _dismissBetaInformation),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
           ],
           Row(
             children: [
@@ -316,7 +631,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             onPressed: _clearSearch,
                             icon: const Icon(Icons.close),
                           ),
-                    border: const OutlineInputBorder(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                    ),
                   ),
                 ),
               ),
@@ -334,23 +651,39 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           if (filteredItems.isEmpty)
             const _NoMatchingInventory()
           else
             for (var index = 0; index < filteredItems.length; index++) ...[
               _InventoryCard(
                 item: filteredItems[index],
+                protocol: _protocolForId(filteredItems[index].protocolId),
                 protocolName: _protocolName(filteredItems[index].protocolId),
+                unopenedContainerCount: _unopenedCountForItem(
+                  filteredItems[index],
+                ),
                 formatNumber: _formatNumber,
+                onOpen: () {
+                  _openDetail(filteredItems[index]);
+                },
                 onEdit: () {
                   _openSetup(item: filteredItems[index]);
+                },
+                onAddStock: () {
+                  _addStock(filteredItems[index]);
+                },
+                onOpenNewVial: () {
+                  _openNewVial(filteredItems[index]);
+                },
+                onAdjust: () {
+                  _adjustInventory(filteredItems[index]);
                 },
                 onDelete: () {
                   _deleteItem(filteredItems[index]);
                 },
               ),
-              if (index < filteredItems.length - 1) const SizedBox(height: 10),
+              if (index < filteredItems.length - 1) const SizedBox(height: AppSpacing.sm),
             ],
         ],
       ),
@@ -394,35 +727,67 @@ class _GhostSupplyTitle extends StatelessWidget {
 class _InventoryCard extends StatelessWidget {
   const _InventoryCard({
     required this.item,
+    required this.protocol,
     required this.protocolName,
+    required this.unopenedContainerCount,
     required this.formatNumber,
+    required this.onOpen,
     required this.onEdit,
+    required this.onAddStock,
+    required this.onOpenNewVial,
+    required this.onAdjust,
     required this.onDelete,
   });
 
   final InventoryItem item;
+  final Protocol? protocol;
   final String protocolName;
+  final int unopenedContainerCount;
   final String Function(double value) formatNumber;
-
+  final VoidCallback onOpen;
   final VoidCallback onEdit;
+  final VoidCallback onAddStock;
+  final VoidCallback onOpenNewVial;
+  final VoidCallback onAdjust;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
+    final accent = protocol == null
+        ? colors.primary
+        : Color(protocol!.colorValue);
+
+    final supplyName = item.displayName?.trim().isNotEmpty == true
+        ? item.displayName!.trim()
+        : protocolName;
+
+    final categoryLabel = protocol == null
+        ? 'Protocol'
+        : protocol!.category.label;
 
     final containerName = item.containerType.toLowerCase();
+    final lowSupply =
+        (unopenedContainerCount + (item.currentAmount > 0 ? 1 : 0)) <=
+        item.lowStockThreshold;
 
-    final unopenedLabel = item.unopenedQuantity == 1
-        ? containerName
-        : _pluralize(containerName);
+    final cardBackground = Color.alphaBlend(
+      accent.withValues(alpha: 0.10),
+      colors.surface,
+    );
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        onTap: onEdit,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          decoration: BoxDecoration(
+            color: cardBackground,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(color: accent.withValues(alpha: 0.42)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -430,159 +795,332 @@ class _InventoryCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: Text(
-                      protocolName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          supplyName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$categoryLabel: $protocolName',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  if (item.isLowStock) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'Low supply',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onErrorContainer,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                  ],
                   PopupMenuButton<String>(
                     tooltip: 'Supply options',
+                    padding: EdgeInsets.zero,
                     onSelected: (value) {
                       switch (value) {
                         case 'edit':
                           onEdit();
+                          break;
+                        case 'add_stock':
+                          onAddStock();
+                          break;
+                        case 'open_vial':
+                          onOpenNewVial();
+                          break;
+                        case 'adjust':
+                          onAdjust();
+                          break;
                         case 'remove':
                           onDelete();
+                          break;
                       }
                     },
-                    itemBuilder: (context) {
-                      return const [
-                        PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit_outlined),
-                              SizedBox(width: 12),
-                              Text('Edit'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'remove',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline),
-                              SizedBox(width: 12),
-                              Text('Remove'),
-                            ],
-                          ),
-                        ),
-                      ];
-                    },
-                  ),
-                ],
-              ),
-              Text(
-                'Current ${item.containerType}',
-                style: TextStyle(color: colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 16),
-              if (item.currentAmount <= 0) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 18,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: colorScheme.outlineVariant),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'No $containerName currently open',
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined),
+                            SizedBox(width: 12),
+                            Text('Edit Supply'),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'The next completed dose will open one automatically.',
-                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      const PopupMenuItem(
+                        value: 'add_stock',
+                        child: Row(
+                          children: [
+                            Icon(Icons.add_box_outlined),
+                            SizedBox(width: 12),
+                            Text('Add Stock'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'open_vial',
+                        enabled:
+                            item.currentAmount <= 0 &&
+                            unopenedContainerCount > 0,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.science_outlined),
+                            const SizedBox(width: 12),
+                            Text('Open New ${item.containerType}'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'adjust',
+                        child: Row(
+                          children: [
+                            Icon(Icons.tune),
+                            SizedBox(width: 12),
+                            Text('Adjust Inventory'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: 'remove',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline),
+                            SizedBox(width: 12),
+                            Text('Remove'),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ] else ...[
-                LinearProgressIndicator(
-                  value: item.currentVialProgress,
-                  minHeight: 10,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '${formatNumber(item.currentAmount)} / '
-                  '${formatNumber(item.vialSize)} '
-                  '${item.unit}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+                ],
+              ),
               const SizedBox(height: 12),
-              Text(
-                item.currentAmount <= 0
-                    ? '${item.unopenedQuantity} unopened '
-                          '$unopenedLabel'
-                          ' • '
-                          '${formatNumber(item.totalRemaining)} '
-                          '${item.unit} available'
-                    : '${item.unopenedQuantity} unopened '
-                          '$unopenedLabel'
-                          ' • '
-                          '${formatNumber(item.totalRemaining)} '
-                          '${item.unit} total',
-                style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: item.currentVialProgress,
+                  minHeight: 8,
+                  backgroundColor: colors.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(accent),
                 ),
               ),
+              const SizedBox(height: 9),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.currentAmount > 0
+                          ? '${formatNumber(item.currentAmount)} / '
+                                '${formatNumber(item.vialSize)} ${item.unit} left'
+                          : 'No $containerName open',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  _ContainerCount(
+                    containerType: item.containerType,
+                    count: unopenedContainerCount,
+                    accent: accent,
+                  ),
+                ],
+              ),
+              if (lowSupply) ...[
+                const SizedBox(height: 8),
+                _WarningIndicator(
+                  label: unopenedContainerCount == 0 && item.currentAmount <= 0
+                      ? 'Out of stock'
+                      : 'Low supply',
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  static String _pluralize(String value) {
-    if (value == 'box') {
-      return 'boxes';
+class _BatchPickerTile extends StatelessWidget {
+  const _BatchPickerTile({required this.batch, required this.onTap});
+
+  final InventoryBatch batch;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final details = <String>[
+      '${batch.quantity} unopened',
+      if (batch.vendor != null && batch.vendor!.trim().isNotEmpty)
+        batch.vendor!.trim(),
+      if (batch.batch != null && batch.batch!.trim().isNotEmpty)
+        'Lot ${batch.batch!.trim()}',
+    ];
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Ink(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(color: colors.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.inventory_2_outlined, color: colors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      batch.name,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${_formatBatchAmount(batch.containerSize)} '
+                      '${batch.unit} • ${details.join(' • ')}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatBatchAmount(double value) {
+  if (value == value.roundToDouble()) {
+    return value.toInt().toString();
+  }
+
+  return value
+      .toStringAsFixed(3)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
+}
+
+class _ContainerCount extends StatelessWidget {
+  const _ContainerCount({
+    required this.containerType,
+    required this.count,
+    required this.accent,
+  });
+
+  final String containerType;
+  final int count;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accent.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ContainerPlaceholder(containerType: containerType, accent: accent),
+          const SizedBox(width: 6),
+          Text(
+            '$count unopened',
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContainerPlaceholder extends StatelessWidget {
+  const _ContainerPlaceholder({
+    required this.containerType,
+    required this.accent,
+  });
+
+  final String containerType;
+  final Color accent;
+
+  IconData get _icon {
+    switch (containerType.trim().toLowerCase()) {
+      case 'vial':
+        return Icons.science_outlined;
+      case 'bottle':
+        return Icons.local_drink_outlined;
+      case 'pen':
+        return Icons.edit_outlined;
+      case 'box':
+        return Icons.inventory_2_outlined;
+      case 'tube':
+        return Icons.medication_liquid_outlined;
+      case 'package':
+        return Icons.all_inbox_outlined;
+      default:
+        return Icons.inventory_outlined;
     }
+  }
 
-    if (value.endsWith('s')) {
-      return value;
-    }
+  @override
+  Widget build(BuildContext context) {
+    return Icon(_icon, size: 16, color: accent);
+  }
+}
 
-    return '${value}s';
+class _WarningIndicator extends StatelessWidget {
+  const _WarningIndicator({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.warning_amber_rounded, size: 16, color: colors.error),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: colors.error,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -761,7 +1299,7 @@ class _EmptyInventoryState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.inventory_2_outlined, size: 64),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -814,7 +1352,9 @@ class _EmptyInventoryState extends StatelessWidget {
 }
 
 class _PremiumInventoryPreview extends StatelessWidget {
-  const _PremiumInventoryPreview();
+  const _PremiumInventoryPreview({required this.dataService});
+
+  final AppDataService dataService;
 
   @override
   Widget build(BuildContext context) {
@@ -837,7 +1377,7 @@ class _PremiumInventoryPreview extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               'Track what remains, unopened '
               'containers, and reorder timing.',
@@ -862,9 +1402,16 @@ class _PremiumInventoryPreview extends StatelessWidget {
               text: 'Estimated shipping and depletion timing',
             ),
             const SizedBox(height: 28),
-            const FilledButton(
-              onPressed: null,
-              child: Text('Upgrade to Premium'),
+            FilledButton(
+              onPressed: () {
+                Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PremiumScreen(dataService: dataService),
+                  ),
+                );
+              },
+              child: const Text('Upgrade to Premium'),
             ),
           ],
         ),

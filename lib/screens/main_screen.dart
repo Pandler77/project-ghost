@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_theme_mode.dart';
+import '../models/display_preferences.dart';
 import '../models/home_layout.dart';
 import '../models/profile.dart';
 import '../models/protocol.dart';
 import '../models/tracking_preferences.dart';
 import '../services/app_data_service.dart';
+import '../services/missed_dose_reconciliation_service.dart';
 import '../services/notification_service.dart';
 import '../services/profile_service.dart';
 import '../services/settings_service.dart';
+import '../widgets/profile_avatar.dart';
 import 'calendar_screen.dart';
 import 'create_profile_screen.dart';
 import 'dashboard_screen.dart';
@@ -18,7 +21,7 @@ import 'premium_screen.dart';
 import 'protocols_screen.dart';
 import 'settings_screen.dart';
 import 'tools_screen.dart';
-import '../widgets/profile_avatar.dart';
+import '../models/measurement_system.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({
@@ -43,11 +46,16 @@ class _MainScreenState extends State<MainScreen> {
   final SettingsService _settingsService = SettingsService();
   final ProfileService _profileService = ProfileService();
 
+  final MissedDoseReconciliationService _missedDoseReconciliationService =
+      const MissedDoseReconciliationService();
+
   int _selectedIndex = 0;
   int _dataRevision = 0;
 
   HomeLayout _homeLayout = HomeLayout.defaultLayout;
   TrackingPreferences _trackingPreferences = TrackingPreferences.defaults;
+  DisplayPreferences _displayPreferences = const DisplayPreferences();
+  MeasurementSystem _measurementSystem = MeasurementSystem.imperial;
 
   List<Protocol> _protocols = [];
   List<Profile> _profiles = [];
@@ -66,6 +74,13 @@ class _MainScreenState extends State<MainScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _handleNotificationNavigation();
+    });
+  }
+
+  void _handleMeasurementSystemChanged(MeasurementSystem measurementSystem) {
+    setState(() {
+      _measurementSystem = measurementSystem;
+      _dataRevision++;
     });
   }
 
@@ -89,11 +104,20 @@ class _MainScreenState extends State<MainScreen> {
         _appDataService.getProtocols(),
         _settingsService.getHomeLayout(),
         _settingsService.getTrackingPreferences(),
+        _settingsService.getMeasurementSystem(),
+        _settingsService.getDisplayPreferences(),
       ]);
 
       final protocols = results[0] as List<Protocol>;
       final homeLayout = results[1] as HomeLayout;
       final trackingPreferences = results[2] as TrackingPreferences;
+      final measurementSystem = results[3] as MeasurementSystem;
+      final displayPreferences = results[4] as DisplayPreferences;
+
+      await _missedDoseReconciliationService.reconcile(
+        dataService: _appDataService,
+        protocols: protocols,
+      );
 
       await NotificationService.instance.synchronizeProtocolReminders(
         protocols,
@@ -109,6 +133,8 @@ class _MainScreenState extends State<MainScreen> {
         _protocols = protocols;
         _homeLayout = homeLayout;
         _trackingPreferences = trackingPreferences;
+        _measurementSystem = measurementSystem;
+        _displayPreferences = displayPreferences;
         _isLoading = false;
         _loadError = null;
       });
@@ -148,6 +174,19 @@ class _MainScreenState extends State<MainScreen> {
 
     setState(() {
       _trackingPreferences = preferences;
+    });
+  }
+
+  Future<void> _loadDisplayPreferences() async {
+    final preferences = await _settingsService.getDisplayPreferences();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _displayPreferences = preferences;
+      _dataRevision++;
     });
   }
 
@@ -207,6 +246,17 @@ class _MainScreenState extends State<MainScreen> {
       });
 
       await Future<void>.delayed(const Duration(milliseconds: 80));
+    } on ProfileAccessRequiresPremiumException {
+      if (!mounted) {
+        return;
+      }
+
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PremiumScreen(dataService: _appDataService),
+        ),
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -225,6 +275,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _openProfileSelector() async {
+    final freeProfileId = await _profileService.getFreeProfileId();
+
+    if (!mounted) {
+      return;
+    }
+
     final selectedProfile = await showModalBottomSheet<Profile>(
       context: context,
       showDragHandle: true,
@@ -244,95 +300,33 @@ class _MainScreenState extends State<MainScreen> {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
-                for (final profile in _profiles)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: profile.id == _activeProfile?.id
-                            ? colors.primaryContainer
-                            : colors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: profile.id == _activeProfile?.id
-                              ? colors.primary
-                              : colors.outlineVariant,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(14),
-                              onTap: () {
-                                Navigator.pop(sheetContext, profile);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    ProfileAvatar(profile: profile, radius: 21),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            profile.name,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            profile.type.label,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: colors.onSurfaceVariant,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (profile.id == _activeProfile?.id)
-                                      Icon(
-                                        Icons.check_circle,
-                                        color: colors.primary,
-                                      )
-                                    else
-                                      Icon(
-                                        Icons.chevron_right,
-                                        color: colors.onSurfaceVariant,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Edit ${profile.name}',
-                            icon: const Icon(Icons.more_vert),
-                            onPressed: () {
-                              Navigator.pop(sheetContext);
 
-                              Future<void>.delayed(
-                                Duration.zero,
-                                () => _openEditProfile(profile),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 4),
-                        ],
-                      ),
-                    ),
+                for (final profile in _profiles) ...[
+                  _ProfileSelectorTile(
+                    profile: profile,
+                    isActive: profile.id == _activeProfile?.id,
+                    isLocked:
+                        !_profileService.hasPremium &&
+                        profile.id != freeProfileId,
+                    onSelect: () {
+                      Navigator.pop(sheetContext, profile);
+                    },
+                    onEdit: () {
+                      Navigator.pop(sheetContext);
+
+                      Future<void>.delayed(
+                        Duration.zero,
+                        () => _openEditProfile(profile),
+                      );
+                    },
                   ),
+                  const SizedBox(height: 8),
+                ],
+
                 const SizedBox(height: 4),
                 const Divider(),
                 const SizedBox(height: 4),
+
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                   leading: Container(
@@ -401,12 +395,14 @@ class _MainScreenState extends State<MainScreen> {
       type: result.type,
       colorValue: result.colorValue,
       iconCodePoint: result.iconCodePoint,
+      avatarImagePath: result.avatarImagePath,
       enabledModules: result.enabledModules,
     );
 
     await _profileService.setActiveProfile(profile.id);
 
     final profiles = await _profileService.getProfiles();
+
     final protocols = await _appDataService.getProtocols();
 
     await NotificationService.instance.synchronizeProtocolReminders(protocols);
@@ -438,7 +434,26 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
 
-    if (result == null || !mounted) {
+    if (!mounted) {
+      return;
+    }
+
+    // The edit screen can auto-save photos/icons even when the user
+    // leaves with the Back button, so always refresh profiles here.
+    if (result == null) {
+      final profiles = await _profileService.getProfiles();
+      final activeProfile = await _profileService.getActiveProfile();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _profiles = profiles;
+        _activeProfile = activeProfile;
+        _dataRevision++;
+      });
+
       return;
     }
 
@@ -452,6 +467,7 @@ class _MainScreenState extends State<MainScreen> {
       await _profileService.updateProfile(updatedProfile);
 
       final profiles = await _profileService.getProfiles();
+      final activeProfile = await _profileService.getActiveProfile();
 
       if (!mounted) {
         return;
@@ -459,11 +475,7 @@ class _MainScreenState extends State<MainScreen> {
 
       setState(() {
         _profiles = profiles;
-
-        if (_activeProfile?.id == updatedProfile.id) {
-          _activeProfile = updatedProfile;
-        }
-
+        _activeProfile = activeProfile;
         _dataRevision++;
       });
 
@@ -576,6 +588,8 @@ class _MainScreenState extends State<MainScreen> {
         builder: (_) => SettingsScreen(
           themeMode: widget.themeMode,
           onThemeModeChanged: widget.onThemeModeChanged,
+          measurementSystem: _measurementSystem,
+          onMeasurementSystemChanged: _handleMeasurementSystemChanged,
         ),
       ),
     );
@@ -586,6 +600,7 @@ class _MainScreenState extends State<MainScreen> {
 
     await Future.wait([
       _loadTrackingPreferences(),
+      _loadDisplayPreferences(),
       _loadHomeLayout(),
       _loadProfiles(),
     ]);
@@ -644,13 +659,15 @@ class _MainScreenState extends State<MainScreen> {
 
     final screens = <Widget>[
       DashboardScreen(
-        profile: _activeProfile!,
+        profile: activeProfile,
         protocols: _protocols,
         onProtocolAdded: _addProtocol,
         dataService: _appDataService,
         dataRevision: _dataRevision,
         homeLayout: _homeLayout,
         trackingPreferences: _trackingPreferences,
+        displayPreferences: _displayPreferences,
+        measurementSystem: _measurementSystem,
         onDataChanged: _notifyDataChanged,
       ),
       ProtocolsScreen(
@@ -658,13 +675,19 @@ class _MainScreenState extends State<MainScreen> {
         onProtocolsChanged: _notifyDataChanged,
         onProtocolAdded: _addProtocol,
         onProtocolUpdated: _updateProtocol,
+        displayPreferences: _displayPreferences,
       ),
       CalendarScreen(
         dataService: _appDataService,
         protocols: _protocols,
         onDataChanged: _notifyDataChanged,
+        measurementSystem: _measurementSystem,
       ),
-      ToolsScreen(dataService: _appDataService, protocols: _protocols),
+      ToolsScreen(
+        dataService: _appDataService,
+        protocols: _protocols,
+        measurementSystem: _measurementSystem,
+      ),
     ];
 
     return Scaffold(
@@ -776,6 +799,115 @@ class _ProfileSelectorButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ProfileSelectorTile extends StatelessWidget {
+  const _ProfileSelectorTile({
+    required this.profile,
+    required this.isActive,
+    required this.isLocked,
+    required this.onSelect,
+    required this.onEdit,
+  });
+
+  final Profile profile;
+  final bool isActive;
+  final bool isLocked;
+  final VoidCallback onSelect;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isActive ? colors.primaryContainer : colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isActive ? colors.primary : colors.outlineVariant,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: isLocked ? null : onSelect,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    Opacity(
+                      opacity: isLocked ? 0.55 : 1,
+                      child: ProfileAvatar(profile: profile, radius: 21),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  profile.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: isLocked
+                                        ? colors.onSurfaceVariant
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                              if (isLocked) ...[
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.lock_outline,
+                                  size: 16,
+                                  color: colors.primary,
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isLocked
+                                ? 'Ghost Premium profile'
+                                : profile.type.label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isActive)
+                      Icon(Icons.check_circle, color: colors.primary)
+                    else if (isLocked)
+                      _GhostPremiumBadge(colorScheme: colors)
+                    else
+                      Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Edit ${profile.name}',
+            icon: const Icon(Icons.more_vert),
+            onPressed: onEdit,
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
     );
   }

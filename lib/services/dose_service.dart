@@ -73,6 +73,7 @@ class DoseService {
       amount: protocol.dose,
       scheduledFor: scheduledFor,
       protocolColorValue: protocol.colorValue,
+      cycleStatus: shouldShowCycleStatus ? cycleStatus : null,
       cyclePrimaryLabel: shouldShowCycleStatus
           ? _cycleStatusFormatter.primaryLabel(cycleStatus)
           : null,

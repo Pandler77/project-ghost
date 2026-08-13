@@ -7,7 +7,7 @@ import '../helpers/protocol_factory.dart';
 
 void main() {
   final service = DoseService();
-  
+
   group('DoseService', () {
     test('getTodaysDoses returns scheduled active protocols', () {
       final morning = buildTestProtocol(

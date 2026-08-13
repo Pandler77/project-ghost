@@ -16,7 +16,7 @@ class TrackingPreferences {
   final TrackingFrequency photoFrequency;
 
   static const defaults = TrackingPreferences(
-    trackWeight: false,
+    trackWeight: true,
     trackPhotos: false,
     trackNotes: false,
     weightFrequency: TrackingFrequency.weekly,

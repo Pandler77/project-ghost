@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../models/cycle_unit.dart';
 import '../../theme/app_theme.dart';
+export 'injection_rotation_editor.dart';
 
 class ProtocolCycleEditor extends StatelessWidget {
   const ProtocolCycleEditor({
     required this.useCycle,
+    this.showCycleChoice = true,
     required this.cycleStartDate,
     required this.onDurationController,
     required this.onUnit,
@@ -26,6 +28,7 @@ class ProtocolCycleEditor extends StatelessWidget {
 
   final TextEditingController onDurationController;
   final CycleUnit onUnit;
+  final bool showCycleChoice;
 
   final TextEditingController offDurationController;
   final CycleUnit offUnit;
@@ -63,41 +66,62 @@ class ProtocolCycleEditor extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Will you be cycling?',
-          style: TextStyle(
-            fontSize: AppTypography.title,
-            fontWeight: FontWeight.bold,
+        if (showCycleChoice) ...[
+          const Text(
+            'Will you be cycling?',
+            style: TextStyle(
+              fontSize: AppTypography.title,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Choose whether this protocol runs continuously or uses planned on and off periods.',
-          style: TextStyle(
-            fontSize: AppTypography.caption,
-            color: colorScheme.onSurfaceVariant,
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Choose whether this protocol runs continuously or uses planned on and off periods.',
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        _CycleModeTile(
-          title: 'Yes',
-          subtitle: 'Run during planned on-cycle periods.',
-          icon: Icons.event_repeat_outlined,
-          isSelected: useCycle == true,
-          onTap: () {
-            onUseCycleChanged(true);
-          },
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _CycleModeTile(
-          title: 'No',
-          subtitle: 'Run continuously on its normal schedule.',
-          icon: Icons.all_inclusive,
-          isSelected: useCycle == false,
-          onTap: () {
-            onUseCycleChanged(false);
-          },
-        ),
+          const SizedBox(height: AppSpacing.lg),
+          _CycleModeTile(
+            title: 'Yes',
+            subtitle: 'Run during planned on-cycle periods.',
+            icon: Icons.event_repeat_outlined,
+            isSelected: useCycle == true,
+            onTap: () {
+              onUseCycleChanged(true);
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _CycleModeTile(
+            title: 'No',
+            subtitle: 'Run continuously on its normal schedule.',
+            icon: Icons.all_inclusive,
+            isSelected: useCycle == false,
+            onTap: () {
+              onUseCycleChanged(false);
+            },
+          ),
+        ],
+        if (!showCycleChoice) ...[
+          const Text(
+            'Cycle Setup',
+            style: TextStyle(
+              fontSize: AppTypography.title,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Configure how this protocol cycles on and off.',
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
+
         if (useCycle == true) ...[
           const SizedBox(height: AppSpacing.lg),
           const _SectionLabel('Cycle start date'),

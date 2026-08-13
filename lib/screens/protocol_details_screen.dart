@@ -4,8 +4,8 @@ import '../models/protocol.dart';
 import '../models/protocol_status.dart';
 import '../models/schedule_type.dart';
 import '../theme/app_theme.dart';
-import 'edit_protocol_screen.dart';
 import '../widgets/protocol_cycle_timeline_card.dart';
+import 'edit_protocol_screen.dart';
 
 class ProtocolDetailsScreen extends StatefulWidget {
   const ProtocolDetailsScreen({required this.protocol, super.key});
@@ -131,43 +131,30 @@ class _ProtocolDetailsScreenState extends State<ProtocolDetailsScreen> {
         ),
         body: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              100,
+            ),
             children: [
-              _ProtocolIdentityCard(protocol: _protocol, color: protocolColor),
-
-              const SizedBox(height: AppSpacing.md),
-
-              _StatusBanner(status: _protocol.status),
+              _ProtocolHeroCard(protocol: _protocol, color: protocolColor),
 
               const SizedBox(height: AppSpacing.md),
 
               ProtocolCycleTimelineCard(protocol: _protocol),
 
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.md),
 
-              _DetailTile(label: 'Dose', value: _protocol.dose),
-
-              const Divider(height: AppSpacing.lg),
-
-              _DetailTile(label: 'Schedule', value: _formatSchedule(_protocol)),
-
-              const Divider(height: AppSpacing.lg),
-
-              _DetailTile(
-                label: 'Start Date',
-                value: _formatDate(_protocol.schedule.startDate),
+              _ProtocolInformationCard(
+                dose: _protocol.dose,
+                schedule: _formatSchedule(_protocol),
+                startDate: _formatDate(_protocol.schedule.startDate),
               ),
 
-              const Divider(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.md),
 
-              _DetailTile(
-                label: 'Status',
-                value: _statusLabel(_protocol.status),
-              ),
-
-              const SizedBox(height: AppSpacing.lg),
-
-              _ProtocolActions(
+              _ProtocolControlsCard(
                 status: _protocol.status,
                 onPauseResume: _togglePauseResume,
                 onArchive: _archiveProtocol,
@@ -205,19 +192,6 @@ class _ProtocolDetailsScreenState extends State<ProtocolDetailsScreen> {
       case ScheduleType.monthly:
         return 'Monthly on day '
             '${schedule.monthlyDay} • $time';
-    }
-  }
-
-  String _statusLabel(ProtocolStatus status) {
-    switch (status) {
-      case ProtocolStatus.active:
-        return 'Active';
-
-      case ProtocolStatus.paused:
-        return 'Paused';
-
-      case ProtocolStatus.archived:
-        return 'Archived';
     }
   }
 
@@ -284,26 +258,45 @@ class _ProtocolDetailsScreenState extends State<ProtocolDetailsScreen> {
   }
 }
 
-class _ProtocolIdentityCard extends StatelessWidget {
-  const _ProtocolIdentityCard({required this.protocol, required this.color});
+class _ProtocolHeroCard extends StatelessWidget {
+  const _ProtocolHeroCard({required this.protocol, required this.color});
 
   final Protocol protocol;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final brightness = Theme.of(context).brightness;
+
+    final gradientColors = brightness == Brightness.dark
+        ? [
+            color.withValues(alpha: 0.26),
+            colors.primaryContainer.withValues(alpha: 0.12),
+          ]
+        : [
+            color.withValues(alpha: 0.14),
+            colors.primaryContainer.withValues(alpha: 0.42),
+          ];
+
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppRadius.button),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
       ),
       child: Row(
         children: [
           Container(
-            width: 10,
-            height: 52,
+            width: 7,
+            height: 74,
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -318,9 +311,12 @@ class _ProtocolIdentityCard extends StatelessWidget {
               children: [
                 Text(
                   protocol.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: AppTypography.title,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
                   ),
                 ),
 
@@ -329,10 +325,15 @@ class _ProtocolIdentityCard extends StatelessWidget {
                 Text(
                   protocol.dose,
                   style: TextStyle(
-                    fontSize: AppTypography.caption,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
+
+                const SizedBox(height: AppSpacing.sm),
+
+                _ProtocolStatusPill(status: protocol.status),
               ],
             ),
           ),
@@ -342,54 +343,117 @@ class _ProtocolIdentityCard extends StatelessWidget {
   }
 }
 
-class _StatusBanner extends StatelessWidget {
-  const _StatusBanner({required this.status});
+class _ProtocolStatusPill extends StatelessWidget {
+  const _ProtocolStatusPill({required this.status});
 
   final ProtocolStatus status;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    final backgroundColor = switch (status) {
-      ProtocolStatus.active => colorScheme.primary.withValues(alpha: 0.10),
-      ProtocolStatus.paused => Colors.amber.withValues(alpha: 0.14),
-      ProtocolStatus.archived => colorScheme.surfaceContainerHighest,
+    final config = switch (status) {
+      ProtocolStatus.active => (
+        'Active',
+        Icons.check_circle_outline,
+        colors.primary,
+      ),
+      ProtocolStatus.paused => (
+        'Paused',
+        Icons.pause_circle_outline,
+        Colors.amber.shade700,
+      ),
+      ProtocolStatus.archived => (
+        'Archived',
+        Icons.archive_outlined,
+        colors.onSurfaceVariant,
+      ),
     };
 
-    final icon = switch (status) {
-      ProtocolStatus.active => Icons.check_circle_outline,
-      ProtocolStatus.paused => Icons.pause_circle_outline,
-      ProtocolStatus.archived => Icons.archive_outlined,
-    };
+    final (label, icon, color) = config;
 
-    final text = switch (status) {
-      ProtocolStatus.active => 'Active protocol',
-      ProtocolStatus.paused => 'Protocol is paused',
-      ProtocolStatus.archived => 'Protocol is archived',
-    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: AppIcon.xs, color: color),
+
+          const SizedBox(width: 6),
+
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProtocolInformationCard extends StatelessWidget {
+  const _ProtocolInformationCard({
+    required this.dose,
+    required this.schedule,
+    required this.startDate,
+  });
+
+  final String dose;
+  final String schedule;
+  final String startDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final cardColor = Theme.of(context).cardTheme.color ?? colors.surface;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(AppRadius.button),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.65),
+        ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: AppIcon.sm),
+          const _SectionTitle(title: 'Protocol Details'),
 
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
 
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: AppTypography.body,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          _InformationRow(
+            icon: Icons.medication_outlined,
+            label: 'Dose',
+            value: dose,
+          ),
+
+          const _InformationDivider(),
+
+          _InformationRow(
+            icon: Icons.schedule_outlined,
+            label: 'Schedule',
+            value: schedule,
+          ),
+
+          const _InformationDivider(),
+
+          _InformationRow(
+            icon: Icons.event_outlined,
+            label: 'Start Date',
+            value: startDate,
           ),
         ],
       ),
@@ -397,47 +461,102 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-class _DetailTile extends StatelessWidget {
-  const _DetailTile({required this.label, required this.value});
+class _InformationRow extends StatelessWidget {
+  const _InformationRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
+  final IconData icon;
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: AppTypography.caption,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
+    final colors = Theme.of(context).colorScheme;
 
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: AppTypography.body,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
-        ],
+          child: Icon(icon, size: AppIcon.sm, color: colors.primary),
+        ),
+
+        const SizedBox(width: AppSpacing.md),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  fontWeight: FontWeight.w600,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+
+              const SizedBox(height: 3),
+
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: AppTypography.body,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InformationDivider extends StatelessWidget {
+  const _InformationDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Divider(height: 1),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Text(
+      title.toUpperCase(),
+      style: TextStyle(
+        fontSize: AppTypography.caption,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.0,
+        color: colors.onSurfaceVariant,
       ),
     );
   }
 }
 
-class _ProtocolActions extends StatelessWidget {
-  const _ProtocolActions({
+class _ProtocolControlsCard extends StatelessWidget {
+  const _ProtocolControlsCard({
     required this.status,
     required this.onPauseResume,
     required this.onArchive,
@@ -451,45 +570,67 @@ class _ProtocolActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (status == ProtocolStatus.archived) {
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: onRestore,
-          icon: const Icon(Icons.restore),
-          label: const Text('Restore as Paused'),
-        ),
-      );
-    }
+    final colors = Theme.of(context).colorScheme;
 
-    return Column(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: onPauseResume,
-            icon: Icon(
-              status == ProtocolStatus.active ? Icons.pause : Icons.play_arrow,
+    final cardColor = Theme.of(context).cardTheme.color ?? colors.surface;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.65),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionTitle(title: 'Protocol Controls'),
+
+          const SizedBox(height: AppSpacing.md),
+
+          if (status == ProtocolStatus.archived)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onRestore,
+                icon: const Icon(Icons.restore),
+                label: const Text('Restore as Paused'),
+              ),
+            )
+          else ...[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onPauseResume,
+                icon: Icon(
+                  status == ProtocolStatus.active
+                      ? Icons.pause
+                      : Icons.play_arrow,
+                ),
+                label: Text(
+                  status == ProtocolStatus.active
+                      ? 'Pause Protocol'
+                      : 'Resume Protocol',
+                ),
+              ),
             ),
-            label: Text(
-              status == ProtocolStatus.active
-                  ? 'Pause Protocol'
-                  : 'Resume Protocol',
+
+            const SizedBox(height: AppSpacing.sm),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onArchive,
+                icon: const Icon(Icons.archive_outlined),
+                label: const Text('Archive Protocol'),
+              ),
             ),
-          ),
-        ),
-
-        const SizedBox(height: AppSpacing.sm),
-
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: onArchive,
-            icon: const Icon(Icons.archive_outlined),
-            label: const Text('Archive Protocol'),
-          ),
-        ),
-      ],
+          ],
+        ],
+      ),
     );
   }
 }

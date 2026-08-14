@@ -26,11 +26,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) {
-        final primaryFocus = FocusManager.instance.primaryFocus;
-
-        if (primaryFocus != null && !primaryFocus.hasPrimaryFocus) {
-          primaryFocus.unfocus();
-        }
+        FocusManager.instance.primaryFocus?.unfocus();
       },
       child: child ?? const SizedBox.shrink(),
     );

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/profile.dart';
 import '../models/profile_module.dart';
+import '../models/measurement_system.dart';
+import '../utils/measurement_converter.dart';
+import '../utils/weight_display.dart';
 import '../services/profile_avatar_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/profile_avatar.dart';
@@ -22,11 +25,13 @@ class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({
     required this.profile,
     required this.canDelete,
+    required this.measurementSystem,
     super.key,
   });
 
   final Profile profile;
   final bool canDelete;
+  final MeasurementSystem measurementSystem;
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -39,6 +44,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late Profile _persistedProfile;
 
   late final TextEditingController _nameController;
+  late final TextEditingController _startingWeightController;
+  late final TextEditingController _goalWeightController;
+  late final TextEditingController _heightFeetController;
+  late final TextEditingController _heightInchesController;
+  late final TextEditingController _heightCmController;
 
   late ProfileType _selectedType;
   late int? _selectedColorValue;
@@ -54,6 +64,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     _nameController = TextEditingController(text: widget.profile.name);
 
+    final startingWeight = widget.profile.startingWeight;
+    final goalWeight = widget.profile.goalWeight;
+    final heightCm = widget.profile.heightCm;
+
+    _startingWeightController = TextEditingController(
+      text: startingWeight == null
+          ? ''
+          : WeightDisplay.displayValue(
+              startingWeight,
+              widget.measurementSystem,
+            ).toStringAsFixed(1),
+    );
+
+    _goalWeightController = TextEditingController(
+      text: goalWeight == null
+          ? ''
+          : WeightDisplay.displayValue(
+              goalWeight,
+              widget.measurementSystem,
+            ).toStringAsFixed(1),
+    );
+
+    if (heightCm == null) {
+      _heightFeetController = TextEditingController();
+      _heightInchesController = TextEditingController();
+      _heightCmController = TextEditingController();
+    } else if (widget.measurementSystem == MeasurementSystem.imperial) {
+      final totalInches = MeasurementConverter.centimetersToInches(heightCm);
+      final feet = totalInches ~/ 12;
+      final inches = totalInches - (feet * 12);
+
+      _heightFeetController = TextEditingController(text: feet.toString());
+      _heightInchesController = TextEditingController(
+        text: inches.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), ''),
+      );
+      _heightCmController = TextEditingController();
+    } else {
+      _heightFeetController = TextEditingController();
+      _heightInchesController = TextEditingController();
+      _heightCmController = TextEditingController(
+        text: heightCm.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), ''),
+      );
+    }
+
     _selectedType = widget.profile.type;
     _selectedColorValue = widget.profile.colorValue;
     _selectedAvatarId = widget.profile.iconCodePoint;
@@ -65,6 +119,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _startingWeightController.dispose();
+    _goalWeightController.dispose();
+    _heightFeetController.dispose();
+    _heightInchesController.dispose();
+    _heightCmController.dispose();
     super.dispose();
   }
 
@@ -294,12 +353,81 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  double? _parseOptionalPositive(TextEditingController controller) {
+    final value = controller.text.trim();
+
+    if (value.isEmpty) {
+      return null;
+    }
+
+    final parsed = double.tryParse(value);
+
+    if (parsed == null || parsed <= 0) {
+      return double.nan;
+    }
+
+    return parsed;
+  }
+
+  double? _heightCmFromInputs() {
+    if (widget.measurementSystem == MeasurementSystem.metric) {
+      return _parseOptionalPositive(_heightCmController);
+    }
+
+    final feetText = _heightFeetController.text.trim();
+    final inchesText = _heightInchesController.text.trim();
+
+    if (feetText.isEmpty && inchesText.isEmpty) {
+      return null;
+    }
+
+    final feet = int.tryParse(feetText);
+    final inches = double.tryParse(inchesText.isEmpty ? '0' : inchesText);
+
+    if (feet == null ||
+        feet <= 0 ||
+        inches == null ||
+        inches < 0 ||
+        inches >= 12) {
+      return double.nan;
+    }
+
+    return MeasurementConverter.inchesToCentimeters((feet * 12) + inches);
+  }
+
+  double? _storedWeightFromController(TextEditingController controller) {
+    final entered = _parseOptionalPositive(controller);
+
+    if (entered == null || entered.isNaN) {
+      return entered;
+    }
+
+    return WeightDisplay.storageValue(entered, widget.measurementSystem);
+  }
+
   Future<void> _save() async {
     final name = _nameController.text.trim();
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile name is required.')),
+      );
+      return;
+    }
+
+    final startingWeight = _storedWeightFromController(
+      _startingWeightController,
+    );
+    final goalWeight = _storedWeightFromController(_goalWeightController);
+    final heightCm = _heightCmFromInputs();
+
+    if ((startingWeight?.isNaN ?? false) ||
+        (goalWeight?.isNaN ?? false) ||
+        (heightCm?.isNaN ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Check the height and weight values and try again.'),
+        ),
       );
       return;
     }
@@ -317,6 +445,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       iconCodePoint: _selectedAvatarId,
       colorValue: _selectedColorValue,
       avatarImagePath: _selectedAvatarImagePath,
+      startingWeight: startingWeight,
+      goalWeight: goalWeight,
+      heightCm: heightCm,
       enabledModules: Set<ProfileModule>.from(_selectedModules),
       updatedAt: DateTime.now(),
     );
@@ -518,6 +649,105 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               if (type != ProfileType.values.last)
                 const SizedBox(height: AppSpacing.sm),
             ],
+
+            const SizedBox(height: AppSpacing.lg),
+
+            const Text(
+              'Body metrics',
+              style: TextStyle(
+                fontSize: AppTypography.title,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.xs),
+
+            Text(
+              'Height is used for BMI. Starting and goal weight are used for progress.',
+              style: TextStyle(
+                fontSize: AppTypography.caption,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.md),
+
+            if (widget.measurementSystem == MeasurementSystem.imperial)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _heightFeetController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Height',
+                        suffixText: 'ft',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: TextField(
+                      controller: _heightInchesController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Inches',
+                        suffixText: 'in',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              TextField(
+                controller: _heightCmController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Height',
+                  suffixText: 'cm',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+
+            const SizedBox(height: AppSpacing.md),
+
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _startingWeightController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Starting weight',
+                      suffixText: WeightDisplay.unit(widget.measurementSystem),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: TextField(
+                    controller: _goalWeightController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Goal weight',
+                      suffixText: WeightDisplay.unit(widget.measurementSystem),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
 
             const SizedBox(height: AppSpacing.lg),
 

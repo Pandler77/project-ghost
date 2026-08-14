@@ -79,6 +79,8 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   bool _useCyclesSelected = false;
   bool _useRotationSelected = false;
   bool _useGhostSupplySelected = false;
+  bool _cycleSetupExpanded = true;
+  bool _rotationSetupExpanded = false;
   RotationMode _rotationMode = RotationMode.sequential;
   final Set<InjectionSite> _enabledInjectionSites = {};
   bool? _useCycle;
@@ -1156,6 +1158,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
                 if (value) {
                   _cycleStartDate = _selectedStartDate;
+                  _cycleSetupExpanded = true;
                 }
               });
             },
@@ -1169,9 +1172,14 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
               setState(() {
                 _useRotationSelected = value;
 
-                if (!value) {
+                if (value) {
+                  if (!_useCyclesSelected) {
+                    _rotationSetupExpanded = true;
+                  }
+                } else {
                   _enabledInjectionSites.clear();
                   _rotationMode = RotationMode.sequential;
+                  _rotationSetupExpanded = false;
                 }
               });
             },
@@ -1241,6 +1249,10 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       );
     }
 
+    final cycleValid = !_useCyclesSelected || _cycleSetupIsValid;
+    final rotationValid =
+        !_useRotationSelected || _enabledInjectionSites.length >= 2;
+
     return ListView(
       children: [
         const Text(
@@ -1252,102 +1264,147 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Configure the Ghost features selected for this protocol.',
+          'Set up each feature separately. Tap a section to open or close it.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
+
         if (_useCyclesSelected) ...[
-          ProtocolCycleEditor(
-            showCycleChoice: false,
-            useCycle: true,
-            cycleStartDate: _cycleStartDate,
-            onDurationController: _cycleOnDurationController,
-            onUnit: _cycleOnUnit,
-            offDurationController: _cycleOffDurationController,
-            offUnit: _cycleOffUnit,
-            repeatCycle: _repeatCycle,
-            onUseCycleChanged: (_) {},
-            onCycleStartDateChanged: (date) {
+          _FeatureSetupCard(
+            title: 'Cycle Setup',
+            subtitle: cycleValid
+                ? _cycleSetupSummary()
+                : 'Enter valid on and off durations.',
+            icon: Icons.event_repeat_outlined,
+            isExpanded: _cycleSetupExpanded,
+            isComplete: cycleValid,
+            onTap: () {
               setState(() {
-                _cycleStartDate = date;
+                _cycleSetupExpanded = !_cycleSetupExpanded;
               });
             },
-            onOnUnitChanged: (unit) {
-              setState(() {
-                _cycleOnUnit = unit;
-              });
-            },
-            onOffUnitChanged: (unit) {
-              setState(() {
-                _cycleOffUnit = unit;
-              });
-            },
-            onRepeatCycleChanged: (value) {
-              setState(() {
-                _repeatCycle = value;
-              });
-            },
-            onValuesChanged: () {
-              setState(() {});
-            },
-          ),
-        ],
-        if (_useGhostSupplySelected) ...[
-          if (_useCyclesSelected || _useRotationSelected)
-            const SizedBox(height: AppSpacing.lg),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              border: Border.all(color: colorScheme.outlineVariant),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.inventory_2_outlined, color: colorScheme.primary),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Text(
-                    'Ghost Supply will be available for this protocol after it is saved. '
-                    'You can configure container type, quantity, and alerts from Ghost Supply.',
-                    style: TextStyle(
-                      fontSize: AppTypography.caption,
-                      height: 1.4,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
+            child: ProtocolCycleEditor(
+              showCycleChoice: false,
+              useCycle: true,
+              cycleStartDate: _cycleStartDate,
+              onDurationController: _cycleOnDurationController,
+              onUnit: _cycleOnUnit,
+              offDurationController: _cycleOffDurationController,
+              offUnit: _cycleOffUnit,
+              repeatCycle: _repeatCycle,
+              onUseCycleChanged: (_) {},
+              onCycleStartDateChanged: (date) {
+                setState(() {
+                  _cycleStartDate = date;
+                });
+              },
+              onOnUnitChanged: (unit) {
+                setState(() {
+                  _cycleOnUnit = unit;
+                });
+              },
+              onOffUnitChanged: (unit) {
+                setState(() {
+                  _cycleOffUnit = unit;
+                });
+              },
+              onRepeatCycleChanged: (value) {
+                setState(() {
+                  _repeatCycle = value;
+                });
+              },
+              onValuesChanged: () {
+                setState(() {});
+              },
             ),
           ),
+          const SizedBox(height: AppSpacing.md),
         ],
-        if (_useCyclesSelected && _useRotationSelected)
-          const SizedBox(height: AppSpacing.lg),
-        if (_useRotationSelected)
-          InjectionRotationEditor(
-            rotationMode: _rotationMode,
-            enabledSites: _enabledInjectionSites,
-            onRotationModeChanged: (mode) {
+
+        if (_useRotationSelected) ...[
+          _FeatureSetupCard(
+            title: 'Injection Site Rotation',
+            subtitle: rotationValid
+                ? '${_rotationMode.label} • ${_enabledInjectionSites.length} sites'
+                : 'Select at least two injection sites.',
+            icon: Icons.location_on_outlined,
+            isExpanded: _rotationSetupExpanded,
+            isComplete: rotationValid,
+            onTap: () {
               setState(() {
-                _rotationMode = mode;
+                _rotationSetupExpanded = !_rotationSetupExpanded;
               });
             },
-            onSiteChanged: (site, enabled) {
-              setState(() {
-                if (enabled) {
-                  _enabledInjectionSites.add(site);
-                } else {
-                  _enabledInjectionSites.remove(site);
-                }
-              });
-            },
+            child: InjectionRotationEditor(
+              rotationMode: _rotationMode,
+              enabledSites: _enabledInjectionSites,
+              onRotationModeChanged: (mode) {
+                setState(() {
+                  _rotationMode = mode;
+                });
+              },
+              onSiteChanged: (site, enabled) {
+                setState(() {
+                  if (enabled) {
+                    _enabledInjectionSites.add(site);
+                  } else {
+                    _enabledInjectionSites.remove(site);
+                  }
+                });
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
+
+        if (_useGhostSupplySelected)
+          _FeatureSetupCard(
+            title: 'Ghost Supply',
+            subtitle: 'Inventory tracking enabled',
+            icon: Icons.inventory_2_outlined,
+            isExpanded: false,
+            isComplete: true,
+            canExpand: false,
+            onTap: () {},
+            footer: Text(
+              'Configure container type, quantity, and alerts from Ghost Supply after this protocol is saved.',
+              style: TextStyle(
+                fontSize: AppTypography.caption,
+                height: 1.4,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            child: const SizedBox.shrink(),
           ),
       ],
     );
+  }
+
+  bool get _cycleSetupIsValid {
+    final onDuration = int.tryParse(_cycleOnDurationController.text.trim());
+    final offDuration = int.tryParse(_cycleOffDurationController.text.trim());
+
+    return onDuration != null &&
+        onDuration > 0 &&
+        offDuration != null &&
+        offDuration >= 0;
+  }
+
+  String _cycleSetupSummary() {
+    final onDuration = _cycleOnDurationController.text.trim();
+    final offDuration = _cycleOffDurationController.text.trim();
+
+    final onLabel = _unitLabel(_cycleOnUnit, onDuration);
+    final offLabel = _unitLabel(_cycleOffUnit, offDuration);
+
+    if (!_repeatCycle) {
+      return '$onDuration $onLabel on • Does not repeat';
+    }
+
+    return '$onDuration $onLabel on • $offDuration $offLabel off';
   }
 
   Widget _buildReminderStep(BuildContext context) {
@@ -2073,6 +2130,143 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     return first.year == second.year &&
         first.month == second.month &&
         first.day == second.day;
+  }
+}
+
+class _FeatureSetupCard extends StatelessWidget {
+  const _FeatureSetupCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.isExpanded,
+    required this.isComplete,
+    required this.onTap,
+    required this.child,
+    this.footer,
+    this.canExpand = true,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool isExpanded;
+  final bool isComplete;
+  final VoidCallback onTap;
+  final Widget child;
+  final Widget? footer;
+  final bool canExpand;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Theme.of(context).cardTheme.color ?? colors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(
+            color: isExpanded
+                ? colors.primary.withValues(alpha: 0.55)
+                : colors.outlineVariant.withValues(alpha: 0.65),
+          ),
+        ),
+        child: Column(
+          children: [
+            InkWell(
+              onTap: canExpand ? onTap : null,
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Icon(icon, color: colors.primary),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: AppTypography.body,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: AppTypography.caption,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Icon(
+                      isComplete
+                          ? Icons.check_circle
+                          : Icons.error_outline_rounded,
+                      color: isComplete ? colors.primary : colors.error,
+                    ),
+                    if (canExpand) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      Icon(
+                        isExpanded
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (footer != null) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                ),
+                child: Align(alignment: Alignment.centerLeft, child: footer!),
+              ),
+            ],
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 180),
+              crossFadeState: isExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Column(
+                children: [
+                  Divider(
+                    height: 1,
+                    color: colors.outlineVariant.withValues(alpha: 0.65),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: child,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -196,47 +196,54 @@ class _SiteSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.sm,
-            ),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: AppTypography.body,
-                fontWeight: FontWeight.w700,
+    return Material(
+      color: colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.sm,
+              ),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: AppTypography.body,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
-          for (var index = 0; index < sites.length; index++) ...[
-            CheckboxListTile(
-              dense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
+            for (var index = 0; index < sites.length; index++) ...[
+              Material(
+                color: Colors.transparent,
+                child: CheckboxListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                  ),
+                  title: Text(sites[index].label),
+                  value: enabledSites.contains(sites[index]),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  onChanged: (value) {
+                    onSiteChanged(sites[index], value ?? false);
+                  },
+                ),
               ),
-              title: Text(sites[index].label),
-              value: enabledSites.contains(sites[index]),
-              controlAffinity: ListTileControlAffinity.leading,
-              onChanged: (value) {
-                onSiteChanged(sites[index], value ?? false);
-              },
-            ),
-            if (index < sites.length - 1)
-              Divider(height: 1, color: colorScheme.outlineVariant),
+              if (index < sites.length - 1)
+                Divider(height: 1, color: colorScheme.outlineVariant),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

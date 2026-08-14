@@ -6,6 +6,7 @@ import '../models/home_layout.dart';
 import '../models/profile.dart';
 import '../models/protocol.dart';
 import '../models/tracking_preferences.dart';
+import '../models/weight_record.dart';
 import '../services/app_data_service.dart';
 import '../services/missed_dose_reconciliation_service.dart';
 import '../services/notification_service.dart';
@@ -383,7 +384,10 @@ class _MainScreenState extends State<MainScreen> {
 
     final result = await Navigator.push<CreateProfileResult>(
       context,
-      MaterialPageRoute(builder: (_) => const CreateProfileScreen()),
+      MaterialPageRoute(
+        builder: (_) =>
+            CreateProfileScreen(measurementSystem: _measurementSystem),
+      ),
     );
 
     if (result == null || !mounted) {
@@ -396,10 +400,25 @@ class _MainScreenState extends State<MainScreen> {
       colorValue: result.colorValue,
       iconCodePoint: result.iconCodePoint,
       avatarImagePath: result.avatarImagePath,
+      startingWeight: result.startingWeight,
+      goalWeight: result.goalWeight,
+      heightCm: result.heightCm,
       enabledModules: result.enabledModules,
     );
 
     await _profileService.setActiveProfile(profile.id);
+
+    if (result.startingWeight != null) {
+      final now = DateTime.now();
+
+      await _appDataService.saveWeightRecord(
+        WeightRecord(
+          id: '${profile.id}_initial_${now.microsecondsSinceEpoch}',
+          weight: result.startingWeight!,
+          recordedAt: now,
+        ),
+      );
+    }
 
     final profiles = await _profileService.getProfiles();
 
@@ -430,6 +449,7 @@ class _MainScreenState extends State<MainScreen> {
         builder: (_) => EditProfileScreen(
           profile: profile,
           canDelete: _profiles.length > 1,
+          measurementSystem: _measurementSystem,
         ),
       ),
     );

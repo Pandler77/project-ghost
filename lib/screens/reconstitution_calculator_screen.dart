@@ -653,7 +653,7 @@ class SyringeScaleVisualization extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         SizedBox(
           width: double.infinity,
-          height: 92,
+          height: 160,
           child: CustomPaint(
             painter: _SyringeScalePainter(
               units: units,
@@ -733,80 +733,92 @@ class _SyringeScalePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const left = 8.0;
-    final right = size.width - 8;
+    const left = 14.0;
+    final right = size.width - 14.0;
 
-    const top = 8.0;
-    const bottom = 54.0;
+    const top = 30.0;
+    const bottom = 104.0;
 
     final width = right - left;
-    final height = bottom - top;
 
-    final scaleRect = RRect.fromRectAndRadius(
+    final rulerRect = RRect.fromRectAndRadius(
       Rect.fromLTRB(left, top, right, bottom),
-      const Radius.circular(7),
+      const Radius.circular(12),
     );
 
-    final outlinePaint = Paint()
-      ..color = outlineColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
     canvas.drawRRect(
-      scaleRect,
+      rulerRect,
       Paint()
         ..color = emptyColor
         ..style = PaintingStyle.fill,
     );
 
     final visibleUnits = units.clamp(0, maximumUnits).toDouble();
+    final fillFraction = maximumUnits <= 0
+        ? 0.0
+        : (visibleUnits / maximumUnits).clamp(0.0, 1.0);
+    final fillX = left + (width * fillFraction);
 
-    final fillFraction = visibleUnits / maximumUnits;
+    canvas.save();
+    canvas.clipRRect(rulerRect);
 
-    if (fillFraction > 0) {
-      canvas.save();
-      canvas.clipRRect(scaleRect);
+    canvas.drawRect(
+      Rect.fromLTRB(left, top, fillX, bottom),
+      Paint()
+        ..color = liquidColor.withValues(alpha: 0.22)
+        ..style = PaintingStyle.fill,
+    );
 
-      canvas.drawRect(
-        Rect.fromLTWH(left, top, width * fillFraction, height),
-        Paint()
-          ..color = liquidColor.withValues(alpha: 0.60)
-          ..style = PaintingStyle.fill,
-      );
+    canvas.restore();
 
-      canvas.restore();
-    }
+    canvas.drawRRect(
+      rulerRect,
+      Paint()
+        ..color = outlineColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.7,
+    );
 
-    canvas.drawRRect(scaleRect, outlinePaint);
+    final maxRounded = maximumUnits.round();
+    final minorIncrement = maximumUnits == 100 ? 1 : 1;
 
-    final minorIncrement = maximumUnits == 100 ? 2 : 1;
+    for (var mark = minorIncrement; mark < maxRounded; mark += minorIncrement) {
+      final x = left + (width * mark / maximumUnits);
 
-    final majorIncrement = maximumUnits == 30 ? 5 : 10;
+      final isMajor = mark % 10 == 0;
+      final isMid = mark % 5 == 0;
 
-    for (var mark = 0; mark <= maximumUnits.round(); mark += minorIncrement) {
-      final x = left + width * (mark / maximumUnits);
-
-      final isMajor = mark % majorIncrement == 0;
-
-      final tickLength = isMajor ? 16.0 : 8.0;
+      final tickLength = isMajor
+          ? 28.0
+          : isMid
+          ? 20.0
+          : 12.0;
 
       canvas.drawLine(
         Offset(x, top),
         Offset(x, top + tickLength),
         Paint()
-          ..color = outlineColor.withValues(alpha: isMajor ? 0.95 : 0.55)
-          ..strokeWidth = isMajor ? 1.5 : 1,
+          ..color = outlineColor.withValues(
+            alpha: isMajor
+                ? 0.95
+                : isMid
+                ? 0.72
+                : 0.42,
+          )
+          ..strokeWidth = isMajor ? 1.8 : 1,
       );
     }
 
-    for (var label = 0; label <= maximumUnits.round(); label += 10) {
-      final x = left + width * (label / maximumUnits);
+    final labelStep = maximumUnits <= 30 ? 5 : 10;
+
+    for (var label = 0; label <= maxRounded; label += labelStep) {
+      final x = left + (width * label / maximumUnits);
 
       final textPainter = TextPainter(
         text: TextSpan(
           text: label.toString(),
           style: TextStyle(
-            color: outlineColor.withValues(alpha: 0.85),
+            color: outlineColor,
             fontSize: 10,
             fontWeight: FontWeight.w600,
           ),
@@ -814,23 +826,49 @@ class _SyringeScalePainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      final labelX = (x - textPainter.width / 2).clamp(
-        0.0,
-        size.width - textPainter.width,
-      );
+      double labelX;
 
-      textPainter.paint(canvas, Offset(labelX, bottom + 8));
+      if (label == 0) {
+        labelX = left;
+      } else if (label == maxRounded) {
+        labelX = right - textPainter.width;
+      } else {
+        labelX = x - (textPainter.width / 2);
+      }
+
+      textPainter.paint(canvas, Offset(labelX, bottom + 9));
     }
 
-    final resultX = left + width * fillFraction;
-    final exceedsCapacity = units > maximumUnits;
+    final markerX = fillX.clamp(left, right);
 
     canvas.drawLine(
-      Offset(resultX, top - 5),
-      Offset(resultX, bottom + 4),
+      Offset(markerX, top - 18),
+      Offset(markerX, bottom + 8),
       Paint()
-        ..color = exceedsCapacity ? errorColor : outlineColor
-        ..strokeWidth = 3,
+        ..color = liquidColor
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round,
+    );
+
+    final arrowPath = Path()
+      ..moveTo(markerX - 9, top - 21)
+      ..lineTo(markerX + 9, top - 21)
+      ..lineTo(markerX, top - 7)
+      ..close();
+
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..color = liquidColor
+        ..style = PaintingStyle.fill,
+    );
+
+    canvas.drawCircle(
+      Offset(markerX, bottom + 9),
+      6,
+      Paint()
+        ..color = liquidColor
+        ..style = PaintingStyle.fill,
     );
   }
 

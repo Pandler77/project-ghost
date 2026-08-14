@@ -135,6 +135,9 @@ class ProfileService {
     int? iconCodePoint,
     int? colorValue,
     String? avatarImagePath,
+    double? startingWeight,
+    double? goalWeight,
+    double? heightCm,
     Set<ProfileModule>? enabledModules,
   }) async {
     final trimmedName = name.trim();
@@ -155,6 +158,9 @@ class ProfileService {
       iconCodePoint: iconCodePoint,
       colorValue: colorValue,
       avatarImagePath: avatarImagePath,
+      startingWeight: startingWeight,
+      goalWeight: goalWeight,
+      heightCm: heightCm,
       enabledModules: enabledModules ?? ProfileModuleDetails.defaultModules,
     );
 

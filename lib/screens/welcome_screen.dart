@@ -159,23 +159,24 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: onGetStarted,
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppRadius.button,
+                      Material(
+                        color: colors.primary,
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                        child: InkWell(
+                          onTap: onGetStarted,
+                          borderRadius: BorderRadius.circular(AppRadius.button),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: Center(
+                              child: Text(
+                                'Set Up Ghost',
+                                style: TextStyle(
+                                  fontSize: AppTypography.primary,
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.onPrimary,
+                                ),
                               ),
-                            ),
-                          ),
-                          child: const Text(
-                            'Set Up Ghost',
-                            style: TextStyle(
-                              fontSize: AppTypography.primary,
-                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),

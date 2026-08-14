@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-
 import '../models/profile.dart';
 import '../models/profile_module.dart';
+import '../services/profile_avatar_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/profile_avatar.dart';
 import 'profile_avatar_picker_screen.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as path;
-import 'package:path_provider/path_provider.dart';
 import '../widgets/app_color_picker.dart';
 
 class CreateProfileScreen extends StatefulWidget {
@@ -26,7 +23,8 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
   int? _selectedAvatarId;
   String? _avatarImagePath;
 
-  final ImagePicker _imagePicker = ImagePicker();
+  final ProfileAvatarService _avatarService = ProfileAvatarService();
+  late final String _draftProfileId;
 
   final Set<ProfileModule> _selectedModules = {
     ...ProfileModuleDetails.defaultModules,
@@ -36,6 +34,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController();
+    _draftProfileId = 'draft_${DateTime.now().microsecondsSinceEpoch}';
   }
 
   @override
@@ -57,8 +56,19 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
       return;
     }
 
+    final previousPhotoPath = _avatarImagePath;
+
+    if (previousPhotoPath != null && previousPhotoPath.isNotEmpty) {
+      await _avatarService.deleteAvatar(previousPhotoPath);
+    }
+
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
       _selectedAvatarId = selectedAvatarId;
+      _avatarImagePath = null;
     });
   }
 
@@ -99,8 +109,19 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                 ListTile(
                   leading: const Icon(Icons.delete_outline),
                   title: const Text('Remove Photo / Avatar'),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(sheetContext);
+
+                    final previousPhotoPath = _avatarImagePath;
+
+                    if (previousPhotoPath != null &&
+                        previousPhotoPath.isNotEmpty) {
+                      await _avatarService.deleteAvatar(previousPhotoPath);
+                    }
+
+                    if (!mounted) {
+                      return;
+                    }
 
                     setState(() {
                       _avatarImagePath = null;
@@ -116,52 +137,30 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
   }
 
   Future<void> _pickProfilePhoto(ImageSource source) async {
-    final pickedImage = await _imagePicker.pickImage(
-      source: source,
-      imageQuality: 90,
-    );
+    try {
+      final savedPath = await _avatarService.pickAndSaveAvatar(
+        profileId: _draftProfileId,
+        source: source,
+        previousAvatarPath: _avatarImagePath,
+      );
 
-    if (pickedImage == null) {
-      return;
+      if (!mounted || savedPath == null) {
+        return;
+      }
+
+      setState(() {
+        _avatarImagePath = savedPath;
+        _selectedAvatarId = null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update profile photo: $error')),
+      );
     }
-
-    final sourceFile = File(pickedImage.path);
-
-    if (!await sourceFile.exists()) {
-      return;
-    }
-
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-
-    final profilePhotoDirectory = Directory(
-      path.join(documentsDirectory.path, 'profile_photos'),
-    );
-
-    if (!await profilePhotoDirectory.exists()) {
-      await profilePhotoDirectory.create(recursive: true);
-    }
-
-    final extension = path.extension(pickedImage.path).isEmpty
-        ? '.jpg'
-        : path.extension(pickedImage.path);
-
-    final fileName =
-        'profile_${DateTime.now().microsecondsSinceEpoch}$extension';
-
-    final savedFile = await sourceFile.copy(
-      path.join(profilePhotoDirectory.path, fileName),
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _avatarImagePath = savedFile.path;
-
-      // A real photo overrides the preset avatar.
-      _selectedAvatarId = null;
-    });
   }
 
   void _resetAvatar() {
@@ -288,12 +287,9 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
             const SizedBox(height: AppSpacing.lg),
             TextField(
               controller: _nameController,
-              autofocus: false,
+              autofocus: true,
               textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) {
-                FocusScope.of(context).unfocus();
-              },
+              textInputAction: TextInputAction.next,
               onChanged: (_) {
                 setState(() {});
               },

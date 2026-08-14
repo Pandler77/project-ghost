@@ -687,6 +687,7 @@ class _MainScreenState extends State<MainScreen> {
         dataService: _appDataService,
         protocols: _protocols,
         measurementSystem: _measurementSystem,
+        onDataChanged: _notifyDataChanged,
       ),
     ];
 

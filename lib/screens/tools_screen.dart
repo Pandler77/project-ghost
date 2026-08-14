@@ -16,12 +16,14 @@ class ToolsScreen extends StatelessWidget {
     required this.dataService,
     required this.protocols,
     required this.measurementSystem,
+    required this.onDataChanged,
     super.key,
   });
 
   final AppDataService dataService;
   final List<Protocol> protocols;
   final MeasurementSystem measurementSystem;
+  final VoidCallback onDataChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -133,8 +135,8 @@ class ToolsScreen extends StatelessWidget {
                 title: 'Weight History',
                 subtitle: 'Trends, goals, and progress',
                 visual: const _WeightMiniVisual(),
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  final didChange = await Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => WeightHistoryScreen(
@@ -143,6 +145,10 @@ class ToolsScreen extends StatelessWidget {
                       ),
                     ),
                   );
+
+                  if (didChange == true) {
+                    onDataChanged();
+                  }
                 },
               ),
 

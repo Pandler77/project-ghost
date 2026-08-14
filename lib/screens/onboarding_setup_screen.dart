@@ -52,6 +52,10 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
 
   static const int _pageCount = 4;
 
+  void _dismissKeyboard() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -94,6 +98,8 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
   }
 
   Future<void> _nextPage() async {
+    _dismissKeyboard();
+
     if (_currentPage == 0) {
       if (_profileNameController.text.trim().isEmpty) {
         _showMessage('Profile name is required.');
@@ -122,6 +128,8 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
   }
 
   Future<void> _previousPage() async {
+    _dismissKeyboard();
+
     if (_currentPage == 0) {
       widget.onBackToWelcome();
       return;
@@ -134,6 +142,8 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
   }
 
   Future<void> _finishSetup() async {
+    _dismissKeyboard();
+
     if (_isSaving) {
       return;
     }
@@ -226,6 +236,8 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (page) {
+                  _dismissKeyboard();
+
                   setState(() {
                     _currentPage = page;
                   });
@@ -502,6 +514,9 @@ class _ProfileSetupPage extends StatelessWidget {
                 child: TextField(
                   controller: heightInchesController,
                   keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) =>
+                      FocusManager.instance.primaryFocus?.unfocus(),
                   decoration: const InputDecoration(
                     labelText: 'Inches',
                     hintText: '0',
@@ -515,6 +530,8 @@ class _ProfileSetupPage extends StatelessWidget {
           TextField(
             controller: heightCmController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
             decoration: const InputDecoration(
               labelText: 'Height',
               hintText: '180',
@@ -744,6 +761,7 @@ class _OnboardingPageLayout extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.lg,
         AppSpacing.sm,

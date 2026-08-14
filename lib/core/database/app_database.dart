@@ -54,6 +54,31 @@ class AppDatabase {
     await database.execute('PRAGMA foreign_keys = ON');
   }
 
+  Future<bool> _columnExists(
+    DatabaseExecutor database,
+    String table,
+    String column,
+  ) async {
+    final columns = await database.rawQuery('PRAGMA table_info($table)');
+
+    return columns.any((entry) => entry['name'] == column);
+  }
+
+  Future<void> _addColumnIfMissing(
+    DatabaseExecutor database, {
+    required String table,
+    required String column,
+    required String definition,
+  }) async {
+    final exists = await _columnExists(database, table, column);
+
+    if (exists) {
+      return;
+    }
+
+    await database.execute('ALTER TABLE $table ADD COLUMN $column $definition');
+  }
+
   Future<void> _onCreate(Database database, int version) async {
     await _createProfilesTable(database);
     await _insertDefaultProfile(database);
@@ -88,11 +113,12 @@ class AppDatabase {
     }
 
     if (oldVersion < 4) {
-      await database.execute('''
-        ALTER TABLE $protocolsTable
-        ADD COLUMN color_value INTEGER NOT NULL
-        DEFAULT 4284960932
-      ''');
+      await _addColumnIfMissing(
+        database,
+        table: protocolsTable,
+        column: 'color_value',
+        definition: 'INTEGER NOT NULL DEFAULT 4284960932',
+      );
     }
 
     if (oldVersion < 5) {
@@ -108,18 +134,21 @@ class AppDatabase {
     }
 
     if (oldVersion < 8) {
-      await database.execute('''
-        ALTER TABLE $inventoryTable
-        ADD COLUMN container_type TEXT NOT NULL
-        DEFAULT 'Container'
-      ''');
+      await _addColumnIfMissing(
+        database,
+        table: inventoryTable,
+        column: 'container_type',
+        definition: "TEXT NOT NULL DEFAULT 'Container'",
+      );
     }
 
     if (oldVersion < 9) {
-      await database.execute('''
-    ALTER TABLE $inventoryTable
-    ADD COLUMN current_container_opened_at TEXT
-  ''');
+      await _addColumnIfMissing(
+        database,
+        table: inventoryTable,
+        column: 'current_container_opened_at',
+        definition: 'TEXT',
+      );
     }
 
     if (oldVersion < 10) {
@@ -131,45 +160,53 @@ class AppDatabase {
     }
 
     if (oldVersion < 12) {
-      await database.execute('''
-        ALTER TABLE $profilesTable
-        ADD COLUMN enabled_modules TEXT NOT NULL
-        DEFAULT 'protocols,weight,inventory'
-      ''');
+      await _addColumnIfMissing(
+        database,
+        table: profilesTable,
+        column: 'enabled_modules',
+        definition: "TEXT NOT NULL DEFAULT 'protocols,weight,inventory'",
+      );
     }
 
     if (oldVersion < 13) {
-      await database.execute('''
-        ALTER TABLE $profilesTable
-        ADD COLUMN avatar_image_path TEXT
-      ''');
+      await _addColumnIfMissing(
+        database,
+        table: profilesTable,
+        column: 'avatar_image_path',
+        definition: 'TEXT',
+      );
     }
 
     if (oldVersion < 14) {
-      await database.execute('''
-        ALTER TABLE $protocolsTable
-        ADD COLUMN protocol_type TEXT NOT NULL
-        DEFAULT 'injection'
-      ''');
+      await _addColumnIfMissing(
+        database,
+        table: protocolsTable,
+        column: 'protocol_type',
+        definition: "TEXT NOT NULL DEFAULT 'injection'",
+      );
     }
 
     if (oldVersion < 15) {
-      await database.execute('''
-        ALTER TABLE $protocolsTable
-        ADD COLUMN rotation_enabled INTEGER NOT NULL
-        DEFAULT 0
-      ''');
+      await _addColumnIfMissing(
+        database,
+        table: protocolsTable,
+        column: 'rotation_enabled',
+        definition: 'INTEGER NOT NULL DEFAULT 0',
+      );
 
-      await database.execute('''
-        ALTER TABLE $protocolsTable
-        ADD COLUMN rotation_mode TEXT NOT NULL
-        DEFAULT 'sequential'
-      ''');
+      await _addColumnIfMissing(
+        database,
+        table: protocolsTable,
+        column: 'rotation_mode',
+        definition: "TEXT NOT NULL DEFAULT 'sequential'",
+      );
 
-      await database.execute('''
-        ALTER TABLE $protocolsTable
-        ADD COLUMN enabled_injection_sites TEXT
-      ''');
+      await _addColumnIfMissing(
+        database,
+        table: protocolsTable,
+        column: 'enabled_injection_sites',
+        definition: 'TEXT',
+      );
     }
 
     if (oldVersion < 16) {
@@ -256,115 +293,120 @@ class AppDatabase {
       await _createProfilesTable(transaction);
       await _insertDefaultProfile(transaction);
 
-      await transaction.execute('''
-        ALTER TABLE $protocolsTable
-        ADD COLUMN profile_id TEXT NOT NULL
-        DEFAULT '$defaultProfileId'
-      ''');
-
-      await transaction.execute('''
-        ALTER TABLE $doseRecordsTable
-        ADD COLUMN profile_id TEXT NOT NULL
-        DEFAULT '$defaultProfileId'
-      ''');
-
-      await transaction.execute('''
-        ALTER TABLE $weightRecordsTable
-        ADD COLUMN profile_id TEXT NOT NULL
-        DEFAULT '$defaultProfileId'
-      ''');
-
-      await transaction.execute('''
-        ALTER TABLE $inventoryTable
-        ADD COLUMN profile_id TEXT NOT NULL
-        DEFAULT '$defaultProfileId'
-      ''');
+      await _addColumnIfMissing(
+        transaction,
+        table: protocolsTable,
+        column: 'profile_id',
+        definition: "TEXT NOT NULL DEFAULT '$defaultProfileId'",
+      );
+      await _addColumnIfMissing(
+        transaction,
+        table: doseRecordsTable,
+        column: 'profile_id',
+        definition: "TEXT NOT NULL DEFAULT '$defaultProfileId'",
+      );
+      await _addColumnIfMissing(
+        transaction,
+        table: weightRecordsTable,
+        column: 'profile_id',
+        definition: "TEXT NOT NULL DEFAULT '$defaultProfileId'",
+      );
+      await _addColumnIfMissing(
+        transaction,
+        table: inventoryTable,
+        column: 'profile_id',
+        definition: "TEXT NOT NULL DEFAULT '$defaultProfileId'",
+      );
 
       await _createProfileIndexes(transaction);
     });
   }
 
   Future<void> _addProtocolDoseColumns(Database database) async {
-    await database.transaction((transaction) async {
-      await transaction.execute('''
-        ALTER TABLE $protocolsTable
-        ADD COLUMN dose_amount REAL
-      ''');
-
-      await transaction.execute('''
-        ALTER TABLE $protocolsTable
-        ADD COLUMN dose_unit TEXT
-      ''');
-    });
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'dose_amount',
+      definition: 'REAL',
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'dose_unit',
+      definition: 'TEXT',
+    );
   }
 
   Future<void> _addCycleColumns(Database database) async {
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN use_cycle INTEGER NOT NULL
-      DEFAULT 0
-    ''');
-
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN cycle_start_date TEXT
-    ''');
-
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN cycle_on_duration INTEGER NOT NULL
-      DEFAULT 1
-    ''');
-
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN cycle_on_unit TEXT NOT NULL
-      DEFAULT 'weeks'
-    ''');
-
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN cycle_off_duration INTEGER NOT NULL
-      DEFAULT 0
-    ''');
-
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN cycle_off_unit TEXT NOT NULL
-      DEFAULT 'weeks'
-    ''');
-
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN repeat_cycle INTEGER NOT NULL
-      DEFAULT 0
-    ''');
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'use_cycle',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'cycle_start_date',
+      definition: 'TEXT',
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'cycle_on_duration',
+      definition: 'INTEGER NOT NULL DEFAULT 1',
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'cycle_on_unit',
+      definition: "TEXT NOT NULL DEFAULT 'weeks'",
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'cycle_off_duration',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'cycle_off_unit',
+      definition: "TEXT NOT NULL DEFAULT 'weeks'",
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'repeat_cycle',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
   }
 
   Future<void> _addReminderColumns(Database database) async {
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN reminder_enabled INTEGER NOT NULL
-      DEFAULT 0
-    ''');
-
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN reminder_minutes_before INTEGER NOT NULL
-      DEFAULT 0
-    ''');
-
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN missed_dose_reminder_enabled INTEGER NOT NULL
-      DEFAULT 0
-    ''');
-
-    await database.execute('''
-      ALTER TABLE $protocolsTable
-      ADD COLUMN missed_dose_reminder_minutes_after INTEGER NOT NULL
-      DEFAULT 60
-    ''');
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'reminder_enabled',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'reminder_minutes_before',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'missed_dose_reminder_enabled',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'missed_dose_reminder_minutes_after',
+      definition: 'INTEGER NOT NULL DEFAULT 60',
+    );
   }
 
   Future<void> _createProgressPhotosTable(DatabaseExecutor database) async {
@@ -904,30 +946,36 @@ class AppDatabase {
 
   Future<void> _addInventoryMetadataColumns(Database database) async {
     await database.transaction((transaction) async {
-      await transaction.execute('''
-      ALTER TABLE $inventoryTable
-      ADD COLUMN reconstitution_volume_ml REAL
-    ''');
-
-      await transaction.execute('''
-      ALTER TABLE $inventoryTable
-      ADD COLUMN expiration_date TEXT
-    ''');
-
-      await transaction.execute('''
-      ALTER TABLE $inventoryTable
-      ADD COLUMN storage_instructions TEXT
-    ''');
-
-      await transaction.execute('''
-      ALTER TABLE $inventoryTable
-      ADD COLUMN purchase_date TEXT
-    ''');
-
-      await transaction.execute('''
-      ALTER TABLE $inventoryTable
-      ADD COLUMN cost REAL
-    ''');
+      await _addColumnIfMissing(
+        transaction,
+        table: inventoryTable,
+        column: 'reconstitution_volume_ml',
+        definition: 'REAL',
+      );
+      await _addColumnIfMissing(
+        transaction,
+        table: inventoryTable,
+        column: 'expiration_date',
+        definition: 'TEXT',
+      );
+      await _addColumnIfMissing(
+        transaction,
+        table: inventoryTable,
+        column: 'storage_instructions',
+        definition: 'TEXT',
+      );
+      await _addColumnIfMissing(
+        transaction,
+        table: inventoryTable,
+        column: 'purchase_date',
+        definition: 'TEXT',
+      );
+      await _addColumnIfMissing(
+        transaction,
+        table: inventoryTable,
+        column: 'cost',
+        definition: 'REAL',
+      );
     });
   }
 
@@ -965,10 +1013,12 @@ class AppDatabase {
 
   Future<void> _addSupplyCapacityColumn(Database database) async {
     await database.transaction((transaction) async {
-      await transaction.execute('''
-      ALTER TABLE $inventoryTable
-      ADD COLUMN supply_capacity REAL
-    ''');
+      await _addColumnIfMissing(
+        transaction,
+        table: inventoryTable,
+        column: 'supply_capacity',
+        definition: 'REAL',
+      );
 
       await transaction.execute('''
       UPDATE $inventoryTable
@@ -1025,10 +1075,12 @@ class AppDatabase {
   }
 
   Future<void> _addCurrentContainerBatchIdColumn(Database database) async {
-    await database.execute('''
-      ALTER TABLE $inventoryTable
-      ADD COLUMN current_container_batch_id TEXT
-    ''');
+    await _addColumnIfMissing(
+      database,
+      table: inventoryTable,
+      column: 'current_container_batch_id',
+      definition: 'TEXT',
+    );
   }
 
   Future<void> _addInventoryBatchNameColumn(Database database) async {

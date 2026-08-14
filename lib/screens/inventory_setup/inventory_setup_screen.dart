@@ -66,8 +66,10 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
   String _containerType = 'Vial';
   double _containerSize = 1;
   String _unit = 'mg';
+  double? _separateContainerSize;
 
   double _currentAmount = 0;
+  bool _isRemainingAmountValid = true;
 
   /// Total physical containers being added.
   int _totalQuantity = 0;
@@ -125,6 +127,10 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
   double get _activeContainerSize {
     if (_activeContainerSource == ActiveContainerSource.existingBatch) {
       return _selectedExistingBatch?.containerSize ?? _containerSize;
+    }
+
+    if (_activeContainerSource == ActiveContainerSource.separate) {
+      return _separateContainerSize ?? 0;
     }
 
     return _containerSize;
@@ -195,6 +201,7 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
       _activeContainerSource = ActiveContainerSource.existingBatch;
     } else {
       _activeContainerSource = ActiveContainerSource.separate;
+      _separateContainerSize = item.vialSize;
     }
 
     _lowStockThreshold = item.lowStockThreshold;
@@ -299,6 +306,8 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
     _activeContainerSource = ActiveContainerSource.none;
 
     _selectedExistingBatchId = null;
+    _separateContainerSize = null;
+    _isRemainingAmountValid = true;
 
     _expirationDate = null;
     _purchaseDate = null;
@@ -430,13 +439,15 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
               _currentAmount <= _activeContainerSize,
 
         ActiveContainerSource.separate =>
-          _currentAmount > 0 && _currentAmount <= _containerSize,
+          _separateContainerSize != null && _separateContainerSize! > 0,
       },
 
       // Step 4 - Remaining amount
       3 =>
         _activeContainerSource == ActiveContainerSource.none ||
-            (_currentAmount >= 0 && _currentAmount <= _activeContainerSize),
+            (_isRemainingAmountValid &&
+                _currentAmount >= 0 &&
+                _currentAmount <= _activeContainerSize),
 
       // Step 5 - Total quantity
       4 => _totalQuantity > 0,
@@ -572,6 +583,8 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
           initialBatchName: _requiresInitialBatchName
               ? _batchNameController.text.trim()
               : null,
+          initialBatchContainerSize: _containerSize,
+          initialBatchUnit: _unit,
         );
       } else {
         await widget.dataService.updateInventoryItem(item);
@@ -675,20 +688,39 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
         source: _activeContainerSource,
         existingBatches: _existingBatches,
         selectedExistingBatchId: _selectedExistingBatchId,
+        separateContainerSize: _separateContainerSize,
+        onSeparateContainerSizeChanged: (value) {
+          setState(() {
+            _separateContainerSize = value;
+            _currentAmount = value;
+            _isRemainingAmountValid = true;
+          });
+        },
         onSourceChanged: (value) {
           setState(() {
             _activeContainerSource = value;
 
             if (value == ActiveContainerSource.none) {
               _selectedExistingBatchId = null;
+              _separateContainerSize = null;
               _currentAmount = 0;
               _currentContainerOpenedAt = null;
+              _isRemainingAmountValid = true;
             } else if (value == ActiveContainerSource.existingBatch) {
               _selectedExistingBatchId = null;
+              _separateContainerSize = null;
               _currentAmount = 0;
+              _isRemainingAmountValid = true;
+            } else if (value == ActiveContainerSource.separate) {
+              _selectedExistingBatchId = null;
+              _separateContainerSize = null;
+              _currentAmount = 0;
+              _isRemainingAmountValid = true;
             } else {
               _selectedExistingBatchId = null;
+              _separateContainerSize = null;
               _currentAmount = _containerSize;
+              _isRemainingAmountValid = true;
             }
           });
         },
@@ -699,8 +731,9 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
 
           setState(() {
             _selectedExistingBatchId = batch.id;
-
+            _separateContainerSize = null;
             _currentAmount = batch.containerSize;
+            _isRemainingAmountValid = true;
           });
         },
       ),
@@ -713,6 +746,11 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
         currentAmount: _currentAmount,
         protocolDoseAmount: _selectedProtocol?.doseAmount,
         protocolDoseUnit: _selectedProtocol?.doseUnit.label,
+        onValidityChanged: (isValid) {
+          setState(() {
+            _isRemainingAmountValid = isValid;
+          });
+        },
         onCurrentAmountChanged: (value) {
           setState(() {
             _currentAmount = value;
@@ -976,5 +1014,4 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
       ),
     );
   }
-
 }

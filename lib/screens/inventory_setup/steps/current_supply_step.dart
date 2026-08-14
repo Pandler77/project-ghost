@@ -15,6 +15,8 @@ class CurrentSupplyStep extends StatelessWidget {
     required this.source,
     required this.existingBatches,
     required this.selectedExistingBatchId,
+    required this.separateContainerSize,
+    required this.onSeparateContainerSizeChanged,
     required this.onSourceChanged,
     required this.onExistingBatchSelected,
     super.key,
@@ -29,6 +31,9 @@ class CurrentSupplyStep extends StatelessWidget {
 
   final List<InventoryBatch> existingBatches;
   final String? selectedExistingBatchId;
+
+  final double? separateContainerSize;
+  final ValueChanged<double> onSeparateContainerSizeChanged;
 
   final ValueChanged<ActiveContainerSource> onSourceChanged;
   final ValueChanged<String> onExistingBatchSelected;
@@ -107,6 +112,44 @@ class CurrentSupplyStep extends StatelessWidget {
           },
         ),
 
+        if (source == ActiveContainerSource.separate) ...[
+          const SizedBox(height: AppSpacing.lg),
+
+          Text(
+            'What size is the older $name?',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+
+          const SizedBox(height: 6),
+
+          Text(
+            'Enter the full capacity of the active $name, not how much is left.',
+            style: TextStyle(color: colors.onSurfaceVariant),
+          ),
+
+          const SizedBox(height: AppSpacing.sm),
+
+          TextFormField(
+            initialValue: separateContainerSize == null
+                ? ''
+                : _formatNumber(separateContainerSize!),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: '$name size',
+              suffixText: unit,
+              hintText: 'Example: 150',
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (value) {
+              final parsed = double.tryParse(value.trim());
+
+              if (parsed != null && parsed > 0) {
+                onSeparateContainerSizeChanged(parsed);
+              }
+            },
+          ),
+        ],
+
         if (source == ActiveContainerSource.existingBatch) ...[
           const SizedBox(height: AppSpacing.lg),
 
@@ -167,6 +210,17 @@ class CurrentSupplyStep extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  static String _formatNumber(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+
+    return value
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   String _sourceExplanation(String name) {

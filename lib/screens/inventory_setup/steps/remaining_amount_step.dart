@@ -17,6 +17,7 @@ class RemainingAmountStep extends StatefulWidget {
     required this.protocolDoseAmount,
     required this.protocolDoseUnit,
     required this.onCurrentAmountChanged,
+    required this.onValidityChanged,
     super.key,
   });
 
@@ -30,6 +31,7 @@ class RemainingAmountStep extends StatefulWidget {
   final String? protocolDoseUnit;
 
   final ValueChanged<double> onCurrentAmountChanged;
+  final ValueChanged<bool> onValidityChanged;
 
   @override
   State<RemainingAmountStep> createState() => _RemainingAmountStepState();
@@ -40,6 +42,7 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
 
   late final TextEditingController _remainingController;
   late final TextEditingController _dosesUsedController;
+  String? _manualAmountError;
 
   @override
   void initState() {
@@ -77,14 +80,40 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
     final parsed = double.tryParse(_remainingController.text.trim());
 
     if (parsed == null) {
+      setState(() {
+        _manualAmountError = 'Enter a valid amount.';
+      });
+
+      widget.onValidityChanged(false);
       return;
     }
 
-    final normalized = parsed.clamp(0.0, widget.containerSize);
+    if (parsed < 0) {
+      setState(() {
+        _manualAmountError = 'Remaining amount cannot be negative.';
+      });
 
-    widget.onCurrentAmountChanged(normalized);
+      widget.onValidityChanged(false);
+      return;
+    }
 
-    _remainingController.text = _formatNumber(normalized);
+    if (parsed > widget.containerSize) {
+      setState(() {
+        _manualAmountError =
+            'Remaining amount cannot exceed '
+            '${_formatNumber(widget.containerSize)} ${widget.unit}.';
+      });
+
+      widget.onValidityChanged(false);
+      return;
+    }
+
+    setState(() {
+      _manualAmountError = null;
+    });
+
+    widget.onValidityChanged(true);
+    widget.onCurrentAmountChanged(parsed);
   }
 
   void _calculateFromDoses() {
@@ -108,10 +137,13 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
     );
 
     widget.onCurrentAmountChanged(remaining);
+    widget.onValidityChanged(true);
 
     _remainingController.text = _formatNumber(remaining);
 
-    setState(() {});
+    setState(() {
+      _manualAmountError = null;
+    });
   }
 
   @override
@@ -226,14 +258,8 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
           TextField(
             controller: _remainingController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onChanged: (value) {
-              final parsed = double.tryParse(value.trim());
-
-              if (parsed != null) {
-                final normalized = parsed.clamp(0.0, widget.containerSize);
-
-                widget.onCurrentAmountChanged(normalized);
-              }
+            onChanged: (_) {
+              _applyManualAmount();
             },
             onSubmitted: (_) {
               _applyManualAmount();
@@ -243,7 +269,18 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
               suffixText: widget.unit,
               helperText:
                   'Maximum ${_formatNumber(widget.containerSize)} ${widget.unit}',
+              errorText: _manualAmountError,
               border: const OutlineInputBorder(),
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonal(
+              onPressed: _manualAmountError == null ? _applyManualAmount : null,
+              child: const Text('Use This Amount'),
             ),
           ),
         ],
@@ -255,6 +292,9 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
             decoration: BoxDecoration(
               color: (Theme.of(context).cardTheme.color ?? colors.surface),
               borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(
+                color: colors.outlineVariant.withValues(alpha: 0.60),
+              ),
             ),
             child: Text(
               'Starting amount: '
@@ -282,39 +322,42 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
           ),
         ],
 
-        const SizedBox(height: AppSpacing.lg),
+        if (_method == RemainingAmountMethod.manual ||
+            _method == RemainingAmountMethod.dosesUsed) ...[
+          const SizedBox(height: AppSpacing.lg),
 
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: colors.primaryContainer.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(AppRadius.card),
-            border: Border.all(color: colors.primary.withValues(alpha: 0.45)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Estimated remaining',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${_formatNumber(widget.currentAmount)} ${widget.unit}',
-                style: const TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: colors.primaryContainer.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: colors.primary.withValues(alpha: 0.45)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Estimated remaining',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'of ${_formatNumber(widget.containerSize)} ${widget.unit}',
-                style: TextStyle(color: colors.onSurfaceVariant),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  '${_formatNumber(widget.currentAmount)} ${widget.unit}',
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'of ${_formatNumber(widget.containerSize)} ${widget.unit}',
+                  style: TextStyle(color: colors.onSurfaceVariant),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

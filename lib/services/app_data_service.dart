@@ -424,13 +424,18 @@ class AppDataService {
   Future<void> saveInventoryItem(
     InventoryItem item, {
     String? initialBatchName,
+    double? initialBatchContainerSize,
+    String? initialBatchUnit,
   }) async {
     final existing = await _repository.getInventoryItemForProtocol(
       item.protocolId,
     );
 
     final initialUnopenedQuantity = item.unopenedQuantity;
-    final unopenedAmount = item.vialSize * initialUnopenedQuantity;
+    final unopenedContainerSize = initialBatchContainerSize ?? item.vialSize;
+
+    final unopenedUnit = initialBatchUnit ?? item.unit;
+    final unopenedAmount = unopenedContainerSize * initialUnopenedQuantity;
     final totalInitialAmount = item.currentAmount + unopenedAmount;
 
     // One protocol owns one InventoryItem. Batches hold unopened stock.
@@ -455,9 +460,9 @@ class AppDataService {
         inventoryItemId: storedItem.id,
         name: initialBatchName?.trim().isNotEmpty == true
             ? initialBatchName!.trim()
-            : '${_normalizeAmount(item.vialSize)} ${item.unit} Batch',
-        containerSize: item.vialSize,
-        unit: item.unit,
+            : '${_normalizeAmount(unopenedContainerSize)} $unopenedUnit Batch',
+        containerSize: unopenedContainerSize,
+        unit: unopenedUnit,
         quantity: initialUnopenedQuantity,
         vendor: item.vendor,
         batch: item.batch,

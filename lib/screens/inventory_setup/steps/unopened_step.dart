@@ -77,9 +77,14 @@ class _UnopenedStepState extends State<UnopenedStep> {
     _quantityController.text = parsed.toString();
   }
 
-  void _setQuickQuantity(int quantity) {
-    widget.onUnopenedQuantityChanged(quantity);
-    _quantityController.text = quantity.toString();
+  void _addQuickQuantity(int amount) {
+    _commitTypedQuantity();
+
+    final updatedQuantity = widget.unopenedQuantity + amount;
+
+    widget.onUnopenedQuantityChanged(updatedQuantity);
+    _quantityController.text = updatedQuantity.toString();
+
     FocusScope.of(context).unfocus();
   }
 
@@ -139,9 +144,7 @@ class _UnopenedStepState extends State<UnopenedStep> {
           decoration: BoxDecoration(
             color: baseColor,
             borderRadius: BorderRadius.circular(AppRadius.card),
-            border: Border.all(
-              color: colors.primary.withValues(alpha: 0.16),
-            ),
+            border: Border.all(color: colors.primary.withValues(alpha: 0.16)),
           ),
           child: Column(
             children: [
@@ -165,6 +168,15 @@ class _UnopenedStepState extends State<UnopenedStep> {
                   onEditingComplete: () {
                     _commitTypedQuantity();
                     FocusScope.of(context).unfocus();
+                  },
+                  onChanged: (value) {
+                    final parsed = int.tryParse(value.trim());
+
+                    if (parsed == null || parsed < 0) {
+                      return;
+                    }
+
+                    widget.onUnopenedQuantityChanged(parsed);
                   },
                 ),
               ),
@@ -216,12 +228,12 @@ class _UnopenedStepState extends State<UnopenedStep> {
           runSpacing: AppSpacing.sm,
           children: [
             for (final quantityOption in [1, 2, 3, 5, 10])
-              ChoiceChip(
+              ActionChip(
+                avatar: const Icon(Icons.add_rounded, size: 16),
                 label: Text(
                   quantityOption == 10 ? 'Kit · 10' : '$quantityOption',
                 ),
-                selected: quantity == quantityOption,
-                onSelected: (_) => _setQuickQuantity(quantityOption),
+                onPressed: () => _addQuickQuantity(quantityOption),
               ),
           ],
         ),

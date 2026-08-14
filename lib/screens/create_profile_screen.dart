@@ -288,9 +288,12 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
             const SizedBox(height: AppSpacing.lg),
             TextField(
               controller: _nameController,
-              autofocus: true,
+              autofocus: false,
               textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.next,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) {
+                FocusScope.of(context).unfocus();
+              },
               onChanged: (_) {
                 setState(() {});
               },

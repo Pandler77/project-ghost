@@ -22,6 +22,20 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
   final ProfileService _profileService = ProfileService();
   final NotificationService _notificationService = NotificationService.instance;
 
+  Widget _buildKeyboardDismissWrapper(BuildContext context, Widget? child) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) {
+        final primaryFocus = FocusManager.instance.primaryFocus;
+
+        if (primaryFocus != null && !primaryFocus.hasPrimaryFocus) {
+          primaryFocus.unfocus();
+        }
+      },
+      child: child ?? const SizedBox.shrink(),
+    );
+  }
+
   AppThemeMode _themeMode = AppThemeMode.system;
 
   bool _isLoadingSettings = true;
@@ -206,6 +220,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
         darkTheme: _buildDarkTheme(),
         themeMode: ThemeMode.system,
         home: const _StartupScreen(),
+        builder: _buildKeyboardDismissWrapper,
       );
     }
 
@@ -216,6 +231,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
       darkTheme: _buildDarkTheme(),
       themeMode: _materialThemeMode,
       home: _buildHome(),
+      builder: _buildKeyboardDismissWrapper,
     );
   }
 

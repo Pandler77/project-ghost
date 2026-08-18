@@ -10,6 +10,7 @@ import 'dose_history_screen.dart';
 import 'inventory_screen.dart';
 import 'progress_photo_screen.dart';
 import 'weight_history_screen.dart';
+import '../theme/arctic_icons.dart';
 
 class ToolsScreen extends StatelessWidget {
   const ToolsScreen({
@@ -52,8 +53,8 @@ class ToolsScreen extends StatelessWidget {
             children: [
               // Premium tools stay together on the first row.
               _ToolCard(
-                icon: Icons.inventory_2_outlined,
-                title: 'Ghost Supply™',
+                icon: ArcticIcons.inventory_2_outlined,
+                title: 'Arctic Supply™',
                 subtitle: 'Inventory tracking',
                 premium: true,
                 visual: const _InventoryMiniVisual(),
@@ -71,13 +72,11 @@ class ToolsScreen extends StatelessWidget {
               ),
 
               _ToolCard(
-                icon: Icons.analytics_outlined,
+                icon: ArcticIcons.analytics_outlined,
                 title: 'Analytics',
                 subtitle: 'Trends and insights',
                 premium: true,
-                visual: const _TrendMiniVisual(
-                  points: [0.74, 0.60, 0.67, 0.40, 0.52, 0.27, 0.38, 0.18],
-                ),
+                visual: const _AnalyticsMiniVisual(),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -93,12 +92,10 @@ class ToolsScreen extends StatelessWidget {
               ),
 
               _ToolCard(
-                icon: Icons.history_outlined,
+                icon: ArcticIcons.history_outlined,
                 title: 'Dose History',
                 subtitle: 'Doses and activity over time',
-                visual: const _TrendMiniVisual(
-                  points: [0.72, 0.52, 0.66, 0.42, 0.35, 0.58, 0.39, 0.46],
-                ),
+                visual: const _DoseTimelineMiniVisual(),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -113,8 +110,8 @@ class ToolsScreen extends StatelessWidget {
               ),
 
               _ToolCard(
-                icon: Icons.calculate_outlined,
-                title: 'Ghost Calculator',
+                icon: ArcticIcons.calculate_outlined,
+                title: 'Arctic Calculator',
                 subtitle: 'Dose, dilution, and target tools',
                 visual: const _CalculatorMiniVisual(),
                 onTap: () {
@@ -131,7 +128,7 @@ class ToolsScreen extends StatelessWidget {
               ),
 
               _ToolCard(
-                icon: Icons.monitor_weight_outlined,
+                icon: ArcticIcons.monitor_weight_outlined,
                 title: 'Weight History',
                 subtitle: 'Trends, goals, and progress',
                 visual: const _WeightMiniVisual(),
@@ -153,7 +150,7 @@ class ToolsScreen extends StatelessWidget {
               ),
 
               _ToolCard(
-                icon: Icons.photo_library_outlined,
+                icon: ArcticIcons.photo_library_outlined,
                 title: 'Progress Photos',
                 subtitle: 'Visual progress sessions',
                 visual: const _PhotosMiniVisual(),
@@ -294,11 +291,18 @@ class _ToolIcon extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: colors.primary.withValues(alpha: 0.08),
+        gradient: ArcticPalette.accentGradient(context),
         borderRadius: BorderRadius.circular(AppRadius.sm),
+        boxShadow: [
+          BoxShadow(
+            color: colors.primary.withValues(alpha: 0.18),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       alignment: Alignment.center,
-      child: Icon(icon, size: AppIcon.md, color: colors.primary),
+      child: Icon(icon, size: AppIcon.md, color: Colors.white),
     );
   }
 }
@@ -359,42 +363,100 @@ class _InventoryMiniVisual extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    const heights = [
-      16.0,
-      27.0,
-      21.0,
-      35.0,
-      18.0,
-      23.0,
-      39.0,
-      20.0,
-      29.0,
-      17.0,
-    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: const [
+          Expanded(child: _MiniSupplyVial(fill: 0.82)),
+          SizedBox(width: 7),
+          Expanded(child: _MiniSupplyVial(fill: 0.54)),
+          SizedBox(width: 7),
+          Expanded(child: _MiniSupplyVial(fill: 0.31)),
+          SizedBox(width: 7),
+          Expanded(child: _MiniSupplyBox()),
+        ],
+      ),
+    );
+  }
+}
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+class _MiniSupplyVial extends StatelessWidget {
+  const _MiniSupplyVial({required this.fill});
+
+  final double fill;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        for (var index = 0; index < heights.length; index++) ...[
-          Expanded(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                height: heights[index],
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(
-                    alpha: index.isEven ? 0.30 : 0.56,
-                  ),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(3),
+        Container(
+          width: 14,
+          height: 4,
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: 0.72),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: colors.primary.withValues(alpha: 0.36),
+                ),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: FractionallySizedBox(
+                  heightFactor: fill,
+                  widthFactor: 1,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: ArcticPalette.accentGradient(context),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-          if (index < heights.length - 1) const SizedBox(width: 4),
-        ],
+        ),
       ],
+    );
+  }
+}
+
+class _MiniSupplyBox extends StatelessWidget {
+  const _MiniSupplyBox();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      height: 27,
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.28)),
+      ),
+      child: Center(
+        child: Icon(
+          ArcticIcons.inventory_outlined,
+          size: 16,
+          color: colors.primary,
+        ),
+      ),
     );
   }
 }
@@ -473,35 +535,89 @@ class _PhotosMiniVisual extends StatelessWidget {
 
     return Row(
       children: [
-        for (var index = 0; index < 3; index++) ...[
-          Expanded(
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: 0.09),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Icon(
-                Icons.person_outline,
-                size: 25,
-                color: colors.primary.withValues(alpha: 0.60),
-              ),
-            ),
-          ),
-          const SizedBox(width: 5),
-        ],
         Expanded(
-          child: Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: colors.primary.withValues(alpha: 0.20)),
-            ),
-            child: Icon(Icons.add, size: 20, color: colors.primary),
+          child: _MiniPhotoFrame(
+            icon: ArcticIcons.person_outline,
+            accent: colors.primary,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              _MiniPhotoFrame(
+                icon: ArcticIcons.person_outline,
+                accent: ArcticPalette.ice,
+              ),
+              Positioned(
+                right: -2,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardTheme.color ?? colors.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colors.primary.withValues(alpha: 0.20),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.compare_arrows_rounded,
+                    size: 13,
+                    color: colors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _MiniPhotoFrame(
+            icon: ArcticIcons.photo_camera_outlined,
+            accent: ArcticPalette.lavender,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MiniPhotoFrame extends StatelessWidget {
+  const _MiniPhotoFrame({required this.icon, required this.accent});
+
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: accent.withValues(alpha: 0.20)),
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Icon(icon, size: 22, color: accent.withValues(alpha: 0.72)),
+          ),
+          Positioned(
+            left: 6,
+            right: 6,
+            bottom: 5,
+            child: Container(
+              height: 3,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.28),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -513,30 +629,165 @@ class _WeightMiniVisual extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return CustomPaint(
-      painter: _MiniLinePainter(
-        color: colors.primary,
-        points: const [0.78, 0.70, 0.77, 0.58, 0.66, 0.39, 0.50, 0.24],
-        showPoints: true,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(
+              ArcticIcons.monitor_weight_outlined,
+              size: 18,
+              color: colors.primary,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: CustomPaint(
+              painter: _MiniLinePainter(
+                color: colors.primary,
+                points: const [0.80, 0.72, 0.74, 0.61, 0.53, 0.46, 0.34, 0.25],
+                showPoints: true,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _TrendMiniVisual extends StatelessWidget {
-  const _TrendMiniVisual({required this.points});
-
-  final List<double> points;
+class _AnalyticsMiniVisual extends StatelessWidget {
+  const _AnalyticsMiniVisual();
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return CustomPaint(
-      painter: _MiniLinePainter(
-        color: colors.primary,
-        points: points,
-        showPoints: false,
+    const bars = [0.34, 0.58, 0.46, 0.76, 0.60, 0.88];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var index = 0; index < bars.length; index++) ...[
+                Expanded(
+                  child: FractionallySizedBox(
+                    heightFactor: bars[index],
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: index.isEven
+                            ? colors.primary.withValues(alpha: 0.22)
+                            : ArcticPalette.ice.withValues(alpha: 0.28),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (index < bars.length - 1) const SizedBox(width: 5),
+              ],
+            ],
+          ),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _MiniLinePainter(
+                color: colors.primary,
+                points: const [0.74, 0.60, 0.65, 0.42, 0.49, 0.22],
+                showPoints: true,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DoseTimelineMiniVisual extends StatelessWidget {
+  const _DoseTimelineMiniVisual();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: 14,
+            right: 14,
+            child: Container(
+              height: 2,
+              color: colors.outlineVariant.withValues(alpha: 0.55),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _DoseTimelineNode(icon: Icons.check_rounded, active: true),
+              _DoseTimelineNode(icon: Icons.check_rounded, active: true),
+              _DoseTimelineNode(icon: Icons.remove_rounded, active: false),
+              _DoseTimelineNode(icon: Icons.check_rounded, active: true),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DoseTimelineNode extends StatelessWidget {
+  const _DoseTimelineNode({required this.icon, required this.active});
+
+  final IconData icon;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      width: 27,
+      height: 27,
+      decoration: BoxDecoration(
+        color: active ? colors.primary.withValues(alpha: 0.12) : colors.surface,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: active
+              ? colors.primary.withValues(alpha: 0.42)
+              : colors.outlineVariant.withValues(alpha: 0.70),
+          width: 1.2,
+        ),
+      ),
+      child: Icon(
+        icon,
+        size: 15,
+        color: active ? colors.primary : colors.onSurfaceVariant,
       ),
     );
   }
@@ -663,7 +914,7 @@ class _ComingSoonCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const _ToolIcon(icon: Icons.auto_awesome_outlined),
+              const _ToolIcon(icon: ArcticIcons.auto_awesome_outlined),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -697,13 +948,19 @@ class _ComingSoonCard extends StatelessWidget {
             runSpacing: AppSpacing.sm,
             children: [
               _ComingSoonChip(
-                icon: Icons.file_download_outlined,
+                icon: ArcticIcons.file_download_outlined,
                 label: 'Data Export',
               ),
-              _ComingSoonChip(icon: Icons.insights_outlined, label: 'Reports'),
-              _ComingSoonChip(icon: Icons.favorite_border, label: 'Health'),
               _ComingSoonChip(
-                icon: Icons.auto_graph_outlined,
+                icon: ArcticIcons.insights_outlined,
+                label: 'Reports',
+              ),
+              _ComingSoonChip(
+                icon: ArcticIcons.favorite_border,
+                label: 'Health',
+              ),
+              _ComingSoonChip(
+                icon: ArcticIcons.auto_graph_outlined,
                 label: 'Insights',
               ),
             ],
@@ -758,15 +1015,7 @@ class _ToolsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
 
-    final gradientColors = brightness == Brightness.dark
-        ? [
-            colors.primary.withValues(alpha: 0.34),
-            colors.primaryContainer.withValues(alpha: 0.16),
-          ]
-        : [
-            colors.primary.withValues(alpha: 0.17),
-            colors.primaryContainer.withValues(alpha: 0.58),
-          ];
+    final gradientColors = ArcticPalette.headerGradient(context).colors;
 
     return Container(
       width: double.infinity,
@@ -779,9 +1028,20 @@ class _ToolsHeader extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(
-          color: colors.primary.withValues(alpha: 0.22),
-          width: 1.2,
+          color: brightness == Brightness.dark
+              ? ArcticPalette.lavender.withValues(alpha: 0.22)
+              : ArcticPalette.purple.withValues(alpha: 0.14),
+          width: 1.15,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: 0.24)
+                : ArcticPalette.purple.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 9),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

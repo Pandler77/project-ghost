@@ -1,0 +1,34 @@
+flutter_native_splash:
+  android: true
+  ios: true
+  web: false
+
+  background_image: "assets/branding/welcome_bg_light.png"
+  background_image_dark: "assets/branding/welcome_bg_dark.png"
+
+  image: "assets/branding/arcticdose_icon.png"
+  image_dark: "assets/branding/arcticdose_icon.png"
+
+  android_gravity: center
+  ios_content_mode: center
+
+  android_12:
+    color: "#F8FAFF"
+    color_dark: "#0F172A"
+
+    # Android 12 masks this center image to a circle.
+    image: "assets/branding/android12_mark_light.png"
+    image_dark: "assets/branding/android12_mark_dark.png"
+
+    # Android 12 provides a separate branding slot.
+    # flutter_native_splash requires 800x320 PNGs here.
+    branding: "assets/branding/android12_wordmark_light.png"
+    branding_dark: "assets/branding/android12_wordmark_dark.png"
+
+  android_12:
+    color: "#F8FAFF"
+    color_dark: "#0F172A"
+    image: "assets/branding/android12_mark_light.png"
+    image_dark: "assets/branding/android12_mark_dark.png"
+    branding: "assets/branding/android12_wordmark_light.png"
+    branding_dark: "assets/branding/android12_wordmark_dark.png"

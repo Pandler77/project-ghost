@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/app_theme_mode.dart';
 import '../models/display_preferences.dart';
 import '../models/home_layout.dart';
+import '../models/measurement_system.dart';
 import '../models/profile.dart';
 import '../models/protocol.dart';
 import '../models/tracking_preferences.dart';
@@ -12,6 +14,7 @@ import '../services/missed_dose_reconciliation_service.dart';
 import '../services/notification_service.dart';
 import '../services/profile_service.dart';
 import '../services/settings_service.dart';
+import '../widgets/milestone_celebration_dialog.dart';
 import '../widgets/profile_avatar.dart';
 import 'calendar_screen.dart';
 import 'create_profile_screen.dart';
@@ -22,9 +25,6 @@ import 'premium_screen.dart';
 import 'protocols_screen.dart';
 import 'settings_screen.dart';
 import 'tools_screen.dart';
-import '../models/measurement_system.dart';
-import '../widgets/milestone_celebration_dialog.dart';
-import '../theme/arctic_icons.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({
@@ -107,8 +107,9 @@ class _MainScreenState extends State<MainScreen> {
     final schedules = <ProfileNotificationSchedule>[];
 
     for (final profile in profiles) {
-      final protocols =
-          await _appDataService.getProtocolsForProfile(profile.id);
+      final protocols = await _appDataService.getProtocolsForProfile(
+        profile.id,
+      );
 
       schedules.add(
         ProfileNotificationSchedule(
@@ -123,7 +124,6 @@ class _MainScreenState extends State<MainScreen> {
       schedules,
     );
   }
-
 
   Future<void> _showPendingMilestoneIfNeeded() async {
     if (_isShowingMilestone || !mounted) {
@@ -154,9 +154,7 @@ class _MainScreenState extends State<MainScreen> {
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => MilestoneCelebrationDialog(
-          achievement: milestone,
-        ),
+        builder: (_) => MilestoneCelebrationDialog(achievement: milestone),
       );
     } finally {
       _isShowingMilestone = false;
@@ -166,8 +164,6 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
 
-    // If two different achievements were queued in quick succession,
-    // show the next one only after the first celebration is dismissed.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showPendingMilestoneIfNeeded();
     });
@@ -203,9 +199,7 @@ class _MainScreenState extends State<MainScreen> {
         protocols: protocols,
       );
 
-      await _synchronizeAllProfileNotifications(
-        profilesOverride: profiles,
-      );
+      await _synchronizeAllProfileNotifications(profilesOverride: profiles);
 
       if (!mounted) {
         return;
@@ -385,6 +379,7 @@ class _MainScreenState extends State<MainScreen> {
                   'Profiles',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
+
                 const SizedBox(height: 12),
 
                 for (final profile in _profiles) ...[
@@ -418,11 +413,16 @@ class _MainScreenState extends State<MainScreen> {
                   leading: Container(
                     width: 42,
                     height: 42,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: colors.primary.withValues(alpha: 0.10),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.add, color: colors.primary),
+                    child: Icon(
+                      LucideIcons.plus,
+                      color: colors.primary,
+                      size: 22,
+                    ),
                   ),
                   title: const Text(
                     'Add Profile',
@@ -434,7 +434,7 @@ class _MainScreenState extends State<MainScreen> {
                         : 'Available with ArcticDose Premium',
                   ),
                   trailing: _profileService.hasPremium
-                      ? const Icon(Icons.chevron_right)
+                      ? const Icon(LucideIcons.chevronRight)
                       : _GhostPremiumBadge(colorScheme: colors),
                   onTap: () {
                     Navigator.pop(sheetContext);
@@ -506,12 +506,9 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     final profiles = await _profileService.getProfiles();
-
     final protocols = await _appDataService.getProtocols();
 
-    await _synchronizeAllProfileNotifications(
-      profilesOverride: profiles,
-    );
+    await _synchronizeAllProfileNotifications(profilesOverride: profiles);
 
     if (!mounted) {
       return;
@@ -545,8 +542,6 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
 
-    // The edit screen can auto-save photos/icons even when the user
-    // leaves with the Back button, so always refresh profiles here.
     if (result == null) {
       final profiles = await _profileService.getProfiles();
       final activeProfile = await _profileService.getActiveProfile();
@@ -576,9 +571,7 @@ class _MainScreenState extends State<MainScreen> {
       final profiles = await _profileService.getProfiles();
       final activeProfile = await _profileService.getActiveProfile();
 
-      await _synchronizeAllProfileNotifications(
-        profilesOverride: profiles,
-      );
+      await _synchronizeAllProfileNotifications(profilesOverride: profiles);
 
       if (!mounted) {
         return;
@@ -604,9 +597,7 @@ class _MainScreenState extends State<MainScreen> {
       final activeProfile = await _profileService.getActiveProfile();
       final protocols = await _appDataService.getProtocols();
 
-      await _synchronizeAllProfileNotifications(
-        profilesOverride: profiles,
-      );
+      await _synchronizeAllProfileNotifications(profilesOverride: profiles);
 
       if (!mounted) {
         return;
@@ -736,7 +727,7 @@ class _MainScreenState extends State<MainScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(ArcticIcons.error_outline, size: 42),
+                  const Icon(LucideIcons.circleAlert, size: 42),
                   const SizedBox(height: 16),
                   const Text(
                     'Could not load app data.',
@@ -815,7 +806,7 @@ class _MainScreenState extends State<MainScreen> {
             ? IconButton(
                 onPressed: _openEditHome,
                 tooltip: 'Edit Home',
-                icon: const Icon(ArcticIcons.tune),
+                icon: const Icon(LucideIcons.slidersHorizontal),
               )
             : const SizedBox(width: 48),
         title: _ProfileSelectorButton(
@@ -826,7 +817,7 @@ class _MainScreenState extends State<MainScreen> {
           IconButton(
             onPressed: _openSettings,
             tooltip: 'Settings',
-            icon: const Icon(ArcticIcons.settings_outlined),
+            icon: const Icon(LucideIcons.settings),
           ),
         ],
       ),
@@ -848,23 +839,23 @@ class _MainScreenState extends State<MainScreen> {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(ArcticIcons.home_outlined),
-            selectedIcon: Icon(ArcticIcons.home),
+            icon: Icon(LucideIcons.house),
+            selectedIcon: Icon(LucideIcons.house),
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(ArcticIcons.medication_outlined),
-            selectedIcon: Icon(ArcticIcons.medication),
+            icon: Icon(LucideIcons.syringe),
+            selectedIcon: Icon(LucideIcons.syringe),
             label: 'Protocols',
           ),
           NavigationDestination(
-            icon: Icon(ArcticIcons.calendar_month_outlined),
-            selectedIcon: Icon(ArcticIcons.calendar_month),
+            icon: Icon(LucideIcons.calendarCheck),
+            selectedIcon: Icon(LucideIcons.calendarCheck),
             label: 'Calendar',
           ),
           NavigationDestination(
-            icon: Icon(ArcticIcons.build_outlined),
-            selectedIcon: Icon(ArcticIcons.build),
+            icon: Icon(LucideIcons.layoutGrid),
+            selectedIcon: Icon(LucideIcons.layoutGrid),
             label: 'Tools',
           ),
         ],
@@ -906,10 +897,10 @@ class _ProfileSelectorButton extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 2),
+              const SizedBox(width: 4),
               Icon(
-                Icons.keyboard_arrow_down,
-                size: 20,
+                LucideIcons.chevronDown,
+                size: 18,
                 color: colors.onSurfaceVariant,
               ),
             ],
@@ -986,7 +977,7 @@ class _ProfileSelectorTile extends StatelessWidget {
                               if (isLocked) ...[
                                 const SizedBox(width: 6),
                                 Icon(
-                                  ArcticIcons.lock_outline,
+                                  LucideIcons.lock,
                                   size: 16,
                                   color: colors.primary,
                                 ),
@@ -1011,7 +1002,10 @@ class _ProfileSelectorTile extends StatelessWidget {
                     else if (isLocked)
                       _GhostPremiumBadge(colorScheme: colors)
                     else
-                      Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+                      Icon(
+                        LucideIcons.chevronRight,
+                        color: colors.onSurfaceVariant,
+                      ),
                   ],
                 ),
               ),
@@ -1019,7 +1013,7 @@ class _ProfileSelectorTile extends StatelessWidget {
           ),
           IconButton(
             tooltip: 'Edit ${profile.name}',
-            icon: const Icon(Icons.more_vert),
+            icon: const Icon(LucideIcons.ellipsisVertical),
             onPressed: onEdit,
           ),
           const SizedBox(width: 4),

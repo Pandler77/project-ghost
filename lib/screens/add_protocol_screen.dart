@@ -102,7 +102,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   int _reminderMinutesBefore = 0;
   bool? _missedDoseReminderEnabled;
   int _missedDoseReminderMinutesAfter = 60;
-  bool _customNotificationTextEnabled = false;
+  bool _customNotificationTextEnabled = true;
 
   @override
   void initState() {

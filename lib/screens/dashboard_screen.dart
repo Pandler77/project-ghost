@@ -696,7 +696,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (_) => _WeightEntryDialog(
         initialWeight: initialDisplayWeight,
-        isFirstEntry: _weightRecords.isEmpty,
+        isFirstEntry:
+            _weightRecords.isEmpty && widget.profile.startingWeight == null,
         measurementSystem: widget.measurementSystem,
       ),
     );
@@ -813,7 +814,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       if (widget.profile.hasModule(ProfileModule.weight)) {
-        return [_EmptyWeightCard(onLogWeight: _openWeightDialog)];
+        return [
+          _EmptyWeightCard(
+            onLogWeight: _openWeightDialog,
+            startingWeight: widget.profile.startingWeight,
+            measurementSystem: widget.measurementSystem,
+          ),
+        ];
       }
 
       return const [];
@@ -909,15 +916,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Center(child: CircularProgressIndicator()),
       );
     } else if (!hasWeight) {
-      content = _EmptyWeightCard(onLogWeight: _openWeightDialog);
+      content = _EmptyWeightCard(
+        onLogWeight: _openWeightDialog,
+        startingWeight: widget.profile.startingWeight,
+        measurementSystem: widget.measurementSystem,
+      );
     } else {
       content = WeightCard(
         currentWeight: currentWeight!,
         startingWeight: startingWeight!,
         weightRecords: _weightRecords,
-        measurementSystem: widget.measurementSystem,
         onLogWeight: _openWeightDialog,
         onOpenHistory: _openWeightHistory,
+        measurementSystem: widget.measurementSystem,
       );
     }
 
@@ -1071,7 +1082,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final currentWeight = hasWeight ? _weightRecords.first.weight : null;
 
-    final startingWeight = hasWeight ? _weightRecords.last.weight : null;
+    final startingWeight =
+        widget.profile.startingWeight ??
+        (hasWeight ? _weightRecords.last.weight : null);
 
     final remainingDoses = _doses.where((dose) => !dose.isResolved).length;
 
@@ -2187,12 +2200,27 @@ class _MergedSectionTitle extends StatelessWidget {
 }
 
 class _EmptyWeightCard extends StatelessWidget {
-  const _EmptyWeightCard({required this.onLogWeight});
+  const _EmptyWeightCard({
+    required this.onLogWeight,
+    required this.startingWeight,
+    required this.measurementSystem,
+  });
 
   final VoidCallback onLogWeight;
+  final double? startingWeight;
+  final MeasurementSystem measurementSystem;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final hasStartingWeight = startingWeight != null && startingWeight! > 0;
+
+    final displayStartingWeight = hasStartingWeight
+        ? WeightDisplay.displayValue(startingWeight!, measurementSystem)
+        : null;
+
+    final unit = WeightDisplay.unit(measurementSystem);
+
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(
@@ -2203,28 +2231,52 @@ class _EmptyWeightCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Weight',
-              style: TextStyle(
-                fontSize: AppTypography.title,
-                fontWeight: FontWeight.bold,
+            if (hasStartingWeight) ...[
+              Text(
+                'Starting Weight',
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Start tracking your weight to see your progress.',
-              style: TextStyle(
-                fontSize: AppTypography.caption,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                '${displayStartingWeight!.toStringAsFixed(1)} $unit',
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'No weigh-ins logged yet. Log your current weight to start tracking progress.',
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  height: 1.4,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ] else ...[
+              Text(
+                'Start tracking your weight to see your progress.',
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+
             const SizedBox(height: AppSpacing.md),
+
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: onLogWeight,
                 icon: const Icon(Icons.add),
-                label: const Text('Log First Weight'),
+                label: Text(
+                  hasStartingWeight ? 'Log Weight' : 'Log First Weight',
+                ),
               ),
             ),
           ],

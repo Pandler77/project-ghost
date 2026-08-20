@@ -10,10 +10,7 @@ import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
-  const NotificationSettingsScreen({
-    required this.dataService,
-    super.key,
-  });
+  const NotificationSettingsScreen({required this.dataService, super.key});
 
   final AppDataService dataService;
 
@@ -27,8 +24,12 @@ class _NotificationSettingsScreenState
   final SettingsService _settingsService = SettingsService();
   final ProfileService _profileService = ProfileService();
 
-  NotificationPreferences _preferences =
-      const NotificationPreferences();
+  NotificationPreferences _preferences = const NotificationPreferences(
+    notificationsEnabled: true,
+    protocolRemindersEnabled: true,
+    missedDoseFollowUpsEnabled: true,
+    customNotificationTextEnabled: true,
+  );
 
   List<Profile> _profiles = [];
 
@@ -62,8 +63,9 @@ class _NotificationSettingsScreenState
     final schedules = <ProfileNotificationSchedule>[];
 
     for (final profile in _profiles) {
-      final protocols =
-          await widget.dataService.getProtocolsForProfile(profile.id);
+      final protocols = await widget.dataService.getProtocolsForProfile(
+        profile.id,
+      );
 
       schedules.add(
         ProfileNotificationSchedule(
@@ -79,9 +81,7 @@ class _NotificationSettingsScreenState
     );
   }
 
-  Future<void> _savePreferences(
-    NotificationPreferences preferences,
-  ) async {
+  Future<void> _savePreferences(NotificationPreferences preferences) async {
     if (_isSaving) {
       return;
     }
@@ -105,8 +105,7 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _requestPermissions() async {
-    final granted =
-        await NotificationService.instance.requestPermissions();
+    final granted = await NotificationService.instance.requestPermissions();
 
     if (!mounted) {
       return;
@@ -131,18 +130,16 @@ class _NotificationSettingsScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Test notification sent.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Test notification sent.')));
     } catch (error) {
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not send test notification: $error'),
-        ),
+        SnackBar(content: Text('Could not send test notification: $error')),
       );
     }
   }
@@ -155,10 +152,7 @@ class _NotificationSettingsScreenState
       appBar: AppBar(
         title: const Text(
           'Notification Settings',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.2,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.2),
         ),
       ),
       body: SafeArea(
@@ -190,8 +184,7 @@ class _NotificationSettingsScreenState
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: colors.primary.withValues(alpha: 0.10),
-                            borderRadius:
-                                BorderRadius.circular(AppRadius.sm),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
                           ),
                           child: Icon(
                             ArcticIcons.notifications_active_outlined,
@@ -260,8 +253,7 @@ class _NotificationSettingsScreenState
                         subtitle: const Text(
                           'Allow reminders configured inside individual protocols.',
                         ),
-                        value:
-                            _preferences.protocolRemindersEnabled,
+                        value: _preferences.protocolRemindersEnabled,
                         onChanged:
                             !_preferences.notificationsEnabled || _isSaving
                             ? null
@@ -284,8 +276,7 @@ class _NotificationSettingsScreenState
                         subtitle: const Text(
                           'Allow follow-up alerts when a scheduled dose is not marked taken.',
                         ),
-                        value:
-                            _preferences.missedDoseFollowUpsEnabled,
+                        value: _preferences.missedDoseFollowUpsEnabled,
                         onChanged:
                             !_preferences.notificationsEnabled ||
                                 !_preferences.protocolRemindersEnabled ||
@@ -341,17 +332,17 @@ class _NotificationSettingsScreenState
 
                   _NotificationCard(
                     children: [
-                      for (var index = 0; index < _profiles.length; index++) ...[
+                      for (
+                        var index = 0;
+                        index < _profiles.length;
+                        index++
+                      ) ...[
                         SwitchListTile(
                           title: Text(
                             _profiles[index].name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
-                          subtitle: Text(
-                            _profiles[index].type.label,
-                          ),
+                          subtitle: Text(_profiles[index].type.label),
                           value: _preferences.notificationsEnabledForProfile(
                             _profiles[index].id,
                           ),
@@ -410,8 +401,7 @@ class _NotificationSettingsScreenState
                         subtitle: const Text(
                           'Ask the device to allow ArcticDose notifications.',
                         ),
-                        trailing:
-                            const Icon(Icons.chevron_right_rounded),
+                        trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: _requestPermissions,
                       ),
 
@@ -429,8 +419,7 @@ class _NotificationSettingsScreenState
                         subtitle: const Text(
                           'Verify notifications are working on this device.',
                         ),
-                        trailing:
-                            const Icon(Icons.chevron_right_rounded),
+                        trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: _sendTestNotification,
                       ),
                     ],
@@ -443,14 +432,10 @@ class _NotificationSettingsScreenState
                     padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
                       color:
-                          Theme.of(context).cardTheme.color ??
-                          colors.surface,
-                      borderRadius:
-                          BorderRadius.circular(AppRadius.card),
+                          Theme.of(context).cardTheme.color ?? colors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
                       border: Border.all(
-                        color: colors.outlineVariant.withValues(
-                          alpha: 0.60,
-                        ),
+                        color: colors.outlineVariant.withValues(alpha: 0.60),
                       ),
                     ),
                     child: Row(
@@ -483,9 +468,7 @@ class _NotificationSettingsScreenState
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({
-    required this.children,
-  });
+  const _NotificationCard({required this.children});
 
   final List<Widget> children;
 
@@ -496,9 +479,7 @@ class _NotificationCard extends StatelessWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color:
-            Theme.of(context).cardTheme.color ??
-            colors.surface,
+        color: Theme.of(context).cardTheme.color ?? colors.surface,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(
           color: colors.outlineVariant.withValues(alpha: 0.60),

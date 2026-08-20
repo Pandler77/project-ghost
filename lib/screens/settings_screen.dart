@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/app_theme_mode.dart';
 import '../models/display_preferences.dart';
@@ -17,7 +18,6 @@ import 'premium_screen.dart';
 import 'privacy_screen.dart';
 import 'terms_of_use_screen.dart';
 import 'tracking_preferences_screen.dart';
-import '../theme/arctic_icons.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -43,6 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final AppDataService _dataService = AppDataService();
 
   TrackingPreferences _trackingPreferences = TrackingPreferences.defaults;
+
   DisplayPreferences _displayPreferences = const DisplayPreferences();
 
   late MeasurementSystem _measurementSystem;
@@ -51,6 +52,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoadingDisplayPreferences = true;
   bool _isLoadingMeasurementSystem = true;
   bool _isResettingAppData = false;
+
   bool _celebrationsEnabled = true;
   bool _isLoadingCelebrations = true;
   bool _isSavingCelebrations = false;
@@ -279,7 +281,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: AppSpacing.xs),
+
                 Text(
                   'Choose how measurements are displayed throughout ArcticDose.',
                   style: TextStyle(
@@ -287,21 +291,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
+
                 const SizedBox(height: AppSpacing.md),
+
                 _MeasurementOption(
                   title: 'Imperial',
                   subtitle: 'Weight in lb • Height in ft / in',
-                  icon: ArcticIcons.square_foot_outlined,
+                  icon: LucideIcons.ruler,
                   selected: _measurementSystem == MeasurementSystem.imperial,
                   onTap: () {
                     Navigator.pop(sheetContext, MeasurementSystem.imperial);
                   },
                 ),
+
                 const SizedBox(height: AppSpacing.sm),
+
                 _MeasurementOption(
                   title: 'Metric',
                   subtitle: 'Weight in kg • Height in cm',
-                  icon: ArcticIcons.straighten_outlined,
+                  icon: LucideIcons.ruler,
                   selected: _measurementSystem == MeasurementSystem.metric,
                   onTap: () {
                     Navigator.pop(sheetContext, MeasurementSystem.metric);
@@ -369,7 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (dialogContext) {
         return AlertDialog(
           icon: Icon(
-            ArcticIcons.warning_amber_rounded,
+            LucideIcons.triangleAlert,
             color: Theme.of(dialogContext).colorScheme.error,
           ),
           title: const Text('Reset all ArcticDose data?'),
@@ -424,7 +432,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'This is the final confirmation. All local ArcticDose data '
                     'will be erased.',
                   ),
+
                   const SizedBox(height: AppSpacing.md),
+
                   TextField(
                     autofocus: true,
                     textCapitalization: TextCapitalization.characters,
@@ -434,7 +444,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     onChanged: (value) {
                       confirmationText = value;
-
                       setDialogState(() {});
                     },
                   ),
@@ -640,6 +649,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.2),
         ),
       ),
+
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
@@ -671,7 +681,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _SettingsCard(
               children: [
                 _SettingsTile(
-                  icon: ArcticIcons.palette_outlined,
+                  icon: LucideIcons.palette,
                   title: 'Appearance',
                   subtitle: switch (widget.themeMode) {
                     AppThemeMode.system => 'System appearance',
@@ -702,7 +712,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
+
                               const SizedBox(height: AppSpacing.xs),
+
                               Text(
                                 'Choose how ArcticDose appears on this device.',
                                 style: TextStyle(
@@ -712,9 +724,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
+
                               const SizedBox(height: AppSpacing.md),
+
                               _ThemeOption(
-                                icon: ArcticIcons.brightness_auto_outlined,
+                                icon: LucideIcons.monitorCog,
                                 title: 'System',
                                 subtitle: 'Follow your device appearance.',
                                 selected:
@@ -723,29 +737,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   widget.onThemeModeChanged(
                                     AppThemeMode.system,
                                   );
+
                                   Navigator.pop(sheetContext);
                                 },
                               ),
+
                               const SizedBox(height: AppSpacing.sm),
+
                               _ThemeOption(
-                                icon: ArcticIcons.light_mode_outlined,
+                                icon: LucideIcons.sun,
                                 title: 'Light',
                                 subtitle: 'Always use light appearance.',
                                 selected:
                                     widget.themeMode == AppThemeMode.light,
                                 onTap: () {
                                   widget.onThemeModeChanged(AppThemeMode.light);
+
                                   Navigator.pop(sheetContext);
                                 },
                               ),
+
                               const SizedBox(height: AppSpacing.sm),
+
                               _ThemeOption(
-                                icon: ArcticIcons.dark_mode_outlined,
+                                icon: LucideIcons.moon,
                                 title: 'Dark',
                                 subtitle: 'Always use dark appearance.',
                                 selected: widget.themeMode == AppThemeMode.dark,
                                 onTap: () {
                                   widget.onThemeModeChanged(AppThemeMode.dark);
+
                                   Navigator.pop(sheetContext);
                                 },
                               ),
@@ -760,7 +781,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 _SettingsTile(
-                  icon: ArcticIcons.straighten_outlined,
+                  icon: LucideIcons.ruler,
                   title: 'Units & Measurements',
                   subtitle: _isLoadingMeasurementSystem
                       ? 'Loading preferences...'
@@ -775,7 +796,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 _SettingsTile(
-                  icon: ArcticIcons.adjust_outlined,
+                  icon: LucideIcons.slidersHorizontal,
                   title: 'Tracking Preferences',
                   subtitle: _isLoadingTrackingPreferences
                       ? 'Loading preferences...'
@@ -789,7 +810,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 _SettingsTile(
-                  icon: ArcticIcons.visibility_outlined,
+                  icon: LucideIcons.eye,
                   title: 'Display Preferences',
                   subtitle: _isLoadingDisplayPreferences
                       ? 'Loading preferences...'
@@ -803,7 +824,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 _SettingsSwitchTile(
-                  icon: ArcticIcons.celebration_outlined,
+                  icon: LucideIcons.partyPopper,
                   title: 'Celebrations',
                   subtitle: 'Celebrate weight goals and dose-count milestones.',
                   value: _celebrationsEnabled,
@@ -827,7 +848,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _SettingsCard(
               children: [
                 _SettingsTile(
-                  icon: ArcticIcons.notifications_none_rounded,
+                  icon: LucideIcons.bell,
                   title: 'Notification Settings',
                   subtitle: 'Protocol reminders and missed-dose follow-ups.',
                   onTap: _openNotificationSettings,
@@ -847,7 +868,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _SettingsCard(
               children: [
                 const _ComingSoonTile(
-                  icon: ArcticIcons.file_download_outlined,
+                  icon: LucideIcons.download,
                   title: 'Export Data',
                   subtitle: 'Export a copy of your ArcticDose data.',
                 ),
@@ -855,7 +876,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 const _ComingSoonTile(
-                  icon: ArcticIcons.cloud_outlined,
+                  icon: LucideIcons.cloud,
                   title: 'Backup & Restore',
                   subtitle: 'Protect and restore your ArcticDose data.',
                 ),
@@ -863,7 +884,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 _SettingsTile(
-                  icon: ArcticIcons.privacy_tip_outlined,
+                  icon: LucideIcons.shieldCheck,
                   title: 'Privacy',
                   subtitle: 'Review how ArcticDose stores and uses your data.',
                   onTap: _openPrivacy,
@@ -872,7 +893,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 _SettingsTile(
-                  icon: ArcticIcons.delete_sweep_outlined,
+                  icon: LucideIcons.trash2,
                   title: 'Reset App Data',
                   subtitle: _isResettingAppData
                       ? 'Resetting ArcticDose...'
@@ -896,7 +917,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _SettingsCard(
               children: [
                 _SettingsTile(
-                  icon: ArcticIcons.workspace_premium_outlined,
+                  icon: LucideIcons.crown,
                   title: _hasPremium
                       ? 'ArcticDose Premium'
                       : 'Upgrade to Premium',
@@ -909,7 +930,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 const _ComingSoonTile(
-                  icon: ArcticIcons.restore_outlined,
+                  icon: LucideIcons.refreshCcw,
                   title: 'Restore Purchases',
                   subtitle:
                       'Restore a previous App Store or Play Store purchase.',
@@ -929,7 +950,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _SettingsCard(
               children: [
                 const _ComingSoonTile(
-                  icon: ArcticIcons.bug_report_outlined,
+                  icon: LucideIcons.bug,
                   title: 'Report a Bug',
                   subtitle: 'Send feedback when something is not working.',
                 ),
@@ -937,7 +958,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 const _ComingSoonTile(
-                  icon: ArcticIcons.support_agent_outlined,
+                  icon: LucideIcons.circleHelp,
                   title: 'Support',
                   subtitle: 'Get help with ArcticDose.',
                 ),
@@ -945,7 +966,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 _SettingsTile(
-                  icon: ArcticIcons.description_outlined,
+                  icon: LucideIcons.fileText,
                   title: 'Terms of Use',
                   subtitle: 'Review ArcticDose terms and conditions.',
                   onTap: _openTermsOfUse,
@@ -954,7 +975,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const _SettingsDivider(),
 
                 _SettingsTile(
-                  icon: ArcticIcons.info_outline,
+                  icon: LucideIcons.info,
                   title: 'About ArcticDose',
                   subtitle: 'Version, licenses, and application information.',
                   onTap: _openAboutArcticDose,
@@ -976,7 +997,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsCard(
                 children: [
                   _SettingsTile(
-                    icon: ArcticIcons.notifications_active_outlined,
+                    icon: LucideIcons.bellRing,
                     title: 'Test Notification',
                     subtitle: 'Send a local test notification.',
                     onTap: _testNotification,
@@ -985,7 +1006,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const _SettingsDivider(),
 
                   _SettingsTile(
-                    icon: Icons.restart_alt_outlined,
+                    icon: LucideIcons.refreshCcw,
                     title: 'Reset Onboarding',
                     subtitle: 'Allow the onboarding flow to run again.',
                     onTap: _resetOnboarding,
@@ -994,7 +1015,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const _SettingsDivider(),
 
                   _SettingsTile(
-                    icon: ArcticIcons.inventory_2_outlined,
+                    icon: LucideIcons.package,
                     title: 'Reset ArcticDose Supply Beta Notice',
                     subtitle:
                         'Allow the ArcticDose Supply beta notice to appear again.',
@@ -1019,6 +1040,7 @@ class _PremiumCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+
     final brightness = Theme.of(context).brightness;
 
     final cardStart = brightness == Brightness.dark
@@ -1084,10 +1106,8 @@ class _PremiumCard extends StatelessWidget {
                   ),
                 ),
                 child: Icon(
-                  hasPremium
-                      ? ArcticIcons.workspace_premium_rounded
-                      : ArcticIcons.lock_outline_rounded,
-                  size: 34,
+                  hasPremium ? LucideIcons.crown : LucideIcons.lock,
+                  size: 32,
                   color: hasPremium ? gold : colors.primary,
                 ),
               ),
@@ -1239,6 +1259,7 @@ class _SettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+
     final baseColor = Theme.of(context).cardTheme.color ?? colors.surface;
 
     return Material(
@@ -1275,7 +1296,6 @@ class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-
   final VoidCallback? onTap;
   final bool isLoading;
   final bool destructive;
@@ -1380,21 +1400,21 @@ class _ComingSoonTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    final foreground = colors.onSurface;
-
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: 6,
       ),
       leading: _SettingsIcon(icon: icon),
-
       title: Row(
         children: [
           Expanded(
             child: Text(
               title,
-              style: TextStyle(fontWeight: FontWeight.w800, color: foreground),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: colors.onSurface,
+              ),
             ),
           ),
 
@@ -1574,7 +1594,9 @@ class _MeasurementOption extends StatelessWidget {
                       title,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
+
                     const SizedBox(height: 2),
+
                     Text(
                       subtitle,
                       style: TextStyle(

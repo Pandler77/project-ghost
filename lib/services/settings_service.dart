@@ -24,8 +24,7 @@ class SettingsService {
   static const String _photoFrequencyKey = 'photo_frequency';
 
   static const String _displayPreferencesKey = 'display_preferences';
-  static const String _notificationPreferencesKey =
-      'notification_preferences';
+  static const String _notificationPreferencesKey = 'notification_preferences';
 
   static const String _ghostSupplyBetaDismissedKey =
       'ghost_supply_beta_dismissed';
@@ -149,9 +148,7 @@ class SettingsService {
     );
   }
 
-  Future<void> saveTrackingPreferences(
-    TrackingPreferences preferences,
-  ) async {
+  Future<void> saveTrackingPreferences(TrackingPreferences preferences) async {
     await Future.wait([
       _preferences.setBool(_trackWeightKey, preferences.trackWeight),
       _preferences.setBool(_trackPhotosKey, preferences.trackPhotos),
@@ -185,9 +182,7 @@ class SettingsService {
   // ------------------------
 
   Future<DisplayPreferences> getDisplayPreferences() async {
-    final savedValue = await _preferences.getString(
-      _displayPreferencesKey,
-    );
+    final savedValue = await _preferences.getString(_displayPreferencesKey);
 
     if (savedValue == null || savedValue.trim().isEmpty) {
       return const DisplayPreferences();
@@ -200,9 +195,7 @@ class SettingsService {
         return const DisplayPreferences();
       }
 
-      return DisplayPreferences.fromMap(
-        Map<String, Object?>.from(decoded),
-      );
+      return DisplayPreferences.fromMap(Map<String, Object?>.from(decoded));
     } catch (_) {
       return const DisplayPreferences();
     }
@@ -230,21 +223,36 @@ class SettingsService {
     );
 
     if (savedValue == null || savedValue.trim().isEmpty) {
-      return const NotificationPreferences();
+      return const NotificationPreferences(
+        notificationsEnabled: true,
+        protocolRemindersEnabled: true,
+        missedDoseFollowUpsEnabled: true,
+        customNotificationTextEnabled: true,
+      );
     }
 
     try {
       final decoded = jsonDecode(savedValue);
 
       if (decoded is! Map<String, dynamic>) {
-        return const NotificationPreferences();
+        return const NotificationPreferences(
+          notificationsEnabled: true,
+          protocolRemindersEnabled: true,
+          missedDoseFollowUpsEnabled: true,
+          customNotificationTextEnabled: true,
+        );
       }
 
       return NotificationPreferences.fromMap(
         Map<String, Object?>.from(decoded),
       );
     } catch (_) {
-      return const NotificationPreferences();
+      return const NotificationPreferences(
+        notificationsEnabled: true,
+        protocolRemindersEnabled: true,
+        missedDoseFollowUpsEnabled: true,
+        customNotificationTextEnabled: true,
+      );
     }
   }
 
@@ -253,16 +261,12 @@ class SettingsService {
   ) async {
     final encoded = jsonEncode(notificationPreferences.toMap());
 
-    await _preferences.setString(
-      _notificationPreferencesKey,
-      encoded,
-    );
+    await _preferences.setString(_notificationPreferencesKey, encoded);
   }
 
   Future<void> resetNotificationPreferences() async {
     await _preferences.remove(_notificationPreferencesKey);
   }
-
 
   // ------------------------
   // Milestones & celebrations
@@ -300,15 +304,11 @@ class SettingsService {
     final existing = <String>{
       ...((all[profileId] as List?)?.whereType<String>() ?? const <String>[]),
       ...milestoneIds,
-    }.toList()
-      ..sort();
+    }.toList()..sort();
 
     all[profileId] = existing;
 
-    await _preferences.setString(
-      _awardedMilestonesKey,
-      jsonEncode(all),
-    );
+    await _preferences.setString(_awardedMilestonesKey, jsonEncode(all));
   }
 
   Future<void> enqueueMilestone(MilestoneAchievement achievement) async {
@@ -316,8 +316,7 @@ class SettingsService {
 
     final duplicate = pending.any(
       (item) =>
-          item.profileId == achievement.profileId &&
-          item.id == achievement.id,
+          item.profileId == achievement.profileId && item.id == achievement.id,
     );
 
     if (duplicate) {
@@ -328,20 +327,14 @@ class SettingsService {
 
     await _preferences.setString(
       _pendingMilestonesKey,
-      jsonEncode(
-        pending.map((item) => item.toMap()).toList(),
-      ),
+      jsonEncode(pending.map((item) => item.toMap()).toList()),
     );
   }
 
-  Future<MilestoneAchievement?> takePendingMilestone(
-    String profileId,
-  ) async {
+  Future<MilestoneAchievement?> takePendingMilestone(String profileId) async {
     final pending = await _readPendingMilestones();
 
-    final index = pending.indexWhere(
-      (item) => item.profileId == profileId,
-    );
+    final index = pending.indexWhere((item) => item.profileId == profileId);
 
     if (index == -1) {
       return null;
@@ -351,9 +344,7 @@ class SettingsService {
 
     await _preferences.setString(
       _pendingMilestonesKey,
-      jsonEncode(
-        pending.map((item) => item.toMap()).toList(),
-      ),
+      jsonEncode(pending.map((item) => item.toMap()).toList()),
     );
 
     return achievement;
@@ -396,9 +387,8 @@ class SettingsService {
       return decoded
           .whereType<Map>()
           .map(
-            (item) => MilestoneAchievement.fromMap(
-              Map<String, Object?>.from(item),
-            ),
+            (item) =>
+                MilestoneAchievement.fromMap(Map<String, Object?>.from(item)),
           )
           .toList();
     } catch (_) {
@@ -411,9 +401,7 @@ class SettingsService {
   // ------------------------
 
   Future<MeasurementSystem> getMeasurementSystem() async {
-    final savedValue = await _preferences.getString(
-      _measurementSystemKey,
-    );
+    final savedValue = await _preferences.getString(_measurementSystemKey);
 
     return switch (savedValue) {
       'metric' => MeasurementSystem.metric,
@@ -425,10 +413,7 @@ class SettingsService {
   Future<void> saveMeasurementSystem(
     MeasurementSystem measurementSystem,
   ) async {
-    await _preferences.setString(
-      _measurementSystemKey,
-      measurementSystem.name,
-    );
+    await _preferences.setString(_measurementSystemKey, measurementSystem.name);
   }
 
   Future<void> resetMeasurementSystem() async {
@@ -456,19 +441,11 @@ class SettingsService {
   // ------------------------
 
   Future<bool> getGhostSupplyBetaDismissed() async {
-    return await _preferences.getBool(
-          _ghostSupplyBetaDismissedKey,
-        ) ??
-        false;
+    return await _preferences.getBool(_ghostSupplyBetaDismissedKey) ?? false;
   }
 
-  Future<void> saveGhostSupplyBetaDismissed(
-    bool isDismissed,
-  ) async {
-    await _preferences.setBool(
-      _ghostSupplyBetaDismissedKey,
-      isDismissed,
-    );
+  Future<void> saveGhostSupplyBetaDismissed(bool isDismissed) async {
+    await _preferences.setBool(_ghostSupplyBetaDismissedKey, isDismissed);
   }
 
   Future<void> resetGhostSupplyBetaDismissed() async {

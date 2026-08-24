@@ -1,4 +1,4 @@
-package com.example.project_ghost
+package com.modose.app
 
 import io.flutter.embedding.android.FlutterActivity
 

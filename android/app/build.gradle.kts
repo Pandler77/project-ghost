@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.project_ghost"
+    namespace = "com.modose.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.project_ghost"
+        applicationId = "com.modose.app"
 
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion

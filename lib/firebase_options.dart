@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCaOWFtPwH0q1Q1IFurR5gTYlHg-Kl1RMM',
-    appId: '1:900413220859:android:595b5df7b0ac0e990c0d5e',
+    appId: '1:900413220859:android:122e9af549ec3ccc0c0d5e',
     messagingSenderId: '900413220859',
     projectId: 'modose',
     storageBucket: 'modose.firebasestorage.app',

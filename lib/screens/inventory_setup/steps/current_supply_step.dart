@@ -56,7 +56,7 @@ class CurrentSupplyStep extends StatelessWidget {
         StepHeader(
           title: 'Do you currently have one open?',
           subtitle:
-              'If you are already using a $name, tell ArcticDose where it came from.',
+              'If you are already using a $name, tell MODOSE where it came from.',
           currentStep: 3,
           totalSteps: 7,
         ),
@@ -89,7 +89,7 @@ class CurrentSupplyStep extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
 
           _SourceCard(
-            title: 'From existing ArcticDose Supply',
+            title: 'From existing MODOSE Supply',
             subtitle:
                 'The active $name came from inventory you already tracked.',
             icon: ArcticIcons.inventory_outlined,
@@ -230,15 +230,15 @@ class CurrentSupplyStep extends StatelessWidget {
         return '';
 
       case ActiveContainerSource.thisBatch:
-        return 'ArcticDose will count one of these ${_pluralize(name)} '
+        return 'MODOSE will count one of these ${_pluralize(name)} '
             'as the active $name and the rest as unopened inventory.';
 
       case ActiveContainerSource.existingBatch:
-        return 'ArcticDose will take one $name from the selected existing batch. '
+        return 'MODOSE will take one $name from the selected existing batch. '
             'All of the new inventory you are adding will remain unopened.';
 
       case ActiveContainerSource.separate:
-        return 'ArcticDose will keep all of this new inventory unopened and '
+        return 'MODOSE will keep all of this new inventory unopened and '
             'track the active $name separately.';
     }
   }
@@ -447,3 +447,4 @@ class _SourceCard extends StatelessWidget {
     );
   }
 }
+

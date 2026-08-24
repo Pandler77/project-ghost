@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
 
-import '../models/cycle_status.dart';
-import '../models/display_preferences.dart';
 import '../models/dose.dart';
+import '../models/dose_unit.dart';
+import '../models/protocol.dart';
 import '../theme/app_theme.dart';
-import '../theme/arctic_icons.dart';
 
 class TodayDosesCard extends StatefulWidget {
   const TodayDosesCard({
     required this.doses,
+    required this.protocols,
     required this.onDosePressed,
-    required this.displayPreferences,
     super.key,
   });
 
   final List<Dose> doses;
+  final List<Protocol> protocols;
   final Future<void> Function(Dose dose) onDosePressed;
-  final DisplayPreferences displayPreferences;
 
   @override
   State<TodayDosesCard> createState() => _TodayDosesCardState();
@@ -24,6 +23,16 @@ class TodayDosesCard extends StatefulWidget {
 
 class _TodayDosesCardState extends State<TodayDosesCard> {
   bool _showCompleted = false;
+
+  Protocol? _protocolForDose(Dose dose) {
+    for (final protocol in widget.protocols) {
+      if (protocol.id == dose.protocolId) {
+        return protocol;
+      }
+    }
+
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +61,7 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                   '${pendingDoses[index].scheduledFor.microsecondsSinceEpoch}',
                 ),
                 dose: pendingDoses[index],
-                displayPreferences: widget.displayPreferences,
+                protocol: _protocolForDose(pendingDoses[index]),
                 onPressed: () async {
                   await widget.onDosePressed(pendingDoses[index]);
                 },
@@ -60,10 +69,8 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
               if (index < pendingDoses.length - 1)
                 const SizedBox(height: AppSpacing.sm),
             ],
-
             if (resolvedDoses.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
-
               _CompletedHeader(
                 count: resolvedDoses.length,
                 isExpanded: _showCompleted,
@@ -73,7 +80,6 @@ class _TodayDosesCardState extends State<TodayDosesCard> {
                   });
                 },
               ),
-
               AnimatedCrossFade(
                 duration: const Duration(milliseconds: 250),
                 crossFadeState: _showCompleted
@@ -117,7 +123,9 @@ class _EmptyTodayState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Text(
         'Nothing is scheduled for today.',
-        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
@@ -126,14 +134,14 @@ class _EmptyTodayState extends StatelessWidget {
 class _PendingDoseRow extends StatefulWidget {
   const _PendingDoseRow({
     required this.dose,
+    required this.protocol,
     required this.onPressed,
-    required this.displayPreferences,
     super.key,
   });
 
   final Dose dose;
+  final Protocol? protocol;
   final Future<void> Function() onPressed;
-  final DisplayPreferences displayPreferences;
 
   @override
   State<_PendingDoseRow> createState() => _PendingDoseRowState();
@@ -162,21 +170,76 @@ class _PendingDoseRowState extends State<_PendingDoseRow> {
     }
   }
 
+  Widget _buildDetailLine(
+    BuildContext context,
+    Color protocolColor,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final protocol = widget.protocol;
+    final timeText = _formatTime(widget.dose.scheduledFor);
+    final drawText = protocol?.drawUnitsDisplay;
+
+    final baseStyle = TextStyle(
+      fontSize: AppTypography.caption,
+      fontWeight: FontWeight.w500,
+      color: colorScheme.onSurface,
+    );
+
+    if (drawText != null && drawText.trim().isNotEmpty) {
+      return Text.rich(
+        TextSpan(
+          style: baseStyle,
+          children: [
+            TextSpan(text: '${widget.dose.amount} • '),
+            TextSpan(
+              text: drawText,
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            TextSpan(text: ' • $timeText'),
+          ],
+        ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    final details = protocol?.doseDetails;
+
+    if (details != null && details.hasPhysicalDose) {
+      final quantity = _formatDoseNumber(details.scheduledQuantity!);
+      final strength = _formatDoseNumber(details.strengthAmount!);
+      final quantityUnit = details.quantityUnitLabel;
+      final displayUnit =
+          details.scheduledQuantity == 1 ||
+              quantityUnit == 'mL' ||
+              quantityUnit == 'g'
+          ? quantityUnit
+          : '${quantityUnit}s';
+
+      return Text(
+        '$quantity $displayUnit × $strength '
+        '${details.strengthUnit!.label} • $timeText',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: baseStyle,
+      );
+    }
+
+    return Text(
+      '${widget.dose.amount} • $timeText',
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: baseStyle,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final protocolColor = Color(widget.dose.protocolColorValue);
-    final cycleStatus = widget.dose.cycleStatus;
-
-    final cyclePrimary = _cyclePrimaryText(
-      cycleStatus,
-      widget.displayPreferences,
-    );
-
-    final cycleSecondary = _cycleSecondaryText(
-      cycleStatus,
-      widget.displayPreferences,
-    );
 
     return Container(
       width: double.infinity,
@@ -207,29 +270,25 @@ class _PendingDoseRowState extends State<_PendingDoseRow> {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  '${widget.dose.amount} • '
-                  '${_formatTime(widget.dose.scheduledFor)}',
-                  style: TextStyle(
-                    fontSize: AppTypography.caption,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
-                  ),
+                _buildDetailLine(
+                  context,
+                  protocolColor,
                 ),
-                if (cyclePrimary.isNotEmpty) ...[
+                if (widget.dose.hasCycleStatus) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Cycle: $cyclePrimary',
+                    'Cycle: ${widget.dose.cyclePrimaryLabel!}',
                     style: TextStyle(
                       fontSize: AppTypography.caption,
                       fontWeight: FontWeight.w700,
                       color: colorScheme.primary,
                     ),
                   ),
-                  if (cycleSecondary.isNotEmpty) ...[
+                  if (widget.dose.cycleSecondaryLabel?.trim().isNotEmpty ==
+                      true) ...[
                     const SizedBox(height: 2),
                     Text(
-                      cycleSecondary,
+                      widget.dose.cycleSecondaryLabel!,
                       style: TextStyle(
                         fontSize: AppTypography.caption,
                         fontWeight: FontWeight.w600,
@@ -252,34 +311,43 @@ class _PendingDoseRowState extends State<_PendingDoseRow> {
                     key: const ValueKey('dose-loading'),
                     width: 96,
                     height: 42,
-                    child: OutlinedButton(
+                    child: FilledButton(
                       onPressed: null,
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: protocolColor.withValues(alpha: 0.75),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: protocolColor.withValues(alpha: 0.82),
+                        disabledBackgroundColor:
+                            protocolColor.withValues(alpha: 0.42),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppRadius.button,
+                          ),
                         ),
                       ),
                       child: const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   )
-                : OutlinedButton(
+                : FilledButton(
                     key: const ValueKey('take-dose'),
                     onPressed: _markTaken,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colorScheme.onSurface,
-                      side: BorderSide(
-                        color: protocolColor.withValues(alpha: 0.75),
-                      ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: protocolColor,
+                      foregroundColor: Colors.white,
                       minimumSize: const Size(96, 42),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                      ),
                     ),
                     child: const Text(
                       'Take Dose',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                      style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
           ),
@@ -316,7 +384,9 @@ class _CompletedHeader extends StatelessWidget {
               ),
             ),
             Icon(
-              isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              isExpanded
+                  ? Icons.keyboard_arrow_up
+                  : Icons.keyboard_arrow_down,
             ),
           ],
         ),
@@ -341,11 +411,11 @@ class _CompletedDoseRow extends StatelessWidget {
 
     final completionText = dose.isSkipped
         ? dose.completedAt == null
-              ? 'Skipped'
-              : 'Skipped at ${_formatTime(dose.completedAt!)}'
+            ? 'Skipped'
+            : 'Skipped at ${_formatTime(dose.completedAt!)}'
         : dose.completedAt == null
-        ? 'Taken'
-        : 'Taken at ${_formatTime(dose.completedAt!)}';
+            ? 'Taken'
+            : 'Taken at ${_formatTime(dose.completedAt!)}';
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -363,7 +433,9 @@ class _CompletedDoseRow extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            dose.isSkipped ? Icons.remove_circle_outline : Icons.check_circle,
+            dose.isSkipped
+                ? Icons.remove_circle_outline
+                : Icons.check_circle,
             color: protocolColor,
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -379,42 +451,37 @@ class _CompletedDoseRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${dose.amount} • $completionText',
-                      style: TextStyle(
-                        fontSize: AppTypography.caption,
-                        color: colorScheme.onSurface,
+                Text(
+                  '${dose.amount} • $completionText',
+                  style: TextStyle(
+                    fontSize: AppTypography.caption,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                if (dose.hasInjectionSite) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: protocolColor,
                       ),
-                    ),
-                    if (dose.hasInjectionSite) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            ArcticIcons.location_on_outlined,
-                            size: 14,
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          dose.injectionSiteLabel!,
+                          style: TextStyle(
+                            fontSize: AppTypography.caption,
+                            fontWeight: FontWeight.w600,
                             color: protocolColor,
                           ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              dose.injectionSiteLabel!,
-                              style: TextStyle(
-                                fontSize: AppTypography.caption,
-                                fontWeight: FontWeight.w600,
-                                color: protocolColor,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
-                  ],
-                ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -430,140 +497,27 @@ class _CompletedDoseRow extends StatelessWidget {
   }
 }
 
-String _cyclePrimaryText(
-  CycleStatus? status,
-  DisplayPreferences preferences,
-) {
-  if (status == null || !status.isCycled || !preferences.showCycleStatus) {
-    return '';
-  }
-
-  if (status.isBeforeStart) {
-    return 'Starts soon';
-  }
-
-  if (status.phaseLabel == 'Cycle complete') {
-    return 'Cycle complete';
-  }
-
-  if (!status.isActive) {
-    return 'Off cycle';
-  }
-
-  final totalDays = status.totalDaysInCurrentPhase;
-  final currentDay = status.dayInCurrentPhase;
-
-  if (totalDays <= 0 || currentDay <= 0) {
-    return 'On cycle';
-  }
-
-  if (totalDays >= 7) {
-    final currentWeek = ((currentDay - 1) ~/ 7) + 1;
-    final totalWeeks = (totalDays / 7).ceil();
-    return 'Week $currentWeek of $totalWeeks';
-  }
-
-  return 'Day $currentDay of $totalDays';
-}
-
-String _cycleSecondaryText(
-  CycleStatus? status,
-  DisplayPreferences preferences,
-) {
-  if (status == null || !status.isCycled || !preferences.showCycleStatus) {
-    return '';
-  }
-
-  final parts = <String>[];
-
-  if (status.isBeforeStart) {
-    final startDate = status.nextTransitionDate;
-
-    if (startDate != null && preferences.showCycleResumeDate) {
-      parts.add('Starts ${_formatCycleDate(startDate)}');
-    }
-
-    if (preferences.showCycleRemainingDays) {
-      parts.add(_remainingCycleText(status.daysRemainingInCurrentPhase));
-    }
-
-    return parts.join(' • ');
-  }
-
-  if (status.phaseLabel == 'Cycle complete') {
-    return 'This cycle has ended';
-  }
-
-  if (status.isActive) {
-    final transitionDate = status.nextTransitionDate;
-
-    if (transitionDate != null && preferences.showCycleEndDate) {
-      final endDate = transitionDate.subtract(const Duration(days: 1));
-      parts.add('Ends ${_formatCycleDate(endDate)}');
-    }
-
-    if (preferences.showCycleRemainingDays) {
-      final remaining = status.daysRemainingInCurrentPhase;
-      parts.add(
-        remaining <= 0
-            ? 'Last active day'
-            : _remainingCycleText(remaining),
-      );
-    }
-
-    return parts.join(' • ');
-  }
-
-  final resumeDate = status.nextTransitionDate;
-
-  if (resumeDate != null && preferences.showCycleResumeDate) {
-    parts.add('Resumes ${_formatCycleDate(resumeDate)}');
-  }
-
-  if (preferences.showCycleRemainingDays) {
-    parts.add(_remainingCycleText(status.daysRemainingInCurrentPhase));
-  }
-
-  return parts.join(' • ');
-}
-
-String _remainingCycleText(int days) {
-  if (days <= 0) {
-    return 'Last Day';
-  }
-
-  return '$days ${days == 1 ? 'Day' : 'Days'} Remaining';
-}
-
-String _formatCycleDate(DateTime date) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-
-  return '${months[date.month - 1]} ${date.day}';
-}
-
 String _formatTime(DateTime time) {
   final hour = time.hour == 0
       ? 12
       : time.hour > 12
-      ? time.hour - 12
-      : time.hour;
+          ? time.hour - 12
+          : time.hour;
 
   final minute = time.minute.toString().padLeft(2, '0');
-
   final period = time.hour >= 12 ? 'PM' : 'AM';
 
   return '$hour:$minute $period';
+}
+
+
+String _formatDoseNumber(double value) {
+  if (value == value.roundToDouble()) {
+    return value.toInt().toString();
+  }
+
+  return value
+      .toStringAsFixed(3)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\.$'), '');
 }

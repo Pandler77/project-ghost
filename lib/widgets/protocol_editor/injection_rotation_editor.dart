@@ -56,7 +56,7 @@ class InjectionRotationEditor extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Choose how ArcticDose should rotate between enabled injection areas.',
+          'Choose how MODOSE should rotate between enabled injection areas.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: colorScheme.onSurfaceVariant,
@@ -327,3 +327,4 @@ class _RotationModeTile extends StatelessWidget {
     );
   }
 }
+

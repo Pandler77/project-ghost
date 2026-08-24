@@ -124,7 +124,7 @@ class _UnopenedStepState extends State<UnopenedStep> {
               Expanded(
                 child: Text(
                   'Count everything you own. If you bought a 10-$_singular kit, '
-                  'enter 10. ArcticDose will handle the active $_singular separately.',
+                  'enter 10. MODOSE will handle the active $_singular separately.',
                   style: TextStyle(
                     fontSize: AppTypography.caption,
                     color: colors.onSurfaceVariant,
@@ -254,7 +254,7 @@ class _UnopenedStepState extends State<UnopenedStep> {
                 child: Text(
                   quantity == 0
                       ? 'No $_plural are currently being added.'
-                      : 'You are adding $quantity $quantityLabel to ArcticDose Supply.',
+                      : 'You are adding $quantity $quantityLabel to MODOSE Supply.',
                   style: TextStyle(
                     fontSize: AppTypography.caption,
                     color: colors.onSurfaceVariant,
@@ -278,3 +278,4 @@ class _UnopenedStepState extends State<UnopenedStep> {
     return '${value}s';
   }
 }
+

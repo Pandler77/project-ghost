@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/tracking_preferences.dart';
 import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class TrackingPreferencesScreen extends StatefulWidget {
   const TrackingPreferencesScreen({
@@ -51,7 +52,7 @@ class _TrackingPreferencesScreenState extends State<TrackingPreferencesScreen> {
             const SizedBox(height: AppSpacing.sm),
             const Card(
               child: ListTile(
-                leading: Icon(ArcticIcons.medication_outlined),
+                leading: Icon(LucideIcons.syringe),
                 title: Text('Protocols'),
                 subtitle: Text('Core protocol and dose tracking.'),
                 trailing: Icon(Icons.check_circle),

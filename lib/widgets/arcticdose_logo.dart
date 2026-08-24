@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class ArcticDoseLogo extends StatelessWidget {
-  const ArcticDoseLogo({
+class MODOSELogo extends StatelessWidget {
+  const MODOSELogo({
     super.key,
     this.size = 72,
     this.borderRadius = 18,
@@ -24,3 +24,4 @@ class ArcticDoseLogo extends StatelessWidget {
     );
   }
 }
+

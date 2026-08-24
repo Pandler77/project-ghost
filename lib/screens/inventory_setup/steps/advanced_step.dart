@@ -169,7 +169,7 @@ class AdvancedStep extends StatelessWidget {
         if (hasOpenContainer) ...[
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'ArcticDose sets this automatically when inventory rollover opens a new container. You can correct it here.',
+            'MODOSE sets this automatically when inventory rollover opens a new container. You can correct it here.',
             style: TextStyle(
               fontSize: 12,
               color: colorScheme.onSurfaceVariant,
@@ -325,7 +325,7 @@ class AdvancedStep extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
 
         Text(
-          'You can edit these details from ArcticDose Supply at any time.',
+          'You can edit these details from MODOSE Supply at any time.',
           style: TextStyle(color: colorScheme.onSurfaceVariant),
         ),
       ],
@@ -413,3 +413,4 @@ class _DateCard extends StatelessWidget {
     );
   }
 }
+

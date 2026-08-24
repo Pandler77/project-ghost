@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models/cycle_unit.dart';
+import '../models/dose_details.dart';
+import '../models/dose_unit.dart';
 import '../models/protocol.dart';
 import '../models/protocol_status.dart';
 import '../models/schedule_type.dart';
@@ -12,6 +14,7 @@ import 'editors/edit_protocol_details_screen.dart';
 import 'editors/edit_reminder_screen.dart';
 import 'editors/edit_injection_rotation_screen.dart';
 import 'editors/edit_schedule_screen.dart';
+import 'advanced_dose_details_screen.dart';
 import '../theme/arctic_icons.dart';
 
 class EditProtocolScreen extends StatefulWidget {
@@ -44,6 +47,28 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
 
     setState(() {
       _draft = updated;
+    });
+  }
+
+  Future<void> _openAdvancedDoseEditor() async {
+    final details = await Navigator.push<DoseDetails>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdvancedDoseDetailsScreen(
+          protocolType: _draft.type,
+          scheduledDoseAmount: _draft.doseAmount,
+          scheduledDoseUnit: _draft.doseUnit,
+          initialDetails: _draft.doseDetails,
+        ),
+      ),
+    );
+
+    if (details == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _draft = _draft.copyWith(doseDetails: details);
     });
   }
 
@@ -96,6 +121,21 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
                   ),
 
                   const SizedBox(height: AppSpacing.sm),
+
+                  if (_draft.isInjection ||
+                      (_draft.doseDetails?.blendComponents.isNotEmpty ??
+                          false)) ...[
+                    _EditSectionTile(
+                      icon: ArcticIcons.calculate_outlined,
+                      title: _draft.isInjection
+                          ? 'Advanced Dose Details'
+                          : 'Composition',
+                      subtitle: _advancedDoseSummary(_draft),
+                      onTap: _openAdvancedDoseEditor,
+                    ),
+
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
 
                   _EditSectionTile(
                     icon: ArcticIcons.schedule_outlined,
@@ -193,6 +233,60 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
         ),
       ),
     );
+  }
+
+  String _advancedDoseSummary(Protocol protocol) {
+    final details = protocol.doseDetails;
+
+    if (details == null) {
+      return 'Not configured';
+    }
+
+    final parts = <String>[];
+
+    if (details.hasReconstitution) {
+      parts.add(
+        '${_formatAmount(details.vialAmount!)} ${details.vialUnit!.label} vial + '
+        '${_formatAmount(details.reconstitutionVolumeMl!)} mL',
+      );
+
+      final draw = details.drawUnits(
+        scheduledDoseAmount: protocol.doseAmount,
+        scheduledDoseUnit: protocol.doseUnit,
+      );
+
+      if (draw != null) {
+        parts.add('Draw ${_formatAmount(draw)} units');
+      }
+    }
+
+    if (details.hasOralStrength) {
+      final form = details.form?.label.toLowerCase() ?? 'item';
+
+      parts.add(
+        '${_formatAmount(details.scheduledQuantity!)} $form'
+        '${details.scheduledQuantity == 1 ? '' : 's'} • '
+        '${_formatAmount(details.strengthAmount!)} '
+        '${details.strengthUnit!.label} each',
+      );
+    }
+
+    if (details.blendComponents.isNotEmpty) {
+      parts.add('${details.blendComponents.length} blend components');
+    }
+
+    return parts.isEmpty ? 'Configured' : parts.join(' • ');
+  }
+
+  String _formatAmount(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+
+    return value
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   String _scheduleSummary(Protocol protocol) {

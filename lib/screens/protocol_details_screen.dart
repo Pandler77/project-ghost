@@ -8,6 +8,20 @@ import '../widgets/protocol_cycle_timeline_card.dart';
 import 'edit_protocol_screen.dart';
 import '../theme/arctic_icons.dart';
 
+enum ProtocolDetailsAction { updated, deleted }
+
+class ProtocolDetailsResult {
+  const ProtocolDetailsResult.updated(this.protocol)
+    : action = ProtocolDetailsAction.updated;
+
+  const ProtocolDetailsResult.deleted()
+    : action = ProtocolDetailsAction.deleted,
+      protocol = null;
+
+  final ProtocolDetailsAction action;
+  final Protocol? protocol;
+}
+
 class ProtocolDetailsScreen extends StatefulWidget {
   const ProtocolDetailsScreen({required this.protocol, super.key});
 
@@ -27,7 +41,7 @@ class _ProtocolDetailsScreenState extends State<ProtocolDetailsScreen> {
   }
 
   void _closeScreen() {
-    Navigator.pop(context, _protocol);
+    Navigator.pop(context, ProtocolDetailsResult.updated(_protocol));
   }
 
   Future<void> _openEditProtocol() async {
@@ -95,6 +109,43 @@ class _ProtocolDetailsScreenState extends State<ProtocolDetailsScreen> {
     });
   }
 
+  Future<void> _deleteProtocol() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Protocol?'),
+          content: const Text(
+            'This will remove the protocol from MODOSE and cancel its reminders. '
+            'Logged dose and injection history will remain available. '
+            'Any linked MODOSE Supply tracking will be removed. '
+            'This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    Navigator.pop(context, const ProtocolDetailsResult.deleted());
+  }
+
   void _restoreProtocol() {
     setState(() {
       _protocol = _protocol.copyWith(status: ProtocolStatus.paused);
@@ -160,6 +211,7 @@ class _ProtocolDetailsScreenState extends State<ProtocolDetailsScreen> {
                 onPauseResume: _togglePauseResume,
                 onArchive: _archiveProtocol,
                 onRestore: _restoreProtocol,
+                onDelete: _deleteProtocol,
               ),
             ],
           ),
@@ -562,12 +614,14 @@ class _ProtocolControlsCard extends StatelessWidget {
     required this.onPauseResume,
     required this.onArchive,
     required this.onRestore,
+    required this.onDelete,
   });
 
   final ProtocolStatus status;
   final VoidCallback onPauseResume;
   final VoidCallback onArchive;
   final VoidCallback onRestore;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -627,6 +681,27 @@ class _ProtocolControlsCard extends StatelessWidget {
                 onPressed: onArchive,
                 icon: const Icon(ArcticIcons.archive_outlined),
                 label: const Text('Archive Protocol'),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            Divider(
+              height: 1,
+              color: colors.outlineVariant.withValues(alpha: 0.65),
+            ),
+
+            const SizedBox(height: AppSpacing.md),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Delete Protocol'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colors.error,
+                  side: BorderSide(color: colors.error.withValues(alpha: 0.55)),
+                ),
               ),
             ),
           ],

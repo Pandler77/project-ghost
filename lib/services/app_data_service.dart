@@ -1,6 +1,7 @@
 import '../core/repository/ghost_repository.dart';
 import '../core/repository/injection_log_repository.dart';
 import '../models/dose_record.dart';
+import '../models/dose_details.dart';
 import '../models/injection_log.dart';
 import '../models/inventory_item.dart';
 import '../models/protocol.dart';
@@ -17,6 +18,7 @@ import '../models/inventory_batch.dart';
 import 'protocol_schedule_service.dart';
 import 'profile_service.dart';
 import 'milestone_service.dart';
+import '../models/protocol_type.dart';
 
 class AppDataService {
   AppDataService({
@@ -153,6 +155,11 @@ class AppDataService {
       profileId: profile.id,
     );
 
+    // Supply belongs to the active protocol configuration, not its historical
+    // dose records. Remove linked supply before hiding the protocol.
+    await _repository.deleteInventoryForProtocol(protocolId);
+
+    // Repository uses a soft delete so logged dose/injection history remains.
     await _repository.deleteProtocol(protocolId);
   }
 
@@ -175,46 +182,49 @@ class AppDataService {
   Future<void> saveDoseRecord(
     DoseRecord record, {
     String? preferredInventoryBatchId,
+    bool adjustInventory = true,
   }) async {
     final beforeDoseRecords = await _repository.getAllDoseRecords();
 
+    final persistedRecord = await _withProtocolSnapshot(record);
+
     final existingRecord = await _findDoseRecord(
-      protocolId: record.protocolId,
-      scheduledFor: record.scheduledFor,
+      protocolId: persistedRecord.protocolId,
+      scheduledFor: persistedRecord.scheduledFor,
     );
 
-    final previousAmount = _inventoryAmountForRecord(existingRecord);
-    final newAmount = _inventoryAmountForRecord(record);
+    final previousAmount = await _inventoryAmountForRecord(existingRecord);
+    final newAmount = await _inventoryAmountForRecord(persistedRecord);
     final difference = newAmount - previousAmount;
 
-    if (hasPremium && difference > 0) {
+    if (adjustInventory && hasPremium && difference > 0) {
       final inventoryUpdated = await _deductInventory(
-        protocolId: record.protocolId,
+        protocolId: persistedRecord.protocolId,
         amount: difference,
         preferredBatchId: preferredInventoryBatchId,
       );
 
       if (!inventoryUpdated) {
         throw StateError(
-          'ArcticDose Supply could not complete the inventory deduction.',
+          'MODOSE Supply could not complete the inventory deduction.',
         );
       }
-    } else if (hasPremium && difference < 0) {
+    } else if (adjustInventory && hasPremium && difference < 0) {
       await _restoreInventory(
-        protocolId: record.protocolId,
+        protocolId: persistedRecord.protocolId,
         amount: difference.abs(),
       );
     }
 
-    await _repository.saveDoseRecord(record);
+    await _repository.saveDoseRecord(persistedRecord);
 
-    if (record.completedAt != null) {
+    if (persistedRecord.completedAt != null) {
       final profile = await _profileService.getActiveProfile();
 
       await _notificationService.cancelFollowUpReminder(
         profileId: profile.id,
-        protocolId: record.protocolId,
-        scheduledDoseTime: record.scheduledFor,
+        protocolId: persistedRecord.protocolId,
+        scheduledDoseTime: persistedRecord.scheduledFor,
       );
     }
 
@@ -228,6 +238,39 @@ class AppDataService {
     );
   }
 
+  Future<DoseRecord> _withProtocolSnapshot(DoseRecord record) async {
+    final alreadyComplete =
+        record.protocolNameSnapshot != null &&
+        record.protocolTypeSnapshot != null &&
+        record.protocolColorValueSnapshot != null;
+
+    if (alreadyComplete) {
+      return record;
+    }
+
+    final protocols = await _repository.getProtocols();
+
+    Protocol? protocol;
+
+    for (final candidate in protocols) {
+      if (candidate.id == record.protocolId) {
+        protocol = candidate;
+        break;
+      }
+    }
+
+    if (protocol == null) {
+      return record;
+    }
+
+    return record.copyWithSnapshot(
+      protocolNameSnapshot: protocol.name,
+      protocolTypeSnapshot: protocol.type.storageValue,
+      protocolColorValueSnapshot: protocol.colorValue,
+      advancedDoseJsonSnapshot: protocol.doseDetails?.toJson(),
+    );
+  }
+
   Future<void> deleteDoseRecord({
     required String protocolId,
     required DateTime scheduledFor,
@@ -238,7 +281,7 @@ class AppDataService {
     );
 
     if (hasPremium) {
-      final amountToRestore = _inventoryAmountForRecord(existingRecord);
+      final amountToRestore = await _inventoryAmountForRecord(existingRecord);
 
       if (amountToRestore > 0) {
         await _restoreInventory(
@@ -270,14 +313,100 @@ class AppDataService {
     return null;
   }
 
-  double _inventoryAmountForRecord(DoseRecord? record) {
+  Future<double> _inventoryAmountForRecord(DoseRecord? record) async {
     if (record == null ||
         record.status != DoseRecordStatus.taken ||
         record.completedAt == null) {
       return 0;
     }
 
-    return _parseDoseAmount(record.actualAmount ?? record.scheduledAmount) ?? 0;
+    final actualActiveAmount =
+        _parseDoseAmount(record.actualAmount ?? record.scheduledAmount);
+
+    if (actualActiveAmount == null || actualActiveAmount <= 0) {
+      return 0;
+    }
+
+    final inventory = await _repository.getInventoryItemForProtocol(
+      record.protocolId,
+    );
+
+    if (inventory == null) {
+      return actualActiveAmount;
+    }
+
+    if (!_isPhysicalInventoryUnit(inventory.unit)) {
+      return actualActiveAmount;
+    }
+
+    // If the recorded dose itself is already count-based, use it directly.
+    if (_doseTextUsesPhysicalUnit(
+      record.actualAmount ?? record.scheduledAmount,
+    )) {
+      return actualActiveAmount;
+    }
+
+    DoseDetails? details = DoseDetails.fromJson(
+      record.advancedDoseJsonSnapshot,
+    );
+
+    if (details == null) {
+      final protocols = await _repository.getProtocols();
+
+      for (final protocol in protocols) {
+        if (protocol.id == record.protocolId) {
+          details = protocol.doseDetails;
+          break;
+        }
+      }
+    }
+
+    final scheduledQuantity = details?.scheduledQuantity;
+
+    if (scheduledQuantity == null || scheduledQuantity <= 0) {
+      // Avoid interpreting an active-ingredient dose such as 1000 mg
+      // as 1000 tablets/capsules when count metadata is unavailable.
+      return 0;
+    }
+
+    final scheduledActiveAmount = _parseDoseAmount(record.scheduledAmount);
+
+    if (scheduledActiveAmount == null || scheduledActiveAmount <= 0) {
+      return scheduledQuantity;
+    }
+
+    final ratio = actualActiveAmount / scheduledActiveAmount;
+
+    return _normalizeAmount(scheduledQuantity * ratio);
+  }
+
+  bool _isPhysicalInventoryUnit(String unit) {
+    final normalized = unit.trim().toLowerCase();
+
+    return const {
+      'tablet',
+      'tablets',
+      'capsule',
+      'capsules',
+      'pill',
+      'pills',
+      'softgel',
+      'softgels',
+      'patch',
+      'patches',
+      'drop',
+      'drops',
+      'serving',
+      'servings',
+    }.contains(normalized);
+  }
+
+  bool _doseTextUsesPhysicalUnit(String value) {
+    final normalized = value.trim().toLowerCase();
+
+    return RegExp(
+      r'\b(tablets?|capsules?|pills?|softgels?|patches?|drops?|servings?)\b',
+    ).hasMatch(normalized);
   }
 
   double? _parseDoseAmount(String value) {
@@ -988,3 +1117,4 @@ class AppDataService {
     return (await getUnopenedContainerCount(inventoryItemId)) > 0;
   }
 }
+

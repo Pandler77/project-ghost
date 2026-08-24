@@ -114,7 +114,7 @@ class MilestoneService {
           profileId: profile.id,
           kind: MilestoneKind.goalWeight,
           title: 'Goal reached!',
-          message: 'You reached the goal weight you set in ArcticDose.',
+          message: 'You reached the goal weight you set in MODOSE.',
           achievedAt: DateTime.now(),
         ),
       );
@@ -232,7 +232,7 @@ class MilestoneService {
         kind: MilestoneKind.doseCount,
         title: '$crossedMilestone doses logged!',
         message:
-            'ArcticDose has tracked $crossedMilestone completed doses with you.',
+            'MODOSE has tracked $crossedMilestone completed doses with you.',
         achievedAt: DateTime.now(),
       ),
     );
@@ -311,3 +311,4 @@ class MilestoneService {
     return '${kilograms.toStringAsFixed(1)} kg';
   }
 }
+

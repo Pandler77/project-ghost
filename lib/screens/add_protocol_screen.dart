@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models/cycle_unit.dart';
+import '../models/dose_details.dart';
+import '../models/dose_unit.dart';
 import '../models/injection_site.dart';
 import '../models/protocol.dart';
 import '../models/protocol_category.dart';
@@ -16,6 +18,7 @@ import '../widgets/ios_time_picker.dart';
 import '../widgets/protocol_editor/protocol_editor.dart';
 import '../widgets/wizard_step_indicator.dart';
 import 'calculator_hub_screen.dart';
+import 'advanced_dose_details_screen.dart';
 import '../theme/arctic_icons.dart';
 
 enum ScheduleOption { daily, weekly, everyXDays, specificDays, monthly }
@@ -37,12 +40,21 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
   final TextEditingController _customUnitController = TextEditingController();
 
+  final TextEditingController _strengthController = TextEditingController();
+
+  final TextEditingController _quantityController = TextEditingController(
+    text: '1',
+  );
+
+  DoseForm _physicalDoseForm = DoseForm.tablet;
+  DoseUnit _physicalStrengthUnit = DoseUnit.mg;
+
   final TextEditingController _intervalDaysController = TextEditingController();
 
-  final TextEditingController _customReminderTitleController =
+  final TextEditingController _customReminderBodyController =
       TextEditingController();
 
-  final TextEditingController _customReminderBodyController =
+  final TextEditingController _customFollowUpBodyController =
       TextEditingController();
 
   final TextEditingController _cycleOnDurationController =
@@ -51,7 +63,33 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   final TextEditingController _cycleOffDurationController =
       TextEditingController(text: '4');
 
-  static const List<String> _commonUnits = [
+  static const List<String> _injectionUnits = [
+    'mg',
+    'mcg',
+    'g',
+    'IU',
+    'mL',
+    'units',
+  ];
+
+  static const List<String> _oralUnits = [
+    'tablet',
+    'capsule',
+    'pill',
+    'mg',
+    'mcg',
+    'g',
+    'mL',
+    'serving',
+  ];
+
+  static const List<String> _topicalUnits = ['mg', 'g', 'mL', 'patch'];
+
+  static const List<String> _nasalUnits = ['spray', 'drop', 'mg', 'mcg'];
+
+  static const List<String> _sublingualUnits = ['drop', 'mg', 'mcg', 'mL'];
+
+  static const List<String> _otherUnits = [
     'mg',
     'mcg',
     'g',
@@ -60,10 +98,24 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     'units',
     'tablet',
     'capsule',
+    'pill',
+    'spray',
     'drop',
     'patch',
     'serving',
   ];
+
+  List<String> get _availableUnits {
+    return switch (_selectedProtocolType) {
+      ProtocolType.injection => _injectionUnits,
+      ProtocolType.oral => _oralUnits,
+      ProtocolType.topical => _topicalUnits,
+      ProtocolType.nasal => _nasalUnits,
+      ProtocolType.sublingual => _sublingualUnits,
+      ProtocolType.other => _otherUnits,
+      null => _otherUnits,
+    };
+  }
 
   int _currentStep = 0;
 
@@ -73,6 +125,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
   String? _selectedUnit;
   bool _useCustomUnit = false;
+  DoseDetails? _advancedDoseDetails;
 
   ScheduleOption? _selectedSchedule;
   int? _selectedWeeklyDay;
@@ -83,6 +136,10 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   TimeOfDay _selectedTime = const TimeOfDay(hour: 20, minute: 0);
 
   DateTime _selectedStartDate = DateTime.now();
+  DateTime _displayedStartMonth = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+  );
   int _selectedColorValue = Protocol.defaultColorValue;
 
   bool _useCyclesSelected = false;
@@ -111,8 +168,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   }
 
   Future<void> _loadNotificationPreferences() async {
-    final preferences =
-        await _settingsService.getNotificationPreferences();
+    final preferences = await _settingsService.getNotificationPreferences();
 
     if (!mounted) {
       return;
@@ -129,9 +185,11 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     _nameController.dispose();
     _doseController.dispose();
     _customUnitController.dispose();
+    _strengthController.dispose();
+    _quantityController.dispose();
     _intervalDaysController.dispose();
-    _customReminderTitleController.dispose();
     _customReminderBodyController.dispose();
+    _customFollowUpBodyController.dispose();
     _cycleOnDurationController.dispose();
     _cycleOffDurationController.dispose();
     super.dispose();
@@ -314,6 +372,8 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   }
 
   void _handleBack() {
+    FocusManager.instance.primaryFocus?.unfocus();
+
     if (_currentStep == 0) {
       Navigator.pop(context);
       return;
@@ -325,6 +385,8 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   }
 
   void _handleContinue() {
+    FocusManager.instance.primaryFocus?.unfocus();
+
     if (_currentStep < 9) {
       setState(() {
         _currentStep++;
@@ -350,6 +412,16 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         return _selectedProtocolType != null;
 
       case 3:
+        if (_usesPhysicalDoseEditor) {
+          final strength = double.tryParse(_strengthController.text.trim());
+          final quantity = double.tryParse(_quantityController.text.trim());
+
+          return strength != null &&
+              strength > 0 &&
+              quantity != null &&
+              quantity > 0;
+        }
+
         final dose = double.tryParse(_doseController.text.trim());
 
         return dose != null && dose > 0 && _currentUnit.isNotEmpty;
@@ -437,11 +509,181 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     return _selectedUnit?.trim() ?? '';
   }
 
+  bool get _usesPhysicalDoseEditor {
+    return switch (_selectedProtocolType) {
+      ProtocolType.oral ||
+      ProtocolType.topical ||
+      ProtocolType.nasal ||
+      ProtocolType.sublingual => true,
+      _ => false,
+    };
+  }
+
+  List<DoseForm> get _availablePhysicalForms {
+    return switch (_selectedProtocolType) {
+      ProtocolType.oral => const [
+        DoseForm.tablet,
+        DoseForm.capsule,
+        DoseForm.pill,
+        DoseForm.liquid,
+        DoseForm.powder,
+        DoseForm.scoop,
+        DoseForm.serving,
+      ],
+      ProtocolType.topical => const [
+        DoseForm.cream,
+        DoseForm.gel,
+        DoseForm.liquid,
+        DoseForm.patch,
+        DoseForm.pump,
+      ],
+      ProtocolType.nasal => const [DoseForm.spray, DoseForm.drop],
+      ProtocolType.sublingual => const [
+        DoseForm.drop,
+        DoseForm.liquid,
+        DoseForm.spray,
+      ],
+      _ => const [DoseForm.other],
+    };
+  }
+
+  static const List<DoseUnit> _physicalStrengthUnits = [
+    DoseUnit.mcg,
+    DoseUnit.mg,
+    DoseUnit.g,
+    DoseUnit.iu,
+    DoseUnit.units,
+    DoseUnit.mL,
+  ];
+
+  double? get _physicalTotalDose {
+    final strength = double.tryParse(_strengthController.text.trim());
+    final quantity = double.tryParse(_quantityController.text.trim());
+
+    if (strength == null ||
+        strength <= 0 ||
+        quantity == null ||
+        quantity <= 0) {
+      return null;
+    }
+
+    return strength * quantity;
+  }
+
+  DoseDetails? get _physicalDoseDetails {
+    if (!_usesPhysicalDoseEditor) {
+      return _advancedDoseDetails;
+    }
+
+    final strength = double.tryParse(_strengthController.text.trim());
+    final quantity = double.tryParse(_quantityController.text.trim());
+
+    if (strength == null ||
+        strength <= 0 ||
+        quantity == null ||
+        quantity <= 0) {
+      return null;
+    }
+
+    return DoseDetails(
+      form: _physicalDoseForm,
+      strengthAmount: strength,
+      strengthUnit: _physicalStrengthUnit,
+      scheduledQuantity: quantity,
+      blendComponents: _advancedDoseDetails?.blendComponents ?? const [],
+    );
+  }
+
   String get _formattedDose {
+    if (_usesPhysicalDoseEditor) {
+      final total = _physicalTotalDose;
+
+      if (total == null) {
+        return '';
+      }
+
+      return '${_formatAdvancedNumber(total)} ${_physicalStrengthUnit.label}';
+    }
+
     return '${_doseController.text.trim()} $_currentUnit';
   }
 
+  String get _physicalDoseInstruction {
+    final details = _physicalDoseDetails;
+
+    if (details == null) {
+      return '';
+    }
+
+    final quantity = _formatAdvancedNumber(details.scheduledQuantity!);
+    final strength = _formatAdvancedNumber(details.strengthAmount!);
+    final unitLabel = details.quantityUnitLabel;
+    final plural =
+        details.scheduledQuantity == 1 || unitLabel == 'mL' || unitLabel == 'g'
+        ? unitLabel
+        : '${unitLabel}s';
+
+    return '$quantity $plural × $strength ${details.strengthUnit!.label} '
+        '= ${_formatAdvancedNumber(details.totalActiveDose!)} '
+        '${details.strengthUnit!.label}';
+  }
+
+  String get _strengthFieldLabel {
+    return switch (_physicalDoseForm) {
+      DoseForm.liquid => 'Strength per mL',
+      DoseForm.powder => 'Strength per g',
+      DoseForm.cream => 'Strength per mL',
+      DoseForm.gel => 'Strength per mL',
+      _ => 'Strength per ${_physicalDoseForm.label.toLowerCase()}',
+    };
+  }
+
+  String get _quantityFieldLabel {
+    return switch (_physicalDoseForm) {
+      DoseForm.liquid => 'mL per dose',
+      DoseForm.powder => 'Grams per dose',
+      DoseForm.cream => 'mL per application',
+      DoseForm.gel => 'mL per application',
+      _ => '${_physicalDoseForm.label}s per dose',
+    };
+  }
+
+  void _ensurePhysicalFormIsValid() {
+    final forms = _availablePhysicalForms;
+
+    if (!forms.contains(_physicalDoseForm)) {
+      _physicalDoseForm = forms.first;
+    }
+  }
+
   Widget _buildCategoryStep(BuildContext context) {
+    final categories = [
+      (
+        ProtocolCategory.peptide,
+        'Peptides & Hormones',
+        'Peptides, research compounds, blends, TRT, hormones, and injectables.',
+        ArcticIcons.science_outlined,
+      ),
+      (
+        ProtocolCategory.medication,
+        'Medication',
+        'Prescription and over-the-counter medications, including tablets, capsules, liquids, and other forms.',
+        ArcticIcons.medication_outlined,
+      ),
+      (
+        ProtocolCategory.supplementsAndVitamins,
+        'Supplements & Vitamins',
+        'Vitamins, minerals, powders, capsules, nutrition, and daily supplements.',
+        ArcticIcons.local_florist_outlined,
+      ),
+      (
+        ProtocolCategory.custom,
+        'Custom',
+        'Create a fully custom protocol when your item does not fit one of the categories above.',
+        ArcticIcons.tune_outlined,
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -462,68 +704,20 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         ),
         const SizedBox(height: AppSpacing.md),
         Expanded(
-          child: ListView(
+          child: Column(
             children: [
-              _CategoryTile(
-                title: 'Peptides & Research',
-                subtitle:
-                    'Peptides, research compounds, blends, and adjacent protocols',
-                icon: ArcticIcons.science_outlined,
-                isSelected: _selectedCategory == ProtocolCategory.peptide,
-                onTap: () {
-                  _selectCategory(ProtocolCategory.peptide);
-                },
-              ),
-              _CategoryTile(
-                title: 'Hormones & TRT',
-                subtitle:
-                    'Testosterone, growth hormone, fertility, and hormone protocols',
-                icon: ArcticIcons.monitor_heart_outlined,
-                isSelected:
-                    _selectedCategory == ProtocolCategory.hormonesAndTrt,
-                onTap: () {
-                  _selectCategory(ProtocolCategory.hormonesAndTrt);
-                },
-              ),
-              _CategoryTile(
-                title: 'Medication',
-                subtitle: 'Prescription and over-the-counter medications',
-                icon: ArcticIcons.medication_outlined,
-                isSelected: _selectedCategory == ProtocolCategory.medication,
-                onTap: () {
-                  _selectCategory(ProtocolCategory.medication);
-                },
-              ),
-              _CategoryTile(
-                title: 'Supplements & Vitamins',
-                subtitle: 'Supplements, vitamins, minerals, and nutrition',
-                icon: ArcticIcons.local_florist_outlined,
-                isSelected:
-                    _selectedCategory ==
-                    ProtocolCategory.supplementsAndVitamins,
-                onTap: () {
-                  _selectCategory(ProtocolCategory.supplementsAndVitamins);
-                },
-              ),
-              _CategoryTile(
-                title: 'Other & Wellness',
-                subtitle:
-                    'Wellness products and protocols that do not fit elsewhere',
-                icon: ArcticIcons.category_outlined,
-                isSelected: _selectedCategory == ProtocolCategory.otherWellness,
-                onTap: () {
-                  _selectCategory(ProtocolCategory.otherWellness);
-                },
-              ),
-              _CategoryTile(
-                title: 'Custom',
-                subtitle: 'Create a tracker your own way',
-                icon: ArcticIcons.tune_outlined,
-                isSelected: _selectedCategory == ProtocolCategory.custom,
-                onTap: () {
-                  _selectCategory(ProtocolCategory.custom);
-                },
-              ),
+              for (var index = 0; index < categories.length; index++) ...[
+                Expanded(
+                  child: _CategoryFeatureCard(
+                    title: categories[index].$2,
+                    description: categories[index].$3,
+                    icon: categories[index].$4,
+                    isSelected: _selectedCategory == categories[index].$1,
+                    onTap: () => _selectCategory(categories[index].$1),
+                  ),
+                ),
+                if (index < categories.length - 1) const SizedBox(height: 10),
+              ],
             ],
           ),
         ),
@@ -538,11 +732,15 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       return const SizedBox.shrink();
     }
 
-    final query = _nameController.text;
+    final query = _nameController.text.trim();
 
     final presets = category == ProtocolCategory.custom
         ? <ProtocolPreset>[]
         : _presetService.search(category: category, query: query);
+
+    final exactMatch = query.isEmpty
+        ? null
+        : _presetService.findByName(category: category, name: query);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -557,8 +755,8 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         const SizedBox(height: AppSpacing.xs),
         Text(
           category == ProtocolCategory.custom
-              ? 'Enter the name you want ArcticDose to display.'
-              : 'Search the list or enter your own name.',
+              ? 'Enter any name for the protocol you want to track.'
+              : 'Search our suggestions or enter any name to create your own protocol.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -567,29 +765,34 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         const SizedBox(height: AppSpacing.md),
         TextField(
           controller: _nameController,
-          autofocus: true,
+          autofocus: false,
           textCapitalization: TextCapitalization.words,
           onChanged: (value) {
             setState(() {
-              final exactMatch = _presetService.findByName(
+              final match = _presetService.findByName(
                 category: category,
                 name: value,
               );
 
-              _selectedPreset = exactMatch;
+              _selectedPreset = match;
 
-              if (exactMatch != null) {
-                _applyPresetDefaults(exactMatch);
+              if (match != null) {
+                _applyPresetDefaults(match);
               }
             });
           },
           decoration: InputDecoration(
-            labelText: 'Name',
-            hintText: _searchHint(category),
+            labelText: category == ProtocolCategory.custom
+                ? 'Protocol name'
+                : 'Search or enter a name',
+            hintText: category == ProtocolCategory.custom
+                ? 'Example: Morning Medication'
+                : _searchHint(category),
             prefixIcon: const Icon(Icons.search),
             suffixIcon: _nameController.text.isEmpty
                 ? null
                 : IconButton(
+                    tooltip: 'Clear',
                     onPressed: () {
                       setState(() {
                         _nameController.clear();
@@ -605,47 +808,96 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        if (category != ProtocolCategory.custom) ...[
-          Text(
-            query.trim().isEmpty ? 'Common options' : 'Matches',
-            style: TextStyle(
-              fontSize: AppTypography.caption,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+
+        if (category == ProtocolCategory.custom) ...[
+          if (query.isNotEmpty)
+            _CustomProtocolCard(name: query, isSelected: true, onTap: () {})
+          else
+            _NameHelperCard(
+              title: 'Create anything',
+              description:
+                  'Type the name above. You will choose how it is taken and how much on the next screens.',
             ),
+          const Spacer(),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  query.isEmpty ? 'Suggested protocols' : 'Results',
+                  style: const TextStyle(
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (query.isEmpty)
+                Text(
+                  'Tap one or type your own',
+                  style: TextStyle(
+                    fontSize: AppTypography.caption,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.sm),
           Expanded(
-            child: presets.isEmpty
-                ? _CustomNameMessage(name: query.trim())
-                : ListView.separated(
-                    itemCount: presets.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, index) {
-                      final preset = presets[index];
-
-                      return _PresetTile(
-                        preset: preset,
-                        isSelected: _selectedPreset?.name == preset.name,
-                        onTap: () {
-                          setState(() {
-                            _selectedPreset = preset;
-                            _nameController.text = preset.name;
-
-                            _nameController.selection = TextSelection.collapsed(
-                              offset: preset.name.length,
-                            );
-
-                            _applyPresetDefaults(preset);
-                          });
-                        },
-                      );
+            child: ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              children: [
+                if (query.isNotEmpty && exactMatch == null) ...[
+                  _CustomProtocolCard(
+                    name: query,
+                    isSelected: _selectedPreset == null,
+                    onTap: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      setState(() {
+                        _selectedPreset = null;
+                      });
                     },
                   ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+                if (presets.isEmpty && query.isEmpty)
+                  const _NameHelperCard(
+                    title: 'No suggestions available',
+                    description:
+                        'Enter any name above to create a custom protocol.',
+                  )
+                else if (presets.isEmpty)
+                  _NameHelperCard(
+                    title: 'No preset match',
+                    description:
+                        'You can still continue with “$query” as a custom protocol.',
+                  )
+                else
+                  for (var index = 0; index < presets.length; index++) ...[
+                    _PresetTile(
+                      preset: presets[index],
+                      isSelected: _selectedPreset?.name == presets[index].name,
+                      onTap: () {
+                        final preset = presets[index];
+
+                        FocusManager.instance.primaryFocus?.unfocus();
+
+                        setState(() {
+                          _selectedPreset = preset;
+                          _nameController.text = preset.name;
+                          _nameController.selection = TextSelection.collapsed(
+                            offset: preset.name.length,
+                          );
+                          _applyPresetDefaults(preset);
+                        });
+                      },
+                    ),
+                    if (index < presets.length - 1)
+                      const SizedBox(height: AppSpacing.sm),
+                  ],
+              ],
+            ),
           ),
-        ] else
-          const Spacer(),
+        ],
       ],
     );
   }
@@ -664,7 +916,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Choose the administration method. ArcticDose will only show features that apply.',
+          'Choose the administration method. MODOSE will only show features that apply.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: colorScheme.onSurfaceVariant,
@@ -750,13 +1002,166 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   Widget _buildDoseStep(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    final dropdownValue = _useCustomUnit
-        ? 'Other'
-        : _commonUnits.contains(_selectedUnit)
+    if (_usesPhysicalDoseEditor) {
+      _ensurePhysicalFormIsValid();
+
+      return ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: [
+          const Text(
+            'How is each dose taken?',
+            style: TextStyle(
+              fontSize: AppTypography.title,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Enter the form, strength, and amount you actually take each time.',
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+
+          DropdownButtonFormField<DoseForm>(
+            initialValue: _physicalDoseForm,
+            decoration: const InputDecoration(
+              labelText: 'Dose form',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              for (final form in _availablePhysicalForms)
+                DropdownMenuItem<DoseForm>(
+                  value: form,
+                  child: Text(form.label),
+                ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+
+              setState(() {
+                _physicalDoseForm = value;
+              });
+            },
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: TextField(
+                  controller: _strengthController,
+                  autofocus: false,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: _strengthFieldLabel,
+                    hintText: '500',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: DropdownButtonFormField<DoseUnit>(
+                  initialValue: _physicalStrengthUnit,
+                  decoration: const InputDecoration(
+                    labelText: 'Unit',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final unit in _physicalStrengthUnits)
+                      DropdownMenuItem<DoseUnit>(
+                        value: unit,
+                        child: Text(unit.label),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+
+                    setState(() {
+                      _physicalStrengthUnit = value;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          TextField(
+            controller: _quantityController,
+            autofocus: false,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: _quantityFieldLabel,
+              suffixText:
+                  _physicalDoseForm == DoseForm.liquid ||
+                      _physicalDoseForm == DoseForm.cream ||
+                      _physicalDoseForm == DoseForm.gel
+                  ? 'mL'
+                  : _physicalDoseForm == DoseForm.powder
+                  ? 'g'
+                  : _physicalDoseForm.label.toLowerCase(),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+
+          if (_physicalTotalDose != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withValues(alpha: 0.28),
+                borderRadius: BorderRadius.circular(AppRadius.button),
+                border: Border.all(
+                  color: colorScheme.primary.withValues(alpha: 0.30),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Scheduled dose',
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _physicalDoseInstruction,
+                    style: const TextStyle(
+                      fontSize: AppTypography.body,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    final dropdownValue =
+        _selectedUnit != null && _availableUnits.contains(_selectedUnit)
         ? _selectedUnit
         : null;
 
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
         const Text(
           'How much?',
@@ -774,20 +1179,21 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
+
         TextField(
           controller: _doseController,
-          autofocus: true,
+          autofocus: false,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          onChanged: (_) {
-            setState(() {});
-          },
+          onChanged: (_) => setState(() {}),
           decoration: const InputDecoration(
             labelText: 'Dose',
             hintText: '3',
             border: OutlineInputBorder(),
           ),
         ),
+
         const SizedBox(height: AppSpacing.md),
+
         DropdownButtonFormField<String>(
           key: ValueKey(dropdownValue),
           initialValue: dropdownValue,
@@ -797,38 +1203,18 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           ),
           hint: const Text('Choose a unit'),
           items: [
-            for (final unit in _commonUnits)
+            for (final unit in _availableUnits)
               DropdownMenuItem(value: unit, child: Text(unit)),
-            const DropdownMenuItem(value: 'Other', child: Text('Other...')),
           ],
           onChanged: (value) {
             setState(() {
-              if (value == 'Other') {
-                _useCustomUnit = true;
-                _selectedUnit = null;
-              } else {
-                _useCustomUnit = false;
-                _selectedUnit = value;
-                _customUnitController.clear();
-              }
+              _selectedUnit = value;
+              _useCustomUnit = false;
+              _customUnitController.clear();
             });
           },
         ),
-        if (_useCustomUnit) ...[
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _customUnitController,
-            textCapitalization: TextCapitalization.none,
-            onChanged: (_) {
-              setState(() {});
-            },
-            decoration: const InputDecoration(
-              labelText: 'Custom unit',
-              hintText: 'pump, scoop, spray...',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ],
+
         if (_selectedPreset?.defaultUnit != null && !_useCustomUnit) ...[
           const SizedBox(height: AppSpacing.sm),
           Text(
@@ -839,7 +1225,21 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
             ),
           ),
         ],
+
         if (_selectedProtocolType == ProtocolType.injection) ...[
+          const SizedBox(height: AppSpacing.lg),
+          _AdvancedDoseTile(
+            hasDetails: _advancedDoseDetails != null,
+            summary: _advancedDoseSummary,
+            onTap: _openAdvancedDoseDetails,
+            onClear: _advancedDoseDetails == null
+                ? null
+                : () {
+                    setState(() {
+                      _advancedDoseDetails = null;
+                    });
+                  },
+          ),
           const SizedBox(height: AppSpacing.lg),
           Material(
             color: Colors.transparent,
@@ -881,7 +1281,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
                           ),
                           SizedBox(height: AppSpacing.xs),
                           Text(
-                            'Open ArcticDose Calculator',
+                            'Open Calculator',
                             style: TextStyle(fontSize: AppTypography.caption),
                           ),
                         ],
@@ -1046,7 +1446,8 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   Widget _buildTimeStep(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return ListView(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'When should it start?',
@@ -1057,101 +1458,156 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Choose a time and starting date.',
+          'Choose the start date, then set the dose time.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.md),
+
+        Align(
+          alignment: Alignment.center,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 340),
+            child: _CompactCalendar(
+              displayedMonth: _displayedStartMonth,
+              selectedDate: _selectedStartDate,
+              onPreviousMonth: () {
+                setState(() {
+                  _displayedStartMonth = DateTime(
+                    _displayedStartMonth.year,
+                    _displayedStartMonth.month - 1,
+                  );
+                });
+              },
+              onNextMonth: () {
+                setState(() {
+                  _displayedStartMonth = DateTime(
+                    _displayedStartMonth.year,
+                    _displayedStartMonth.month + 1,
+                  );
+                });
+              },
+              onDateSelected: (date) {
+                setState(() {
+                  _selectedStartDate = date;
+                  _displayedStartMonth = DateTime(date.year, date.month);
+                  _cycleStartDate = date;
+                });
+              },
+            ),
+          ),
+        ),
+
+        const SizedBox(height: AppSpacing.md),
+
         const Text(
-          'Time',
+          'What time?',
           style: TextStyle(
-            fontSize: AppTypography.body,
-            fontWeight: FontWeight.w600,
+            fontSize: AppTypography.title,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Choose a quick time or select an exact time.',
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
+
+        Row(
           children: [
-            _QuickChoiceChip(
-              label: 'Morning',
-              detail: '8:00 AM',
-              isSelected: _selectedTime.hour == 8 && _selectedTime.minute == 0,
-              onTap: () {
-                setState(() {
-                  _selectedTime = const TimeOfDay(hour: 8, minute: 0);
-                });
-              },
+            Expanded(
+              child: _TimePresetCard(
+                label: 'Morning',
+                detail: '8:00 AM',
+                isSelected:
+                    _selectedTime.hour == 8 && _selectedTime.minute == 0,
+                onTap: () {
+                  setState(() {
+                    _selectedTime = const TimeOfDay(hour: 8, minute: 0);
+                  });
+                },
+              ),
             ),
-            _QuickChoiceChip(
-              label: 'Afternoon',
-              detail: '2:00 PM',
-              isSelected: _selectedTime.hour == 14 && _selectedTime.minute == 0,
-              onTap: () {
-                setState(() {
-                  _selectedTime = const TimeOfDay(hour: 14, minute: 0);
-                });
-              },
+            const SizedBox(width: 8),
+            Expanded(
+              child: _TimePresetCard(
+                label: 'Afternoon',
+                detail: '2:00 PM',
+                isSelected:
+                    _selectedTime.hour == 14 && _selectedTime.minute == 0,
+                onTap: () {
+                  setState(() {
+                    _selectedTime = const TimeOfDay(hour: 14, minute: 0);
+                  });
+                },
+              ),
             ),
-            _QuickChoiceChip(
-              label: 'Evening',
-              detail: '8:00 PM',
-              isSelected: _selectedTime.hour == 20 && _selectedTime.minute == 0,
-              onTap: () {
-                setState(() {
-                  _selectedTime = const TimeOfDay(hour: 20, minute: 0);
-                });
-              },
+            const SizedBox(width: 8),
+            Expanded(
+              child: _TimePresetCard(
+                label: 'Evening',
+                detail: '8:00 PM',
+                isSelected:
+                    _selectedTime.hour == 20 && _selectedTime.minute == 0,
+                onTap: () {
+                  setState(() {
+                    _selectedTime = const TimeOfDay(hour: 20, minute: 0);
+                  });
+                },
+              ),
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
-          onPressed: _chooseCustomTime,
-          icon: const Icon(ArcticIcons.schedule),
-          label: Text('Custom time: ${_formatTime(_selectedTime)}'),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        const Text(
-          'Start date',
-          style: TextStyle(
-            fontSize: AppTypography.body,
-            fontWeight: FontWeight.w600,
+
+        const SizedBox(height: AppSpacing.sm),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _chooseCustomTime,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(42),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.button),
+              ),
+            ),
+            child: Text(
+              'Choose exact time • ${_formatTime(_selectedTime)}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ),
+
         const SizedBox(height: AppSpacing.sm),
-        _DateChoiceTile(
-          title: 'Today',
-          subtitle: _formatDate(DateTime.now()),
-          isSelected: _isSameDay(_selectedStartDate, DateTime.now()),
-          onTap: () {
-            setState(() {
-              _selectedStartDate = DateTime.now();
-            });
-          },
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _DateChoiceTile(
-          title: 'Tomorrow',
-          subtitle: _formatDate(DateTime.now().add(const Duration(days: 1))),
-          isSelected: _isSameDay(
-            _selectedStartDate,
-            DateTime.now().add(const Duration(days: 1)),
+
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: 10,
           ),
-          onTap: () {
-            setState(() {
-              _selectedStartDate = DateTime.now().add(const Duration(days: 1));
-            });
-          },
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: _chooseStartDate,
-          icon: const Icon(ArcticIcons.calendar_month),
-          label: Text('Choose date: ${_formatDate(_selectedStartDate)}'),
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.18),
+            ),
+          ),
+          child: Text(
+            'Starts ${_formatDate(_selectedStartDate)} at ${_formatTime(_selectedTime)}',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.primary,
+            ),
+          ),
         ),
       ],
     );
@@ -1163,7 +1619,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     return ListView(
       children: [
         const Text(
-          'ArcticDose Features',
+          'MODOSE Features',
           style: TextStyle(
             fontSize: AppTypography.title,
             fontWeight: FontWeight.bold,
@@ -1171,7 +1627,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Select the extra tools ArcticDose should use for this protocol.',
+          'Select the extra tools MODOSE should use for this protocol.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1217,7 +1673,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
             },
           ),
         _FeatureSelectionTile(
-          title: 'ArcticDose Supply',
+          title: 'MODOSE Supply',
           subtitle: 'Track inventory and receive reorder reminders.',
           value: _useGhostSupplySelected,
           onChanged: (value) {
@@ -1394,7 +1850,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
         if (_useGhostSupplySelected)
           _FeatureSetupCard(
-            title: 'ArcticDose Supply',
+            title: 'MODOSE Supply',
             subtitle: 'Inventory tracking enabled',
             icon: ArcticIcons.inventory_2_outlined,
             isExpanded: false,
@@ -1402,7 +1858,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
             canExpand: false,
             onTap: () {},
             footer: Text(
-              'Configure container type, quantity, and alerts from ArcticDose Supply after this protocol is saved.',
+              'Configure container type, quantity, and alerts from MODOSE Supply after this protocol is saved.',
               style: TextStyle(
                 fontSize: AppTypography.caption,
                 height: 1.4,
@@ -1507,72 +1963,23 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Choose when ArcticDose should notify you.',
+            'Choose when MODOSE should notify you.',
             style: TextStyle(
               fontSize: AppTypography.caption,
               color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              _ReminderChoiceChip(
-                label: 'At time',
-                isSelected: _reminderMinutesBefore == 0,
-                onTap: () {
-                  setState(() {
-                    _reminderMinutesBefore = 0;
-                  });
-                },
-              ),
-              _ReminderChoiceChip(
-                label: '5m before',
-                isSelected: _reminderMinutesBefore == 5,
-                onTap: () {
-                  setState(() {
-                    _reminderMinutesBefore = 5;
-                  });
-                },
-              ),
-              _ReminderChoiceChip(
-                label: '10m before',
-                isSelected: _reminderMinutesBefore == 10,
-                onTap: () {
-                  setState(() {
-                    _reminderMinutesBefore = 10;
-                  });
-                },
-              ),
-              _ReminderChoiceChip(
-                label: '15m before',
-                isSelected: _reminderMinutesBefore == 15,
-                onTap: () {
-                  setState(() {
-                    _reminderMinutesBefore = 15;
-                  });
-                },
-              ),
-              _ReminderChoiceChip(
-                label: '30m before',
-                isSelected: _reminderMinutesBefore == 30,
-                onTap: () {
-                  setState(() {
-                    _reminderMinutesBefore = 30;
-                  });
-                },
-              ),
-              _ReminderChoiceChip(
-                label: '1h before',
-                isSelected: _reminderMinutesBefore == 60,
-                onTap: () {
-                  setState(() {
-                    _reminderMinutesBefore = 60;
-                  });
-                },
-              ),
-            ],
+          _ReminderTimingDropdown(
+            value: _reminderMinutesBefore,
+            values: const [0, 5, 10, 15, 30, 60],
+            label: 'Reminder timing',
+            labelBuilder: _beforeLabel,
+            onChanged: (value) {
+              setState(() {
+                _reminderMinutesBefore = value;
+              });
+            },
           ),
           const SizedBox(height: AppSpacing.lg),
           const Text(
@@ -1628,53 +2035,22 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                _ReminderChoiceChip(
-                  label: '15m later',
-                  isSelected: _missedDoseReminderMinutesAfter == 15,
-                  onTap: () {
-                    setState(() {
-                      _missedDoseReminderMinutesAfter = 15;
-                    });
-                  },
-                ),
-                _ReminderChoiceChip(
-                  label: '30m later',
-                  isSelected: _missedDoseReminderMinutesAfter == 30,
-                  onTap: () {
-                    setState(() {
-                      _missedDoseReminderMinutesAfter = 30;
-                    });
-                  },
-                ),
-                _ReminderChoiceChip(
-                  label: '1h later',
-                  isSelected: _missedDoseReminderMinutesAfter == 60,
-                  onTap: () {
-                    setState(() {
-                      _missedDoseReminderMinutesAfter = 60;
-                    });
-                  },
-                ),
-                _ReminderChoiceChip(
-                  label: '2h later',
-                  isSelected: _missedDoseReminderMinutesAfter == 120,
-                  onTap: () {
-                    setState(() {
-                      _missedDoseReminderMinutesAfter = 120;
-                    });
-                  },
-                ),
-              ],
+            _ReminderTimingDropdown(
+              value: _missedDoseReminderMinutesAfter,
+              values: _followUpTimingValues,
+              label: 'Follow-up timing',
+              labelBuilder: _afterLabel,
+              onChanged: (value) {
+                setState(() {
+                  _missedDoseReminderMinutesAfter = value;
+                });
+              },
             ),
           ],
           if (_customNotificationTextEnabled) ...[
             const SizedBox(height: AppSpacing.lg),
             const Text(
-              'Custom notification',
+              'Main reminder message',
               style: TextStyle(
                 fontSize: AppTypography.body,
                 fontWeight: FontWeight.w700,
@@ -1682,7 +2058,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Make this reminder your own. Leave a field blank to use the ArcticDose default.',
+              'Applies only to the main reminder. Leave blank to use “It\'s time for your protocol”.',
               style: TextStyle(
                 fontSize: AppTypography.caption,
                 color: colorScheme.onSurfaceVariant,
@@ -1690,27 +2066,46 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
-              controller: _customReminderTitleController,
-              textCapitalization: TextCapitalization.sentences,
-              maxLength: 64,
-              decoration: const InputDecoration(
-                labelText: 'Notification title',
-                hintText: 'Ratatouille Time',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            TextField(
               controller: _customReminderBodyController,
               textCapitalization: TextCapitalization.sentences,
               maxLength: 140,
-              maxLines: 3,
+              maxLines: 1,
               decoration: const InputDecoration(
-                labelText: 'Notification message',
-                hintText: 'Time for your scheduled dose.',
+                labelText: 'Custom main reminder',
+                hintText: "It's time for your protocol",
                 border: OutlineInputBorder(),
               ),
             ),
+            if (_missedDoseReminderEnabled == true) ...[
+              const SizedBox(height: AppSpacing.lg),
+              const Text(
+                'Follow-up reminder message',
+                style: TextStyle(
+                  fontSize: AppTypography.body,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Applies only to the follow-up. Leave blank to use the MODOSE default.',
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: _customFollowUpBodyController,
+                textCapitalization: TextCapitalization.sentences,
+                maxLength: 140,
+                maxLines: 1,
+                decoration: const InputDecoration(
+                  labelText: 'Custom follow-up reminder',
+                  hintText: "You haven't logged your protocol today.",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
           ],
         ],
       ],
@@ -1743,6 +2138,11 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           colorValue: _selectedColorValue,
           rows: [
             _ReviewRowData(label: 'Dose', value: _formattedDose),
+            if (_usesPhysicalDoseEditor)
+              _ReviewRowData(
+                label: 'How taken',
+                value: _physicalDoseInstruction,
+              ),
             _ReviewRowData(label: 'Schedule', value: _scheduleSummary()),
             _ReviewRowData(label: 'Time', value: _formatTime(_selectedTime)),
             _ReviewRowData(
@@ -1757,7 +2157,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
                 value: _rotationReviewSummary(),
               ),
             if (_useGhostSupplySelected)
-              const _ReviewRowData(label: 'ArcticDose Supply', value: 'Enabled'),
+              const _ReviewRowData(label: 'MODOSE Supply', value: 'Enabled'),
             _ReviewRowData(label: 'Reminder', value: _reminderReviewSummary()),
             if (_reminderEnabled == true && _missedDoseReminderEnabled == true)
               _ReviewRowData(
@@ -1766,13 +2166,18 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
               ),
             if (_reminderEnabled == true &&
                 _customNotificationTextEnabled &&
-                (_customReminderTitleController.text.trim().isNotEmpty ||
-                    _customReminderBodyController.text.trim().isNotEmpty))
+                _customReminderBodyController.text.trim().isNotEmpty)
               _ReviewRowData(
-                label: 'Custom text',
-                value: _customReminderTitleController.text.trim().isNotEmpty
-                    ? _customReminderTitleController.text.trim()
-                    : 'Custom message',
+                label: 'Main text',
+                value: _customReminderBodyController.text.trim(),
+              ),
+            if (_reminderEnabled == true &&
+                _missedDoseReminderEnabled == true &&
+                _customNotificationTextEnabled &&
+                _customFollowUpBodyController.text.trim().isNotEmpty)
+              _ReviewRowData(
+                label: 'Follow-up text',
+                value: _customFollowUpBodyController.text.trim(),
               ),
           ],
         ),
@@ -1832,30 +2237,106 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     });
   }
 
+  Future<void> _openAdvancedDoseDetails() async {
+    final doseAmount = double.tryParse(_doseController.text.trim());
+
+    if (_selectedProtocolType == null ||
+        doseAmount == null ||
+        doseAmount <= 0 ||
+        _currentUnit.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter the scheduled dose and unit first.'),
+        ),
+      );
+      return;
+    }
+
+    final doseUnit = DoseUnitDetails.fromStorageValue(_currentUnit);
+
+    final details = await Navigator.push<DoseDetails>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdvancedDoseDetailsScreen(
+          protocolType: _selectedProtocolType!,
+          scheduledDoseAmount: doseAmount,
+          scheduledDoseUnit: doseUnit,
+          initialDetails: _advancedDoseDetails,
+          presetName: _selectedPreset?.name,
+        ),
+      ),
+    );
+
+    if (details == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _advancedDoseDetails = details;
+    });
+  }
+
+  String get _advancedDoseSummary {
+    final details = _advancedDoseDetails;
+
+    if (details == null) {
+      return 'Optional: reconstitution, syringe units, strength, or blend composition.';
+    }
+
+    final parts = <String>[];
+
+    if (details.form != null && details.form != DoseForm.injection) {
+      parts.add(details.form!.label);
+    }
+
+    if (details.hasReconstitution) {
+      parts.add(
+        '${_formatAdvancedNumber(details.vialAmount!)} '
+        '${details.vialUnit!.label} vial + '
+        '${_formatAdvancedNumber(details.reconstitutionVolumeMl!)} mL',
+      );
+    }
+
+    final draw = details.drawUnits(
+      scheduledDoseAmount: double.tryParse(_doseController.text.trim()) ?? 0,
+      scheduledDoseUnit: DoseUnitDetails.fromStorageValue(_currentUnit),
+    );
+
+    if (draw != null) {
+      parts.add('Draw ${_formatAdvancedNumber(draw)} units');
+    }
+
+    if (details.hasOralStrength) {
+      parts.add(
+        '${_formatAdvancedNumber(details.scheduledQuantity!)} × '
+        '${_formatAdvancedNumber(details.strengthAmount!)} '
+        '${details.strengthUnit!.label}',
+      );
+    }
+
+    if (details.blendComponents.isNotEmpty) {
+      parts.add('${details.blendComponents.length} blend components');
+    }
+
+    return parts.isEmpty ? 'Advanced details added' : parts.join(' • ');
+  }
+
+  String _formatAdvancedNumber(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+
+    return value
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+
   Future<void> _openCalculator() async {
     await Navigator.push<void>(
       context,
       MaterialPageRoute(builder: (_) => const CalculatorHubScreen()),
     );
-  }
-
-  Future<void> _chooseStartDate() async {
-    final today = DateTime.now();
-
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _selectedStartDate,
-      firstDate: DateTime(today.year - 5, today.month, today.day),
-      lastDate: DateTime(today.year + 10, today.month, today.day),
-    );
-
-    if (selected == null || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _selectedStartDate = selected;
-    });
   }
 
   Protocol _createProtocol() {
@@ -1865,6 +2346,9 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       category: _selectedCategory!,
       type: _selectedProtocolType!,
       dose: _formattedDose,
+      doseDetails: _usesPhysicalDoseEditor
+          ? _physicalDoseDetails
+          : _advancedDoseDetails,
       schedule: _createSchedule(),
       colorValue: _selectedColorValue,
       useCycle: _useCyclesSelected && _useCycle == true,
@@ -1896,11 +2380,13 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       missedDoseReminderMinutesAfter: _missedDoseReminderEnabled == true
           ? _missedDoseReminderMinutesAfter
           : 60,
-      customReminderTitle: _optionalNotificationText(
-        _customReminderTitleController.text,
-      ),
+      customReminderTitle: null,
       customReminderBody: _optionalNotificationText(
         _customReminderBodyController.text,
+      ),
+      customFollowUpTitle: null,
+      customFollowUpBody: _optionalNotificationText(
+        _customFollowUpBodyController.text,
       ),
     );
   }
@@ -1974,7 +2460,12 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         _selectedPreset = null;
         _selectedUnit = null;
         _useCustomUnit = false;
+        _advancedDoseDetails = null;
         _selectedProtocolType = null;
+        _strengthController.clear();
+        _quantityController.text = '1';
+        _physicalDoseForm = DoseForm.tablet;
+        _physicalStrengthUnit = DoseUnit.mg;
 
         _selectedSchedule = null;
         _selectedWeeklyDay = null;
@@ -1991,23 +2482,59 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       return;
     }
 
-    if (_commonUnits.contains(unit)) {
-      _selectedUnit = unit;
+    final normalized = switch (unit.trim().toLowerCase()) {
+      'tablets' => 'tablet',
+      'capsules' => 'capsule',
+      'pills' => 'pill',
+      'sprays' => 'spray',
+      'drops' => 'drop',
+      'patches' => 'patch',
+      'servings' => 'serving',
+      'iu' => 'IU',
+      'ml' => 'mL',
+      _ => unit.trim(),
+    };
+
+    if (_availableUnits.contains(normalized)) {
+      _selectedUnit = normalized;
       _useCustomUnit = false;
       _customUnitController.clear();
-    } else {
-      _selectedUnit = null;
-      _useCustomUnit = true;
-      _customUnitController.text = unit;
     }
   }
 
   void _applyPresetDefaults(ProtocolPreset preset) {
-    _applyPresetUnit(preset.defaultUnit);
-
     final protocolType = preset.defaultProtocolType;
+
     if (protocolType != null) {
       _selectedProtocolType = protocolType;
+    }
+
+    _applyPresetUnit(preset.defaultUnit);
+
+    if (_usesPhysicalDoseEditor) {
+      final inventoryUnit =
+          preset.defaultInventoryUnit?.trim().toLowerCase() ?? '';
+
+      _physicalDoseForm = switch (inventoryUnit) {
+        'tablet' || 'tablets' => DoseForm.tablet,
+        'capsule' || 'capsules' => DoseForm.capsule,
+        'pill' || 'pills' => DoseForm.pill,
+        'spray' || 'sprays' => DoseForm.spray,
+        'drop' || 'drops' => DoseForm.drop,
+        'patch' || 'patches' => DoseForm.patch,
+        'serving' || 'servings' => DoseForm.serving,
+        _ => _availablePhysicalForms.first,
+      };
+
+      final presetUnit = preset.defaultUnit;
+
+      if (presetUnit != null) {
+        final parsed = DoseUnitDetails.fromStorageValue(presetUnit);
+
+        if (_physicalStrengthUnits.contains(parsed)) {
+          _physicalStrengthUnit = parsed;
+        }
+      }
     }
   }
 
@@ -2219,12 +2746,6 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
-
-  bool _isSameDay(DateTime first, DateTime second) {
-    return first.year == second.year &&
-        first.month == second.month &&
-        first.day == second.day;
-  }
 }
 
 class _FeatureSetupCard extends StatelessWidget {
@@ -2364,29 +2885,133 @@ class _FeatureSetupCard extends StatelessWidget {
   }
 }
 
-class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({
+class _CategoryFeatureCard extends StatelessWidget {
+  const _CategoryFeatureCard({
     required this.title,
-    required this.subtitle,
+    required this.description,
     required this.icon,
     required this.isSelected,
     required this.onTap,
   });
 
   final String title;
-  final String subtitle;
+  final String description;
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return _SelectionTile(
-      title: title,
-      subtitle: subtitle,
-      icon: icon,
-      isSelected: isSelected,
-      onTap: onTap,
+    final colors = Theme.of(context).colorScheme;
+    final baseColor = Theme.of(context).cardTheme.color ?? colors.surface;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card + 2),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: 12,
+          ),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colors.primary.withValues(alpha: 0.11)
+                : baseColor,
+            borderRadius: BorderRadius.circular(AppRadius.card + 2),
+            border: Border.all(
+              color: isSelected
+                  ? colors.primary
+                  : colors.outline.withValues(alpha: 0.85),
+              width: isSelected ? 2.2 : 1.8,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: colors.primary.withValues(alpha: 0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? colors.primary.withValues(alpha: 0.14)
+                      : colors.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppRadius.button),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  icon,
+                  size: 28,
+                  color: isSelected ? colors.primary : colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected ? colors.primary : colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        height: 1.35,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: isSelected ? colors.primary : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected
+                        ? colors.primary
+                        : colors.outline.withValues(alpha: 0.55),
+                    width: 1.3,
+                  ),
+                ),
+                child: isSelected
+                    ? Icon(
+                        Icons.check_rounded,
+                        size: 18,
+                        color: colors.onPrimary,
+                      )
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2414,6 +3039,89 @@ class _AdministrationTile extends StatelessWidget {
       icon: icon,
       isSelected: isSelected,
       onTap: onTap,
+    );
+  }
+}
+
+class _AdvancedDoseTile extends StatelessWidget {
+  const _AdvancedDoseTile({
+    required this.hasDetails,
+    required this.summary,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final bool hasDetails;
+  final String summary;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: hasDetails
+                ? colors.primary.withValues(alpha: 0.08)
+                : colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(
+              color: hasDetails
+                  ? colors.primary.withValues(alpha: 0.55)
+                  : colors.outlineVariant,
+              width: hasDetails ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Checkbox(value: hasDetails, onChanged: (_) => onTap()),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Advanced dose details',
+                      style: TextStyle(
+                        fontSize: AppTypography.body,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      summary,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        height: 1.35,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onClear != null)
+                IconButton(
+                  tooltip: 'Remove advanced details',
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close_rounded),
+                )
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colors.onSurfaceVariant,
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2594,27 +3302,30 @@ class _PresetTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
+    final baseColor = Theme.of(context).cardTheme.color ?? colors.surface;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.card),
         onTap: onTap,
-        child: Ink(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
-            vertical: 12,
+            vertical: 13,
           ),
           decoration: BoxDecoration(
             color: isSelected
-                ? colorScheme.primary.withValues(alpha: 0.10)
-                : Theme.of(context).cardTheme.color ?? colorScheme.surface,
+                ? colors.primary.withValues(alpha: 0.10)
+                : baseColor,
             borderRadius: BorderRadius.circular(AppRadius.card),
             border: Border.all(
               color: isSelected
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant,
+                  ? colors.primary
+                  : colors.outline.withValues(alpha: 0.55),
+              width: isSelected ? 1.8 : 1.2,
             ),
           ),
           child: Row(
@@ -2622,27 +3333,31 @@ class _PresetTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   preset.name,
-                  style: const TextStyle(
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
                     fontSize: AppTypography.body,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected ? colors.primary : colors.onSurface,
                   ),
                 ),
               ),
-              Text(
-                preset.defaultUnit ?? '',
-                style: TextStyle(
-                  fontSize: AppTypography.caption,
-                  color: colorScheme.onSurfaceVariant,
+              const SizedBox(width: AppSpacing.sm),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  preset.defaultProtocolType?.label ?? 'Custom',
+                  style: TextStyle(
+                    fontSize: AppTypography.micro,
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ),
-              if (isSelected) ...[
-                const SizedBox(width: AppSpacing.sm),
-                Icon(
-                  Icons.check_circle,
-                  size: AppIcon.sm,
-                  color: colorScheme.primary,
-                ),
-              ],
             ],
           ),
         ),
@@ -2651,8 +3366,218 @@ class _PresetTile extends StatelessWidget {
   }
 }
 
-class _QuickChoiceChip extends StatelessWidget {
-  const _QuickChoiceChip({
+class _CompactCalendar extends StatelessWidget {
+  const _CompactCalendar({
+    required this.displayedMonth,
+    required this.selectedDate,
+    required this.onPreviousMonth,
+    required this.onNextMonth,
+    required this.onDateSelected,
+  });
+
+  final DateTime displayedMonth;
+  final DateTime selectedDate;
+  final VoidCallback onPreviousMonth;
+  final VoidCallback onNextMonth;
+  final ValueChanged<DateTime> onDateSelected;
+
+  static const _months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final firstDay = DateTime(displayedMonth.year, displayedMonth.month, 1);
+    final daysInMonth = DateTime(
+      displayedMonth.year,
+      displayedMonth.month + 1,
+      0,
+    ).day;
+    final leadingEmpty = firstDay.weekday % 7;
+    final cellCount = leadingEmpty + daysInMonth;
+    final rowCount = (cellCount / 7).ceil();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color: colors.outline.withValues(alpha: 0.45),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 32,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${_months[displayedMonth.month - 1]} ${displayedMonth.year}',
+                    style: const TextStyle(
+                      fontSize: AppTypography.body,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 34,
+                  ),
+                  onPressed: onPreviousMonth,
+                  icon: const Icon(Icons.chevron_left_rounded, size: 22),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 34,
+                  ),
+                  onPressed: onNextMonth,
+                  icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 3),
+          const Row(
+            children: [
+              _CalendarWeekday('S'),
+              _CalendarWeekday('M'),
+              _CalendarWeekday('T'),
+              _CalendarWeekday('W'),
+              _CalendarWeekday('T'),
+              _CalendarWeekday('F'),
+              _CalendarWeekday('S'),
+            ],
+          ),
+          const SizedBox(height: 2),
+          for (var row = 0; row < rowCount; row++)
+            SizedBox(
+              height: 32,
+              child: Row(
+                children: [
+                  for (var column = 0; column < 7; column++)
+                    Expanded(
+                      child: _buildDayCell(
+                        context,
+                        row * 7 + column,
+                        leadingEmpty,
+                        daysInMonth,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDayCell(
+    BuildContext context,
+    int index,
+    int leadingEmpty,
+    int daysInMonth,
+  ) {
+    final day = index - leadingEmpty + 1;
+
+    if (day < 1 || day > daysInMonth) {
+      return const SizedBox.shrink();
+    }
+
+    final colors = Theme.of(context).colorScheme;
+    final date = DateTime(displayedMonth.year, displayedMonth.month, day);
+    final today = DateTime.now();
+
+    final isSelected =
+        selectedDate.year == date.year &&
+        selectedDate.month == date.month &&
+        selectedDate.day == date.day;
+
+    final isToday =
+        today.year == date.year &&
+        today.month == date.month &&
+        today.day == date.day;
+
+    return Center(
+      child: InkWell(
+        onTap: () => onDateSelected(date),
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected ? colors.primary : Colors.transparent,
+            shape: BoxShape.circle,
+            border: !isSelected && isToday
+                ? Border.all(color: colors.primary, width: 1.2)
+                : null,
+          ),
+          child: Text(
+            '$day',
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              fontWeight: isSelected || isToday
+                  ? FontWeight.w800
+                  : FontWeight.w500,
+              color: isSelected
+                  ? colors.onPrimary
+                  : isToday
+                  ? colors.primary
+                  : colors.onSurface,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarWeekday extends StatelessWidget {
+  const _CalendarWeekday(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: AppTypography.micro,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimePresetCard extends StatelessWidget {
+  const _TimePresetCard({
     required this.label,
     required this.detail,
     required this.isSelected,
@@ -2666,91 +3591,48 @@ class _QuickChoiceChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return ChoiceChip(
-      selected: isSelected,
-      onSelected: (_) => onTap(),
-      label: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label),
-          Text(
-            detail,
-            style: TextStyle(
-              fontSize: 11,
-              color: isSelected
-                  ? colorScheme.onPrimaryContainer
-                  : colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DateChoiceTile extends StatelessWidget {
-  const _DateChoiceTile({
-    required this.title,
-    required this.subtitle,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.button),
         onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(AppSpacing.md),
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
           decoration: BoxDecoration(
             color: isSelected
-                ? colorScheme.primary.withValues(alpha: 0.10)
-                : colorScheme.surfaceContainerLow,
+                ? colors.primary.withValues(alpha: 0.11)
+                : colors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(AppRadius.button),
             border: Border.all(
               color: isSelected
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant,
+                  ? colors.primary
+                  : colors.outline.withValues(alpha: 0.40),
+              width: isSelected ? 1.6 : 1.0,
             ),
           ),
-          child: Row(
+          child: Column(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: AppTypography.body,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: AppTypography.caption,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected ? colors.primary : colors.onSurface,
                 ),
               ),
-              if (isSelected)
-                Icon(Icons.check_circle, color: colorScheme.primary),
+              const SizedBox(height: 3),
+              Text(
+                detail,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: AppTypography.micro,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ),
@@ -2824,23 +3706,79 @@ class _BinaryChoiceTile extends StatelessWidget {
   }
 }
 
-class _ReminderChoiceChip extends StatelessWidget {
-  const _ReminderChoiceChip({
+const List<int> _followUpTimingValues = [
+  5,
+  10,
+  15,
+  20,
+  25,
+  30,
+  35,
+  40,
+  45,
+  50,
+  55,
+  60,
+  120,
+  180,
+  240,
+  300,
+  360,
+  420,
+  480,
+  540,
+  600,
+];
+
+String _beforeLabel(int value) {
+  if (value == 0) return 'At scheduled time';
+  if (value == 60) return '1 hour before';
+  return '$value minutes before';
+}
+
+String _afterLabel(int value) {
+  if (value == 60) return '1 hour later';
+  if (value > 60 && value % 60 == 0) {
+    final hours = value ~/ 60;
+    return '$hours hours later';
+  }
+  return '$value minutes later';
+}
+
+class _ReminderTimingDropdown extends StatelessWidget {
+  const _ReminderTimingDropdown({
+    required this.value,
+    required this.values,
     required this.label,
-    required this.isSelected,
-    required this.onTap,
+    required this.labelBuilder,
+    required this.onChanged,
   });
 
+  final int value;
+  final List<int> values;
   final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final String Function(int value) labelBuilder;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => onTap(),
+    final safeValue = values.contains(value) ? value : values.first;
+
+    return DropdownButtonFormField<int>(
+      initialValue: safeValue,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        for (final item in values)
+          DropdownMenuItem<int>(value: item, child: Text(labelBuilder(item))),
+      ],
+      onChanged: (selected) {
+        if (selected != null) {
+          onChanged(selected);
+        }
+      },
     );
   }
 }
@@ -2956,28 +3894,116 @@ class _ReviewRowData {
   final String value;
 }
 
-class _CustomNameMessage extends StatelessWidget {
-  const _CustomNameMessage({required this.name});
+class _CustomProtocolCard extends StatelessWidget {
+  const _CustomProtocolCard({
+    required this.name,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   final String name;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final trimmedName = name.trim();
+    final colors = Theme.of(context).colorScheme;
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Text(
-          trimmedName.isEmpty
-              ? 'No presets available.'
-              : 'Use “$trimmedName” as a custom name.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: AppTypography.caption,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colors.primary.withValues(alpha: 0.09)
+                : colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(
+              color: isSelected
+                  ? colors.primary
+                  : colors.outline.withValues(alpha: 0.55),
+              width: isSelected ? 1.8 : 1.2,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Create custom protocol',
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  fontWeight: FontWeight.w700,
+                  color: colors.primary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: AppTypography.body,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Continue with this name and choose the details yourself.',
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _NameHelperCard extends StatelessWidget {
+  const _NameHelperCard({required this.title, required this.description});
+
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: colors.outline.withValues(alpha: 0.40)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: AppTypography.body,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            description,
+            style: TextStyle(
+              fontSize: AppTypography.caption,
+              height: 1.35,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

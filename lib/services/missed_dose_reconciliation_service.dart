@@ -63,13 +63,13 @@ class MissedDoseReconciliationService {
     var createdCount = 0;
 
     for (final protocol in protocols) {
-      // New protocols use a microsecond timestamp as their ID. That gives us
-      // a reliable "ArcticDose started tracking this protocol" boundary even when
-      // the schedule itself began months earlier.
-      final trackingStart = _trackingStartDate(
-        protocol,
-        fallback: globalLookbackStart,
-      );
+      // Protocol IDs created by MODOSE use a microsecond timestamp.
+      // That timestamp is our authoritative "tracking began" boundary.
+      //
+      // If we cannot prove when tracking began (legacy/non-timestamp IDs),
+      // use today as the safe fallback. That prevents reconciliation from
+      // inventing missed-dose history before MODOSE actually tracked it.
+      final trackingStart = _trackingStartDate(protocol, fallback: today);
 
       final protocolStart = DateTime(
         protocol.schedule.startDate.year,
@@ -86,7 +86,7 @@ class MissedDoseReconciliationService {
       }
 
       // Never create a missed record for the same calendar day the protocol
-      // was first added to ArcticDose. Tracking becomes authoritative after that.
+      // was first added to MODOSE. Tracking becomes authoritative after that.
       if (!startDate.isBefore(today)) {
         continue;
       }
@@ -136,7 +136,7 @@ class MissedDoseReconciliationService {
     try {
       final createdAt = DateTime.fromMicrosecondsSinceEpoch(rawId);
 
-      // Reject IDs that happen to be numeric but are not plausible timestamps.
+      // Reject numeric IDs that are not plausible creation timestamps.
       if (createdAt.year < 2020 || createdAt.year > 2100) {
         return fallback;
       }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/dose.dart';
 import '../models/dose_record.dart';
@@ -21,7 +22,6 @@ import '../services/injection_rotation_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/completed_dose_sheet.dart';
 import '../widgets/dashboard_header.dart';
-import '../widgets/empty_today_card.dart';
 import '../widgets/ghost_supply_card.dart';
 import '../widgets/take_dose_sheet.dart';
 import '../widgets/today_doses_card.dart';
@@ -40,7 +40,9 @@ import '../widgets/progress_photos_card.dart';
 import 'progress_photo_screen.dart';
 import '../models/symptom_entry.dart';
 import '../services/symptom_service.dart';
+import '../services/usage_analytics_service.dart';
 import 'daily_notes_symptoms_screen.dart';
+import 'calculator_hub_screen.dart';
 import '../models/measurement_system.dart';
 import '../utils/weight_display.dart';
 import '../theme/arctic_icons.dart';
@@ -57,6 +59,8 @@ class DashboardScreen extends StatefulWidget {
     required this.displayPreferences,
     required this.measurementSystem,
     required this.profile,
+    required this.onAddMoreModules,
+    required this.onArrangeHome,
     super.key,
   });
 
@@ -70,6 +74,8 @@ class DashboardScreen extends StatefulWidget {
   final DisplayPreferences displayPreferences;
   final MeasurementSystem measurementSystem;
   final Profile profile;
+  final VoidCallback onAddMoreModules;
+  final VoidCallback onArrangeHome;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -404,7 +410,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
 
           if (createdBatch == null) {
-            throw StateError('ArcticDose could not identify the new batch.');
+            throw StateError('MODOSE could not identify the new batch.');
           }
 
           preferredInventoryBatchId = createdBatch.id;
@@ -416,6 +422,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         protocol: protocol,
         result: result,
         preferredInventoryBatchId: preferredInventoryBatchId,
+      );
+
+      UsageAnalyticsService.instance.track(
+        UsageAnalyticsEvent.doseTaken,
+        properties: {
+          'protocol_type': protocol.type.name,
+          'has_inventory': _inventoryItems.any(
+            (item) => item.protocolId == protocol.id,
+          ),
+          'has_advanced_dose': protocol.doseDetails != null,
+        },
       );
     } catch (error) {
       if (!mounted) {
@@ -460,6 +477,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       await widget.dataService.saveDoseRecord(record);
+
+      UsageAnalyticsService.instance.track(
+        UsageAnalyticsEvent.doseSkipped,
+        properties: {'protocol_type': protocol.type.name},
+      );
 
       if (!mounted) {
         return;
@@ -544,6 +566,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       protocolId: dose.protocolId,
       scheduledFor: dose.scheduledFor,
     );
+
+    UsageAnalyticsService.instance.track(UsageAnalyticsEvent.doseUndone);
 
     if (!mounted) {
       return;
@@ -662,6 +686,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _loadDashboardData();
   }
 
+  Future<void> _openCalculator() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CalculatorHubScreen(
+          dataService: widget.dataService,
+          measurementSystem: widget.measurementSystem,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openGhostSupply() async {
     await Navigator.push<void>(
       context,
@@ -722,6 +758,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     await widget.dataService.saveWeightRecord(record);
+
+    UsageAnalyticsService.instance.track(UsageAnalyticsEvent.weightLogged);
 
     if (!mounted) {
       return;
@@ -803,29 +841,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   List<Widget> _buildConfiguredSections({
-    required bool hasProtocols,
     required bool hasWeight,
     required double? currentWeight,
     required double? startingWeight,
   }) {
-    if (!hasProtocols) {
-      if (widget.profile.hasModule(ProfileModule.protocols)) {
-        return [EmptyTodayCard(onAddProtocol: _openAddProtocol)];
-      }
-
-      if (widget.profile.hasModule(ProfileModule.weight)) {
-        return [
-          _EmptyWeightCard(
-            onLogWeight: _openWeightDialog,
-            startingWeight: widget.profile.startingWeight,
-            measurementSystem: widget.measurementSystem,
-          ),
-        ];
-      }
-
-      return const [];
-    }
-
     final sections = <Widget>[];
 
     for (final section in widget.homeLayout.visibleSections) {
@@ -841,6 +860,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (section == HomeSection.recentActivity &&
           !widget.displayPreferences.showRecentActivity) {
+        continue;
+      }
+
+      final isAllowed = switch (section) {
+        HomeSection.today || HomeSection.upcoming => widget.profile.hasModule(
+          ProfileModule.protocols,
+        ),
+        HomeSection.ghostSupply => widget.profile.hasModule(
+          ProfileModule.inventory,
+        ),
+        HomeSection.weight => widget.profile.hasModule(ProfileModule.weight),
+        HomeSection.progressPhotos => widget.profile.hasModule(
+          ProfileModule.photos,
+        ),
+        HomeSection.notesSymptoms => widget.profile.hasModule(
+          ProfileModule.notes,
+        ),
+        HomeSection.recentActivity => true,
+      };
+
+      if (!isAllowed) {
         continue;
       }
 
@@ -868,6 +908,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return sections;
   }
 
+  bool _hasStartedModule(ProfileModule module) {
+    return switch (module) {
+      ProfileModule.protocols => widget.protocols.isNotEmpty,
+      ProfileModule.weight =>
+        _weightRecords.isNotEmpty ||
+            (widget.profile.startingWeight != null &&
+                widget.profile.startingWeight! > 0),
+      ProfileModule.photos => _progressPhotoSessions.isNotEmpty,
+      ProfileModule.notes => _symptomEntries.isNotEmpty,
+      ProfileModule.inventory => _inventoryItems.isNotEmpty,
+    };
+  }
+
+  List<ProfileModule> get _setupModules {
+    const order = [
+      ProfileModule.protocols,
+      ProfileModule.weight,
+      ProfileModule.photos,
+      ProfileModule.notes,
+    ];
+
+    return order
+        .where((module) => widget.profile.hasModule(module))
+        .toList(growable: false);
+  }
+
+  bool get _needsInitialSetup {
+    final modules = _setupModules;
+
+    if (modules.isEmpty) {
+      return false;
+    }
+
+    // Get Started reflects only the modules this profile explicitly tracks.
+    // It remains visible while any selected module still needs its first entry.
+    return modules.any((module) => !_hasStartedModule(module));
+  }
+
+  Widget _buildGetStartedCard() {
+    return _GetStartedCard(
+      modules: _setupModules,
+      isStarted: _hasStartedModule,
+      onProtocols: _openAddProtocol,
+      onWeight: _openWeightDialog,
+      onPhotos: _openProgressPhotos,
+      onNotes: _openNotesSymptoms,
+      onAddMore: widget.onAddMoreModules,
+      onArrangeHome: widget.onArrangeHome,
+      onCalculator: _openCalculator,
+      onSupply: _openGhostSupply,
+    );
+  }
+
   Widget _buildTodaySection() {
     final visibleDoses = widget.displayPreferences.showCompletedDoses
         ? _doses
@@ -878,8 +971,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       mergeWithHeader: true,
       child: TodayDosesCard(
         doses: visibleDoses,
+        protocols: widget.protocols,
         onDosePressed: _toggleDose,
-        displayPreferences: widget.displayPreferences,
       ),
     );
   }
@@ -959,6 +1052,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<void> _openNotesSymptoms() async {
+    final now = DateTime.now();
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DailyNotesSymptomsScreen(
+          date: DateTime(now.year, now.month, now.day),
+          protocols: widget.protocols,
+        ),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadSymptomData();
+  }
+
   Widget _buildNotesSymptomsSection() {
     final now = DateTime.now();
 
@@ -975,23 +1088,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return _NotesSymptomsHomeCard(
       todayEntries: todayEntries,
       recentEntries: _symptomEntries.take(5).toList(),
-      onOpen: () async {
-        await Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => DailyNotesSymptomsScreen(
-              date: DateTime(now.year, now.month, now.day),
-              protocols: widget.protocols,
-            ),
-          ),
-        );
-
-        if (!mounted) {
-          return;
-        }
-
-        await _loadSymptomData();
-      },
+      onOpen: _openNotesSymptoms,
     );
   }
 
@@ -1077,7 +1174,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasProtocols = widget.protocols.isNotEmpty;
     final hasWeight = _weightRecords.isNotEmpty;
 
     final currentWeight = hasWeight ? _weightRecords.first.weight : null;
@@ -1089,7 +1185,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final remainingDoses = _doses.where((dose) => !dose.isResolved).length;
 
     final configuredSections = _buildConfiguredSections(
-      hasProtocols: hasProtocols,
       hasWeight: hasWeight,
       currentWeight: currentWeight,
       startingWeight: startingWeight,
@@ -1098,24 +1193,423 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       floatingActionButton: null,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            110,
+        child: _needsInitialSetup
+            ? SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  110,
+                ),
+                child: _buildGetStartedCard(),
+              )
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  110,
+                ),
+                children: [
+                  DashboardHeader(
+                    profileName: widget.profile.name,
+                    remainingDoses: remainingDoses,
+                    totalDoses: _doses.length,
+                    onAddProtocol:
+                        widget.profile.hasModule(ProfileModule.protocols)
+                        ? _openAddProtocol
+                        : null,
+                    showGreeting: widget.displayPreferences.showGreeting,
+                    showProgressBar: widget.displayPreferences.showProgressBar,
+                  ),
+                  if (configuredSections.isNotEmpty &&
+                      !(widget.profile.hasModule(ProfileModule.protocols) &&
+                          widget.homeLayout.visibleSections.isNotEmpty &&
+                          widget.homeLayout.visibleSections.first ==
+                              HomeSection.today))
+                    const SizedBox(height: AppSpacing.md),
+                  ...configuredSections,
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _GetStartedCard extends StatelessWidget {
+  const _GetStartedCard({
+    required this.modules,
+    required this.isStarted,
+    required this.onProtocols,
+    required this.onWeight,
+    required this.onPhotos,
+    required this.onNotes,
+    required this.onAddMore,
+    required this.onArrangeHome,
+    required this.onCalculator,
+    required this.onSupply,
+  });
+
+  final List<ProfileModule> modules;
+  final bool Function(ProfileModule module) isStarted;
+
+  final VoidCallback onProtocols;
+  final VoidCallback onWeight;
+  final VoidCallback onPhotos;
+  final VoidCallback onNotes;
+
+  final VoidCallback onAddMore;
+  final VoidCallback onArrangeHome;
+  final VoidCallback onCalculator;
+  final VoidCallback onSupply;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final completedCount = modules.where(isStarted).length;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color ?? colors.surface,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: isDark ? 0.62 : 0.72),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: isDark ? 0.14 : 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
-          children: [
-            DashboardHeader(
-              profileName: widget.profile.name,
-              remainingDoses: remainingDoses,
-              totalDoses: _doses.length,
-              onAddProtocol: hasProtocols ? _openAddProtocol : null,
-              showGreeting: widget.displayPreferences.showGreeting,
-              showProgressBar: widget.displayPreferences.showProgressBar,
+        ],
+      ),
+      child: Column(
+        children: [
+          Image.asset(
+            isDark
+                ? 'assets/branding/arcticdose_brandmark_dark.png'
+                : 'assets/branding/arcticdose_brandmark_light.png',
+            width: 176,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+
+          const SizedBox(height: 16),
+
+          Divider(
+            height: 1,
+            color: colors.outlineVariant.withValues(alpha: 0.55),
+          ),
+
+          const SizedBox(height: 18),
+
+          const Text(
+            'Get Started',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 27,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.45,
             ),
-            ...configuredSections,
+          ),
+
+          const SizedBox(height: 5),
+
+          Text(
+            completedCount == 0
+                ? 'Set up the things you chose to track.'
+                : '$completedCount of ${modules.length} ready. Finish the rest whenever you want.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: AppTypography.body,
+              height: 1.4,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+
+          const SizedBox(height: 22),
+
+          for (var index = 0; index < modules.length; index++) ...[
+            _GetStartedRow(
+              module: modules[index],
+              complete: isStarted(modules[index]),
+              onTap: switch (modules[index]) {
+                ProfileModule.protocols => onProtocols,
+                ProfileModule.weight => onWeight,
+                ProfileModule.photos => onPhotos,
+                ProfileModule.notes => onNotes,
+                ProfileModule.inventory => onSupply,
+              },
+            ),
+            if (index < modules.length - 1)
+              const SizedBox(height: AppSpacing.sm),
           ],
+
+          const SizedBox(height: 28),
+
+          Divider(
+            height: 1,
+            color: colors.outlineVariant.withValues(alpha: 0.48),
+          ),
+
+          const SizedBox(height: 14),
+
+          Row(
+            children: [
+              Expanded(
+                child: _SetupUtilityButton(
+                  icon: Icons.add_rounded,
+                  label: 'Add More',
+                  onTap: onAddMore,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _SetupUtilityButton(
+                  icon: LucideIcons.slidersHorizontal,
+                  label: 'Arrange Home',
+                  onTap: onArrangeHome,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'QUICK ACCESS',
+              style: TextStyle(
+                fontSize: AppTypography.micro,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.0,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 9),
+
+          Row(
+            children: [
+              Expanded(
+                child: _QuickAccessButton(
+                  icon: Icons.calculate_outlined,
+                  label: 'Calculator',
+                  onTap: onCalculator,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _QuickAccessButton(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Supply',
+                  onTap: onSupply,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GetStartedRow extends StatelessWidget {
+  const _GetStartedRow({
+    required this.module,
+    required this.complete,
+    required this.onTap,
+  });
+
+  final ProfileModule module;
+  final bool complete;
+  final VoidCallback onTap;
+
+  IconData get _icon {
+    return switch (module) {
+      ProfileModule.protocols => LucideIcons.syringe,
+      ProfileModule.weight => ArcticIcons.monitor_weight_outlined,
+      ProfileModule.photos => ArcticIcons.photo_camera_outlined,
+      ProfileModule.notes => ArcticIcons.notes_outlined,
+      ProfileModule.inventory => ArcticIcons.inventory_2_outlined,
+    };
+  }
+
+  String get _subtitle {
+    return switch (module) {
+      ProfileModule.protocols => 'Create your first schedule and dose.',
+      ProfileModule.weight => 'Log a weight to begin your trend.',
+      ProfileModule.photos => 'Create your first progress session.',
+      ProfileModule.notes => 'Add your first note or symptom.',
+      ProfileModule.inventory => 'Add your first supply item.',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: complete
+              ? colors.primary.withValues(alpha: 0.22)
+              : colors.outlineVariant.withValues(alpha: 0.62),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: 0.09),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(_icon, color: colors.primary, size: 22),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  module.label,
+                  style: const TextStyle(
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  complete ? 'Ready to go.' : _subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: AppTypography.caption,
+                    height: 1.25,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          if (complete)
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_rounded, size: 20, color: colors.primary),
+            )
+          else
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: FilledButton(
+                onPressed: onTap,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(40, 40),
+                  maximumSize: const Size(40, 40),
+                  padding: EdgeInsets.zero,
+                  shape: const CircleBorder(),
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: const Icon(Icons.add_rounded, size: 21),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SetupUtilityButton extends StatelessWidget {
+  const _SetupUtilityButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      ),
+    );
+  }
+}
+
+class _QuickAccessButton extends StatelessWidget {
+  const _QuickAccessButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Ink(
+          height: 66,
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: 0.055),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: colors.primary.withValues(alpha: 0.14)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 21, color: colors.primary),
+              const SizedBox(height: 5),
+              Text(
+                label,
+                maxLines: 1,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1176,9 +1670,9 @@ class _InventoryRolloverSheet extends StatelessWidget {
                         '${_formatDashboardAmount(item.currentAmount)} '
                         '${item.unit} remaining. This dose needs '
                         '${_formatDashboardAmount(doseAmount)} ${item.unit}. '
-                        'Choose which batch ArcticDose should open next.'
+                        'Choose which batch MODOSE should open next.'
                   : 'Your current $containerName is empty. '
-                        'Choose which batch ArcticDose should open next.',
+                        'Choose which batch MODOSE should open next.',
               style: TextStyle(color: colors.onSurfaceVariant, height: 1.4),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -1482,7 +1976,7 @@ class _NewRolloverBatchSheetState extends State<_NewRolloverBatchSheet> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Add this batch to Arctic Supply and use it for the rollover.',
+              'Add this batch to MODOSE Supply and use it for the rollover.',
               style: TextStyle(color: colors.onSurfaceVariant),
             ),
             const SizedBox(height: AppSpacing.lg),

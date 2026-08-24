@@ -2027,18 +2027,19 @@ class _PremiumAnalyticsPreview extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Container(
-                width: 62,
-                height: 62,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colors.surface.withValues(alpha: 0.48),
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                ),
-                child: Icon(
-                  ArcticIcons.analytics_outlined,
-                  size: 32,
-                  color: colors.primary,
+              SizedBox(
+                width: 70,
+                height: 70,
+                child: ColorFiltered(
+                  colorFilter: ColorFilter.mode(
+                    colors.primary,
+                    BlendMode.srcIn,
+                  ),
+                  child: Image.asset(
+                    'assets/branding/modose_premium_mark.png',
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -2090,9 +2091,21 @@ class _PremiumAnalyticsPreview extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         FilledButton.icon(
           onPressed: onUpgrade,
-          icon: const Icon(ArcticIcons.lock_open_rounded),
+          icon: ColorFiltered(
+            colorFilter: ColorFilter.mode(
+              colors.onPrimary,
+              BlendMode.srcIn,
+            ),
+            child: Image.asset(
+              'assets/branding/modose_premium_mark.png',
+              width: 23,
+              height: 23,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
           label: const Text(
-            'Upgrade to Premium',
+            'Upgrade to MODOSE Premium',
             style: TextStyle(fontWeight: FontWeight.w800),
           ),
         ),

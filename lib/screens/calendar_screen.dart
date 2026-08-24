@@ -11,6 +11,7 @@ import '../services/app_data_service.dart';
 import '../services/progress_photo_service.dart';
 import '../services/protocol_schedule_service.dart';
 import '../services/symptom_service.dart';
+import '../services/usage_analytics_service.dart';
 import '../theme/app_theme.dart';
 import 'calendar/calendar_helpers.dart';
 import 'calendar/widgets/month_calendar.dart';
@@ -61,6 +62,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
+
+    UsageAnalyticsService.instance.track(
+      UsageAnalyticsEvent.calendarOpened,
+    );
 
     final now = DateTime.now();
 
@@ -306,32 +311,42 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
 
           Expanded(
-            child: ScrollablePositionedList.builder(
-              itemScrollController: _itemScrollController,
-              initialScrollIndex: _currentMonthIndex,
-              initialAlignment: 0,
+            child: Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
-                AppSpacing.sm,
+                0,
                 AppSpacing.md,
-                100,
+                AppSpacing.sm,
               ),
-              itemCount: _months.length,
-              itemBuilder: (context, index) {
-                final month = _months[index];
+              child: _CalendarBodySurface(
+                child: ScrollablePositionedList.builder(
+                  itemScrollController: _itemScrollController,
+                  initialScrollIndex: _currentMonthIndex,
+                  initialAlignment: 0,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                    100,
+                  ),
+                  itemCount: _months.length,
+                  itemBuilder: (context, index) {
+                    final month = _months[index];
 
-                _ensureMonthLoaded(month);
+                    _ensureMonthLoaded(month);
 
-                return MonthCalendar(
-                  key: ValueKey(_monthKey(month)),
-                  displayedMonth: month,
-                  selectedDate: _selectedDate,
-                  summaryForDate: (date) {
-                    return _summaryForDate(month: month, date: date);
+                    return MonthCalendar(
+                      key: ValueKey(_monthKey(month)),
+                      displayedMonth: month,
+                      selectedDate: _selectedDate,
+                      summaryForDate: (date) {
+                        return _summaryForDate(month: month, date: date);
+                      },
+                      onDateSelected: _openDate,
+                    );
                   },
-                  onDateSelected: _openDate,
-                );
-              },
+                ),
+              ),
             ),
           ),
         ],
@@ -339,6 +354,42 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 }
+
+
+class _CalendarBodySurface extends StatelessWidget {
+  const _CalendarBodySurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: isDark
+            ? colors.surface.withValues(alpha: 0.78)
+            : Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: isDark ? 0.42 : 0.55),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: isDark ? 0.12 : 0.045),
+            blurRadius: 18,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
 
 class _CalendarHeader extends StatelessWidget {
   const _CalendarHeader({

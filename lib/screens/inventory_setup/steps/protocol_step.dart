@@ -61,7 +61,7 @@ class _ProtocolStepState extends State<ProtocolStep> {
         const StepHeader(
           title: 'What are you tracking?',
           subtitle:
-              'Choose an existing protocol. ArcticDose will use smart defaults when available.',
+              'Choose an existing protocol. MODOSE will use smart defaults when available.',
           currentStep: 1,
           totalSteps: 7,
         ),
@@ -248,7 +248,7 @@ class _NoMatchingProtocols extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'ArcticDose Supply can only be attached to protocols already created in ArcticDose.',
+            'MODOSE Supply can only be attached to protocols already created in MODOSE.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: AppTypography.caption,
@@ -260,3 +260,4 @@ class _NoMatchingProtocols extends StatelessWidget {
     );
   }
 }
+

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/measurement_system.dart';
 import '../models/profile.dart';
+import '../models/profile_module.dart';
 import '../models/tracking_preferences.dart';
 import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
@@ -11,6 +12,7 @@ class OnboardingSetupResult {
     required this.profileName,
     required this.profileType,
     required this.preferences,
+    required this.enabledModules,
     required this.heightCm,
     required this.measurementSystem,
   });
@@ -18,6 +20,7 @@ class OnboardingSetupResult {
   final String profileName;
   final ProfileType profileType;
   final TrackingPreferences preferences;
+  final Set<ProfileModule> enabledModules;
   final double heightCm;
   final MeasurementSystem measurementSystem;
 }
@@ -44,7 +47,12 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
   late final TextEditingController _heightInchesController;
   late final TextEditingController _heightCmController;
 
-  TrackingPreferences _preferences = TrackingPreferences.defaults;
+  TrackingPreferences _preferences = TrackingPreferences.defaults.copyWith(
+    trackWeight: false,
+    trackPhotos: false,
+    trackNotes: false,
+  );
+  final Set<ProfileModule> _selectedModules = <ProfileModule>{};
   ProfileType _profileType = ProfileType.self;
   MeasurementSystem _measurementSystem = MeasurementSystem.imperial;
 
@@ -117,6 +125,11 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
       }
     }
 
+    if (_currentPage == 1 && _selectedModules.isEmpty) {
+      _showMessage('Choose at least one thing to track.');
+      return;
+    }
+
     if (_currentPage == _pageCount - 1) {
       await _finishSetup();
       return;
@@ -166,6 +179,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
           profileName: profileName,
           profileType: _profileType,
           preferences: _preferences,
+          enabledModules: _savedModules,
           heightCm: heightCm,
           measurementSystem: _measurementSystem,
         ),
@@ -189,6 +203,43 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
     setState(() {
       _preferences = preferences;
     });
+  }
+
+  void _setModuleEnabled(ProfileModule module, bool enabled) {
+    setState(() {
+      if (enabled) {
+        _selectedModules.add(module);
+      } else {
+        _selectedModules.remove(module);
+      }
+
+      switch (module) {
+        case ProfileModule.weight:
+          _preferences = _preferences.copyWith(trackWeight: enabled);
+          break;
+        case ProfileModule.photos:
+          _preferences = _preferences.copyWith(trackPhotos: enabled);
+          break;
+        case ProfileModule.notes:
+          _preferences = _preferences.copyWith(trackNotes: enabled);
+          break;
+        case ProfileModule.protocols:
+        case ProfileModule.inventory:
+          break;
+      }
+    });
+  }
+
+  Set<ProfileModule> get _savedModules {
+    final modules = Set<ProfileModule>.from(_selectedModules);
+
+    // Supply is a protocol companion feature, so keep it available whenever
+    // protocol tracking is selected without making it another onboarding choice.
+    if (modules.contains(ProfileModule.protocols)) {
+      modules.add(ProfileModule.inventory);
+    }
+
+    return modules;
   }
 
   void _setMeasurementSystem(MeasurementSystem system) {
@@ -260,16 +311,19 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
                   ),
                   _TrackingSelectionPage(
                     preferences: _preferences,
-                    onChanged: _updatePreferences,
+                    selectedModules: _selectedModules,
+                    onModuleChanged: _setModuleEnabled,
                   ),
                   _CustomizeTrackingPage(
                     preferences: _preferences,
+                    selectedModules: _selectedModules,
                     onChanged: _updatePreferences,
                   ),
                   _FinishSetupPage(
                     profileNameController: _profileNameController,
                     profileType: _profileType,
                     preferences: _preferences,
+                    selectedModules: _selectedModules,
                     measurementSystem: _measurementSystem,
                     heightCm: _heightCm,
                   ),
@@ -430,11 +484,11 @@ class _ProfileSetupPage extends StatelessWidget {
       icon: ArcticIcons.person_outline_rounded,
       title: 'Set up your profile.',
       subtitle:
-          'ArcticDose uses your profile to keep protocols, progress, inventory, and history organized.',
+          'MODOSE uses your profile to keep protocols, progress, inventory, and history organized.',
       children: [
         const _FieldLabel(
           title: 'Profile name',
-          subtitle: 'This is how ArcticDose will address this profile.',
+          subtitle: 'This is how MODOSE will address this profile.',
         ),
         const SizedBox(height: AppSpacing.sm),
 
@@ -547,11 +601,13 @@ class _ProfileSetupPage extends StatelessWidget {
 class _TrackingSelectionPage extends StatelessWidget {
   const _TrackingSelectionPage({
     required this.preferences,
-    required this.onChanged,
+    required this.selectedModules,
+    required this.onModuleChanged,
   });
 
   final TrackingPreferences preferences;
-  final ValueChanged<TrackingPreferences> onChanged;
+  final Set<ProfileModule> selectedModules;
+  final void Function(ProfileModule module, bool enabled) onModuleChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -560,21 +616,25 @@ class _TrackingSelectionPage extends StatelessWidget {
       icon: ArcticIcons.tune_rounded,
       title: 'Choose what matters.',
       subtitle:
-          'Protocols are always available. Turn on the additional tracking you want to use.',
+          'Choose what you want MODOSE to focus on. You can change these choices later.',
       children: [
-        const _LockedTrackingTile(
+        _TrackingSwitchTile(
           icon: ArcticIcons.medication_outlined,
           title: 'Protocols',
           subtitle: 'Schedules, doses, cycles, reminders, and history.',
+          value: selectedModules.contains(ProfileModule.protocols),
+          onChanged: (value) {
+            onModuleChanged(ProfileModule.protocols, value);
+          },
         ),
         const SizedBox(height: AppSpacing.sm),
         _TrackingSwitchTile(
           icon: ArcticIcons.monitor_weight_outlined,
           title: 'Weight',
           subtitle: 'Track weight history, trends, and BMI.',
-          value: preferences.trackWeight,
+          value: selectedModules.contains(ProfileModule.weight),
           onChanged: (value) {
-            onChanged(preferences.copyWith(trackWeight: value));
+            onModuleChanged(ProfileModule.weight, value);
           },
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -582,19 +642,19 @@ class _TrackingSelectionPage extends StatelessWidget {
           icon: ArcticIcons.photo_camera_outlined,
           title: 'Progress Photos',
           subtitle: 'Build visual progress sessions over time.',
-          value: preferences.trackPhotos,
+          value: selectedModules.contains(ProfileModule.photos),
           onChanged: (value) {
-            onChanged(preferences.copyWith(trackPhotos: value));
+            onModuleChanged(ProfileModule.photos, value);
           },
         ),
         const SizedBox(height: AppSpacing.sm),
         _TrackingSwitchTile(
           icon: ArcticIcons.notes_outlined,
           title: 'Notes & Symptoms',
-          subtitle: 'Log symptoms, notes, and protocol-related observations.',
-          value: preferences.trackNotes,
+          subtitle: 'Log symptoms, notes, and observations.',
+          value: selectedModules.contains(ProfileModule.notes),
           onChanged: (value) {
-            onChanged(preferences.copyWith(trackNotes: value));
+            onModuleChanged(ProfileModule.notes, value);
           },
         ),
       ],
@@ -605,28 +665,35 @@ class _TrackingSelectionPage extends StatelessWidget {
 class _CustomizeTrackingPage extends StatelessWidget {
   const _CustomizeTrackingPage({
     required this.preferences,
+    required this.selectedModules,
     required this.onChanged,
   });
 
   final TrackingPreferences preferences;
+  final Set<ProfileModule> selectedModules;
   final ValueChanged<TrackingPreferences> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final hasOptionalTracking =
-        preferences.trackWeight ||
-        preferences.trackPhotos ||
-        preferences.trackNotes;
-
     return _OnboardingPageLayout(
       eyebrow: 'ROUTINE',
       icon: ArcticIcons.calendar_month_outlined,
       title: 'Build your routine.',
-      subtitle: hasOptionalTracking
-          ? 'Set a simple check-in cadence. You can change it later.'
-          : 'Protocols are ready. Additional tracking can be enabled later in Settings.',
+      subtitle:
+          'Set the cadence for anything that needs one. You can change it later.',
       children: [
-        if (!hasOptionalTracking) const _NothingSelectedCard(),
+        if (selectedModules.contains(ProfileModule.protocols))
+          const _EnabledTrackingCard(
+            icon: ArcticIcons.medication_outlined,
+            title: 'Protocols',
+            subtitle: 'Create your first protocol from Home after setup.',
+          ),
+
+        if (selectedModules.contains(ProfileModule.protocols) &&
+            (preferences.trackWeight ||
+                preferences.trackPhotos ||
+                preferences.trackNotes))
+          const SizedBox(height: AppSpacing.md),
 
         if (preferences.trackWeight)
           _FrequencyCard(
@@ -673,6 +740,7 @@ class _FinishSetupPage extends StatelessWidget {
     required this.profileNameController,
     required this.profileType,
     required this.preferences,
+    required this.selectedModules,
     required this.measurementSystem,
     required this.heightCm,
   });
@@ -680,6 +748,7 @@ class _FinishSetupPage extends StatelessWidget {
   final TextEditingController profileNameController;
   final ProfileType profileType;
   final TrackingPreferences preferences;
+  final Set<ProfileModule> selectedModules;
   final MeasurementSystem measurementSystem;
   final double? heightCm;
 
@@ -690,7 +759,7 @@ class _FinishSetupPage extends StatelessWidget {
     return _OnboardingPageLayout(
       eyebrow: 'READY',
       icon: Icons.check_rounded,
-      title: 'ArcticDose is ready.',
+      title: 'MODOSE is ready.',
       subtitle:
           'Review your setup. Everything here can be changed later from Settings.',
       children: [
@@ -708,10 +777,12 @@ class _FinishSetupPage extends StatelessWidget {
               value: _heightLabel(heightCm, measurementSystem),
             ),
             const _SummaryDivider(),
-            const _SummaryRow(
+            _SummaryRow(
               icon: ArcticIcons.medication_outlined,
               title: 'Protocols',
-              value: 'Enabled',
+              value: selectedModules.contains(ProfileModule.protocols)
+                  ? 'Enabled'
+                  : 'Off',
             ),
             const _SummaryDivider(),
             _SummaryRow(
@@ -926,31 +997,6 @@ class _ProfileTypeChip extends StatelessWidget {
         fontWeight: FontWeight.w700,
         color: selected ? colors.primary : colors.onSurface,
       ),
-    );
-  }
-}
-
-class _LockedTrackingTile extends StatelessWidget {
-  const _LockedTrackingTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return _TrackingTileShell(
-      icon: icon,
-      title: title,
-      subtitle: subtitle,
-      trailing: Icon(Icons.check_circle_rounded, color: colors.primary),
-      emphasized: true,
     );
   }
 }
@@ -1170,42 +1216,6 @@ class _EnabledTrackingCard extends StatelessWidget {
   }
 }
 
-class _NothingSelectedCard extends StatelessWidget {
-  const _NothingSelectedCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: colors.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: colors.primary.withValues(alpha: 0.16)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(ArcticIcons.info_outline_rounded, color: colors.primary),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Text(
-              'Protocols will still be available. Weight, photos, and notes can be enabled later in Settings.',
-              style: TextStyle(
-                fontSize: AppTypography.caption,
-                height: 1.4,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _FrequencySelector extends StatelessWidget {
   const _FrequencySelector({required this.value, required this.onChanged});
 
@@ -1217,12 +1227,36 @@ class _FrequencySelector extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: SegmentedButton<TrackingFrequency>(
+        style: ButtonStyle(
+          padding: WidgetStateProperty.all(
+            const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+          ),
+          textStyle: WidgetStateProperty.all(
+            const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+          visualDensity: VisualDensity.compact,
+        ),
         segments: const [
-          ButtonSegment(value: TrackingFrequency.daily, label: Text('Daily')),
-          ButtonSegment(value: TrackingFrequency.weekly, label: Text('Weekly')),
+          ButtonSegment(
+            value: TrackingFrequency.daily,
+            label: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('Daily', maxLines: 1, softWrap: false),
+            ),
+          ),
+          ButtonSegment(
+            value: TrackingFrequency.weekly,
+            label: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('Weekly', maxLines: 1, softWrap: false),
+            ),
+          ),
           ButtonSegment(
             value: TrackingFrequency.monthly,
-            label: Text('Monthly'),
+            label: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('Monthly', maxLines: 1, softWrap: false),
+            ),
           ),
         ],
         selected: {value},

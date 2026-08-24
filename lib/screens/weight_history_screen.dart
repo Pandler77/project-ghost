@@ -10,6 +10,7 @@ import '../models/weight_record.dart';
 import '../services/app_data_service.dart';
 import '../services/profile_service.dart';
 import '../services/progress_photo_service.dart';
+import '../services/usage_analytics_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/weight_display.dart';
 import 'premium_screen.dart';
@@ -62,6 +63,11 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
   @override
   void initState() {
     super.initState();
+
+    UsageAnalyticsService.instance.track(
+      UsageAnalyticsEvent.weightHistoryOpened,
+    );
+
     _loadData();
   }
 
@@ -206,6 +212,10 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
     );
 
     await widget.dataService.saveWeightRecord(record);
+
+    UsageAnalyticsService.instance.track(
+      UsageAnalyticsEvent.weightLogged,
+    );
 
     final profile = _profile;
 

@@ -825,9 +825,16 @@ class ProtocolPresetService {
   ];
 
   List<ProtocolPreset> getByCategory(ProtocolCategory category) {
-    final presets = _presets
-        .where((preset) => preset.category == category)
-        .toList();
+    final presets = _presets.where((preset) {
+      if (category == ProtocolCategory.peptide) {
+        return preset.category == ProtocolCategory.peptide ||
+            preset.category == ProtocolCategory.hormonesAndTrt ||
+            preset.category == ProtocolCategory.otherWellness ||
+            preset.category == ProtocolCategory.researchCompound;
+      }
+
+      return preset.category == category;
+    }).toList();
 
     presets.sort(
       (first, second) =>

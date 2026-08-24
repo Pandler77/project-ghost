@@ -216,7 +216,7 @@ class ProfileLimitReachedException implements Exception {
 
   @override
   String toString() {
-    return 'ArcticDose Premium is required to add another profile.';
+    return 'MODOSE Premium is required to add another profile.';
   }
 }
 
@@ -225,7 +225,7 @@ class ProfileAccessRequiresPremiumException implements Exception {
 
   @override
   String toString() {
-    return 'ArcticDose Premium is required to access this profile.';
+    return 'MODOSE Premium is required to access this profile.';
   }
 }
 
@@ -237,3 +237,4 @@ class CannotDeleteLastProfileException implements Exception {
     return 'The final remaining profile cannot be deleted.';
   }
 }
+

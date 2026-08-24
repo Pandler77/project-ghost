@@ -36,7 +36,7 @@ class GhostSupplyCard extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  'ArcticDose Supply™',
+                  'MODOSE Supply™',
                   style: TextStyle(
                     fontSize: AppTypography.title,
                     fontWeight: FontWeight.bold,
@@ -296,10 +296,11 @@ class _EmptySupplyState extends StatelessWidget {
         onPressed: onTap,
         icon: const Icon(ArcticIcons.inventory_2_outlined),
         label: const Text(
-          'Set Up ArcticDose Supply',
+          'Set Up MODOSE Supply',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
     );
   }
 }
+

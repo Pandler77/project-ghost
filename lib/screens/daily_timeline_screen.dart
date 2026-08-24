@@ -402,7 +402,10 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
     );
 
     try {
-      await widget.dataService.saveDoseRecord(record);
+      await widget.dataService.saveDoseRecord(
+        record,
+        adjustInventory: false,
+      );
 
       if (!mounted) {
         return;
@@ -434,17 +437,30 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
         '${scheduledFor.toIso8601String()}';
   }
 
+  bool get _isPastDate {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = DateTime(
+      widget.date.year,
+      widget.date.month,
+      widget.date.day,
+    );
+
+    return selected.isBefore(today);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Day'),
         actions: [
-          IconButton(
-            onPressed: _addHistoricalDose,
-            tooltip: 'Add historical dose',
-            icon: const Icon(Icons.add_circle_outline),
-          ),
+          if (_isPastDate)
+            IconButton(
+              onPressed: _addHistoricalDose,
+              tooltip: 'Add historical dose',
+              icon: const Icon(Icons.add_circle_outline),
+            ),
           TextButton.icon(
             onPressed: _openDayEditor,
             icon: const Icon(ArcticIcons.edit_outlined),

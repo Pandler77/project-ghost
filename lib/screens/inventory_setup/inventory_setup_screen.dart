@@ -192,7 +192,10 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
 
     _currentAmount = item.currentAmount;
 
-    _totalQuantity = item.unopenedQuantity + (item.currentAmount > 0 ? 1 : 0);
+    // Unopened inventory is stored in InventoryBatch rows, not on
+    // InventoryItem. Start with only the active physical container here;
+    // _loadExistingBatches() adds the unopened batch quantities afterward.
+    _totalQuantity = item.currentAmount > 0 ? 1 : 0;
 
     _selectedExistingBatchId = item.currentContainerBatchId;
 
@@ -296,6 +299,17 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
       if (selectedId != null &&
           !batches.any((batch) => batch.id == selectedId)) {
         _selectedExistingBatchId = null;
+      }
+
+      if (_isEditing && _selectedProtocol?.id == protocolId) {
+        final unopenedContainers = batches.fold<int>(
+          0,
+          (total, batch) => total + batch.quantity,
+        );
+
+        final activeContainerCount = _currentAmount > 0 ? 1 : 0;
+
+        _totalQuantity = unopenedContainers + activeContainerCount;
       }
     });
   }
@@ -606,7 +620,7 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save ArcticDose Supply: $error')),
+        SnackBar(content: Text('Could not save MODOSE Supply: $error')),
       );
     }
   }
@@ -799,7 +813,7 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'This is the name ArcticDose will show on your inventory card. '
+              'This is the name MODOSE will show on your inventory card. '
               'Renaming it does not change the linked protocol.',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -904,7 +918,7 @@ class _InventorySetupScreenState extends State<InventorySetupScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _isEditing ? 'Edit ArcticDose Supply™' : 'Set Up ArcticDose Supply™',
+          _isEditing ? 'Edit MODOSE Supply™' : 'Set Up MODOSE Supply™',
           style: const TextStyle(
             fontWeight: FontWeight.w800,
             letterSpacing: -0.2,

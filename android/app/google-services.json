@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "900413220859",
+    "project_id": "modose",
+    "storage_bucket": "modose.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:900413220859:android:595b5df7b0ac0e990c0d5e",
+        "android_client_info": {
+          "package_name": "com.example.project_ghost"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaOWFtPwH0q1Q1IFurR5gTYlHg-Kl1RMM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

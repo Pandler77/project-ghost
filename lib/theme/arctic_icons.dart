@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// ArcticDose feature icon vocabulary.
+/// MODOSE feature icon vocabulary.
 ///
 /// Product/feature icons use Lucide so the app has one consistent
 /// thin-line visual language. Universal OS controls remain Material.
@@ -180,3 +180,4 @@ class ArcticIcons {
   static const IconData workspace_premium_outlined = LucideIcons.crown;
   static const IconData workspace_premium_rounded = LucideIcons.crown;
 }
+

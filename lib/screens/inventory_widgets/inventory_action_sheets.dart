@@ -621,7 +621,7 @@ class _InventoryAdjustmentSheetState
                         Text(
                           'Correct the active '
                           '${widget.item.containerType.toLowerCase()} '
-                          'when ArcticDose does not match what you physically have.',
+                          'when MODOSE does not match what you physically have.',
                           style: TextStyle(
                             fontSize: AppTypography.caption,
                             color: colors.onSurfaceVariant,
@@ -770,3 +770,4 @@ String formatInventoryDate(DateTime value) {
 
   return '${months[value.month - 1]} ${value.day}, ${value.year}';
 }
+

@@ -7,7 +7,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String databaseName = 'ghost.db';
-  static const int databaseVersion = 36;
+  static const int databaseVersion = 41;
 
   static const String profilesTable = 'profiles';
   static const String protocolsTable = 'protocols';
@@ -294,6 +294,23 @@ class AppDatabase {
     if (oldVersion < 36) {
       await _addProtocolCustomReminderColumns(database);
     }
+
+    if (oldVersion < 37) {
+      await _addProtocolAdvancedDoseColumn(database);
+    }
+
+    if (oldVersion < 38) {
+      await _addDoseRecordSnapshotColumns(database);
+    }
+
+    // Repair installs that reached v39 without the follow-up text columns.
+    if (oldVersion < 40) {
+      await _addProtocolCustomFollowUpColumns(database);
+    }
+
+    if (oldVersion < 41) {
+      await _addProtocolSoftDeleteColumn(database);
+    }
   }
 
   Future<void> _addProfiles(Database database) async {
@@ -341,6 +358,15 @@ class AppDatabase {
       database,
       table: protocolsTable,
       column: 'dose_unit',
+      definition: 'TEXT',
+    );
+  }
+
+  Future<void> _addProtocolAdvancedDoseColumn(Database database) async {
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'advanced_dose_json',
       definition: 'TEXT',
     );
   }
@@ -430,6 +456,31 @@ class AppDatabase {
       table: protocolsTable,
       column: 'custom_reminder_body',
       definition: 'TEXT',
+    );
+  }
+
+  Future<void> _addProtocolCustomFollowUpColumns(Database database) async {
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'custom_follow_up_title',
+      definition: 'TEXT',
+    );
+
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'custom_follow_up_body',
+      definition: 'TEXT',
+    );
+  }
+
+  Future<void> _addProtocolSoftDeleteColumn(Database database) async {
+    await _addColumnIfMissing(
+      database,
+      table: protocolsTable,
+      column: 'is_deleted',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
     );
   }
 
@@ -563,6 +614,7 @@ class AppDatabase {
         dose TEXT NOT NULL,
         dose_amount REAL,
         dose_unit TEXT,
+        advanced_dose_json TEXT,
         status TEXT NOT NULL,
 
         color_value INTEGER NOT NULL
@@ -603,6 +655,9 @@ class AppDatabase {
           DEFAULT 60,
         custom_reminder_title TEXT,
         custom_reminder_body TEXT,
+        custom_follow_up_title TEXT,
+        custom_follow_up_body TEXT,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
 
         FOREIGN KEY (profile_id)
           REFERENCES $profilesTable (id)
@@ -625,6 +680,10 @@ class AppDatabase {
         scheduled_amount TEXT NOT NULL,
         actual_amount TEXT,
         status TEXT NOT NULL,
+        protocol_name_snapshot TEXT,
+        protocol_type_snapshot TEXT,
+        protocol_color_value_snapshot INTEGER,
+        advanced_dose_json_snapshot TEXT,
 
         FOREIGN KEY (profile_id)
           REFERENCES $profilesTable (id)
@@ -644,6 +703,38 @@ class AppDatabase {
         scheduled_for
       )
     ''');
+  }
+
+  Future<void> _addDoseRecordSnapshotColumns(
+    Database database,
+  ) async {
+    await _addColumnIfMissing(
+      database,
+      table: doseRecordsTable,
+      column: 'protocol_name_snapshot',
+      definition: 'TEXT',
+    );
+
+    await _addColumnIfMissing(
+      database,
+      table: doseRecordsTable,
+      column: 'protocol_type_snapshot',
+      definition: 'TEXT',
+    );
+
+    await _addColumnIfMissing(
+      database,
+      table: doseRecordsTable,
+      column: 'protocol_color_value_snapshot',
+      definition: 'INTEGER',
+    );
+
+    await _addColumnIfMissing(
+      database,
+      table: doseRecordsTable,
+      column: 'advanced_dose_json_snapshot',
+      definition: 'TEXT',
+    );
   }
 
   Future<void> _createWeightRecordsTable(Database database) async {

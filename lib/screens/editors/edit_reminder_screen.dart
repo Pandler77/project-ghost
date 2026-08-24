@@ -21,8 +21,8 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
   late bool? _followUpEnabled;
   late int _minutesAfter;
 
-  late final TextEditingController _customTitleController;
   late final TextEditingController _customBodyController;
+  late final TextEditingController _customFollowUpBodyController;
 
   bool _customNotificationTextEnabled = false;
 
@@ -35,11 +35,11 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
     _followUpEnabled = widget.protocol.missedDoseReminderEnabled;
     _minutesAfter = widget.protocol.missedDoseReminderMinutesAfter;
 
-    _customTitleController = TextEditingController(
-      text: widget.protocol.customReminderTitle ?? '',
-    );
     _customBodyController = TextEditingController(
       text: widget.protocol.customReminderBody ?? '',
+    );
+    _customFollowUpBodyController = TextEditingController(
+      text: widget.protocol.customFollowUpBody ?? '',
     );
 
     _loadCustomNotificationPreference();
@@ -47,14 +47,13 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
 
   @override
   void dispose() {
-    _customTitleController.dispose();
     _customBodyController.dispose();
+    _customFollowUpBodyController.dispose();
     super.dispose();
   }
 
   Future<void> _loadCustomNotificationPreference() async {
-    final preferences =
-        await _settingsService.getNotificationPreferences();
+    final preferences = await _settingsService.getNotificationPreferences();
 
     if (!mounted) {
       return;
@@ -82,8 +81,10 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
         missedDoseReminderMinutesAfter: _followUpEnabled == true
             ? _minutesAfter
             : 60,
-        customReminderTitle: _optionalText(_customTitleController.text),
+        customReminderTitle: null,
         customReminderBody: _optionalText(_customBodyController.text),
+        customFollowUpTitle: null,
+        customFollowUpBody: _optionalText(_customFollowUpBodyController.text),
       ),
     );
   }
@@ -135,15 +136,12 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              _ChoiceWrap(
+              _ReminderTimingDropdown(
+                value: _minutesBefore,
                 values: const [0, 5, 10, 15, 30, 60],
-                selectedValue: _minutesBefore,
-                labelBuilder: (value) => switch (value) {
-                  0 => 'At time',
-                  60 => '1h before',
-                  _ => '${value}m before',
-                },
-                onSelected: (value) {
+                label: 'Reminder timing',
+                labelBuilder: _beforeLabel,
+                onChanged: (value) {
                   setState(() => _minutesBefore = value);
                 },
               ),
@@ -173,22 +171,19 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
               if (_followUpEnabled == true) ...[
                 const SizedBox(height: AppSpacing.md),
                 const Text(
-                  'When should ArcticDose remind you again?',
+                  'When should MODOSE remind you again?',
                   style: TextStyle(
                     fontSize: AppTypography.body,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                _ChoiceWrap(
-                  values: const [15, 30, 60, 120],
-                  selectedValue: _minutesAfter,
-                  labelBuilder: (value) => switch (value) {
-                    60 => '1h later',
-                    120 => '2h later',
-                    _ => '${value}m later',
-                  },
-                  onSelected: (value) {
+                _ReminderTimingDropdown(
+                  value: _minutesAfter,
+                  values: _followUpTimingValues,
+                  label: 'Follow-up timing',
+                  labelBuilder: _afterLabel,
+                  onChanged: (value) {
                     setState(() => _minutesAfter = value);
                   },
                 ),
@@ -196,7 +191,7 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
               if (_customNotificationTextEnabled) ...[
                 const SizedBox(height: AppSpacing.lg),
                 const Text(
-                  'Custom notification',
+                  'Main reminder message',
                   style: TextStyle(
                     fontSize: AppTypography.body,
                     fontWeight: FontWeight.w700,
@@ -204,7 +199,7 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Leave either field blank to use ArcticDose’s default text.',
+                  'Applies only to the main reminder. Leave blank to use “It\'s time for your protocol”.',
                   style: TextStyle(
                     fontSize: AppTypography.caption,
                     color: colors.onSurfaceVariant,
@@ -212,27 +207,46 @@ class _EditReminderScreenState extends State<EditReminderScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
-                  controller: _customTitleController,
-                  textCapitalization: TextCapitalization.sentences,
-                  maxLength: 64,
-                  decoration: const InputDecoration(
-                    labelText: 'Notification title',
-                    hintText: 'Ratatouille Time',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(
                   controller: _customBodyController,
                   textCapitalization: TextCapitalization.sentences,
                   maxLength: 140,
-                  maxLines: 3,
+                  maxLines: 1,
                   decoration: const InputDecoration(
-                    labelText: 'Notification message',
-                    hintText: 'Time for your scheduled dose.',
+                    labelText: 'Custom main reminder',
+                    hintText: "It's time for your protocol",
                     border: OutlineInputBorder(),
                   ),
                 ),
+                if (_followUpEnabled == true) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  const Text(
+                    'Follow-up reminder message',
+                    style: TextStyle(
+                      fontSize: AppTypography.body,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Applies only to the follow-up. Leave blank to use the MODOSE default.',
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _customFollowUpBodyController,
+                    textCapitalization: TextCapitalization.sentences,
+                    maxLength: 140,
+                    maxLines: 1,
+                    decoration: const InputDecoration(
+                      labelText: 'Custom follow-up reminder',
+                      hintText: "You haven't logged your protocol today.",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
               ],
             ],
             const SizedBox(height: AppSpacing.lg),
@@ -348,32 +362,79 @@ class _BinaryChoiceTile extends StatelessWidget {
   }
 }
 
-class _ChoiceWrap extends StatelessWidget {
-  const _ChoiceWrap({
+const List<int> _followUpTimingValues = [
+  5,
+  10,
+  15,
+  20,
+  25,
+  30,
+  35,
+  40,
+  45,
+  50,
+  55,
+  60,
+  120,
+  180,
+  240,
+  300,
+  360,
+  420,
+  480,
+  540,
+  600,
+];
+
+String _beforeLabel(int value) {
+  if (value == 0) return 'At scheduled time';
+  if (value == 60) return '1 hour before';
+  return '$value minutes before';
+}
+
+String _afterLabel(int value) {
+  if (value == 60) return '1 hour later';
+  if (value > 60 && value % 60 == 0) {
+    final hours = value ~/ 60;
+    return '$hours hours later';
+  }
+  return '$value minutes later';
+}
+
+class _ReminderTimingDropdown extends StatelessWidget {
+  const _ReminderTimingDropdown({
+    required this.value,
     required this.values,
-    required this.selectedValue,
+    required this.label,
     required this.labelBuilder,
-    required this.onSelected,
+    required this.onChanged,
   });
 
+  final int value;
   final List<int> values;
-  final int selectedValue;
+  final String label;
   final String Function(int value) labelBuilder;
-  final ValueChanged<int> onSelected;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        for (final value in values)
-          ChoiceChip(
-            label: Text(labelBuilder(value)),
-            selected: selectedValue == value,
-            onSelected: (_) => onSelected(value),
-          ),
+    final safeValue = values.contains(value) ? value : values.first;
+
+    return DropdownButtonFormField<int>(
+      initialValue: safeValue,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        for (final item in values)
+          DropdownMenuItem<int>(value: item, child: Text(labelBuilder(item))),
       ],
+      onChanged: (selected) {
+        if (selected != null) {
+          onChanged(selected);
+        }
+      },
     );
   }
 }

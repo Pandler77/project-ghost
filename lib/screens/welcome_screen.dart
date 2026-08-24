@@ -16,9 +16,8 @@ class WelcomeScreen extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final foreground = isDark ? Colors.white : const Color(0xFF0F172A);
-
     final secondary = isDark
-        ? Colors.white.withValues(alpha: 0.82)
+        ? Colors.white.withValues(alpha: 0.88)
         : const Color(0xFF334155);
 
     return Scaffold(
@@ -39,7 +38,6 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
           ),
-
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -59,7 +57,6 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
           ),
-
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -72,17 +69,31 @@ class WelcomeScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Center(
-                      child: Image.asset(
-                        isDark
-                            ? 'assets/branding/arcticdose_brandmark_dark.png'
-                            : 'assets/branding/arcticdose_brandmark_light.png',
-                        width: 285,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset(
+                            isDark
+                                ? 'assets/branding/arcticdose_brandmark_dark.png'
+                                : 'assets/branding/arcticdose_brandmark_light.png',
+                            width: 265,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                          ),
+                          const SizedBox(height: 12),
+                          Image.asset(
+                            isDark
+                                ? 'assets/branding/welcome_tagline_dark.png'
+                                : 'assets/branding/welcome_tagline_light.png',
+                            width: 250,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                          ),
+                        ],
                       ),
                     ),
                   ),
-
+                  const SizedBox(height: 6),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(30),
                     child: BackdropFilter(
@@ -112,9 +123,7 @@ class WelcomeScreen extends StatelessWidget {
                                 color: foreground,
                               ),
                             ),
-
                             const SizedBox(height: 1),
-
                             ShaderMask(
                               shaderCallback: (bounds) =>
                                   ArcticPalette.accentGradient(
@@ -129,9 +138,7 @@ class WelcomeScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-
                             const SizedBox(height: 10),
-
                             Text(
                               'Protocols, doses, progress, reminders, inventory, '
                               'and tools — organized around your routine.',
@@ -142,9 +149,7 @@ class WelcomeScreen extends StatelessWidget {
                                 color: secondary,
                               ),
                             ),
-
                             const SizedBox(height: 14),
-
                             const Column(
                               children: [
                                 _FeatureRow(
@@ -169,9 +174,7 @@ class WelcomeScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 14),
-
                             DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: ArcticPalette.accentGradient(context),
@@ -191,7 +194,7 @@ class WelcomeScreen extends StatelessWidget {
                                     height: 52,
                                     child: Center(
                                       child: Text(
-                                        'Set Up ArcticDose',
+                                        'Set Up MODOSE',
                                         style: TextStyle(
                                           fontSize: AppTypography.primary,
                                           fontWeight: FontWeight.w900,
@@ -203,9 +206,7 @@ class WelcomeScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-
                             const SizedBox(height: 8),
-
                             Text(
                               'Takes about a minute.\n'
                               'You can change everything later.',
@@ -221,7 +222,6 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 6),
                 ],
               ),
@@ -251,7 +251,7 @@ class _FeatureRow extends StatelessWidget {
     final foreground = isDark ? Colors.white : const Color(0xFF0F172A);
 
     final secondary = isDark
-        ? Colors.white.withValues(alpha: 0.68)
+        ? Colors.white.withValues(alpha: 0.78)
         : const Color(0xFF475569);
 
     return Container(

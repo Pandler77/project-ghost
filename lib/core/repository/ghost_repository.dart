@@ -37,7 +37,7 @@ class GhostRepository {
 
     final rows = await db.query(
       AppDatabase.protocolsTable,
-      where: 'profile_id = ?',
+      where: 'profile_id = ? AND is_deleted = 0',
       whereArgs: [profileId],
       orderBy: 'name COLLATE NOCASE ASC',
     );
@@ -50,7 +50,7 @@ class GhostRepository {
 
     final rows = await db.query(
       AppDatabase.protocolsTable,
-      where: 'profile_id = ?',
+      where: 'profile_id = ? AND is_deleted = 0',
       whereArgs: [profileId],
       orderBy: 'name COLLATE NOCASE ASC',
     );
@@ -85,8 +85,11 @@ class GhostRepository {
     final db = await _appDatabase.database;
     final profileId = await _getActiveProfileId();
 
-    await db.delete(
+    // Soft-delete the protocol so historical dose records, injection logs,
+    // and other history that still references this protocol remain intact.
+    await db.update(
       AppDatabase.protocolsTable,
+      {'is_deleted': 1},
       where: 'id = ? AND profile_id = ?',
       whereArgs: [id, profileId],
     );

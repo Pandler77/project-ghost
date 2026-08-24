@@ -193,7 +193,7 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
       children: [
         StepHeader(
           title: 'How much is left?',
-          subtitle: 'ArcticDose can help estimate what remains in the active $name.',
+          subtitle: 'MODOSE can help estimate what remains in the active $name.',
           currentStep: 4,
           totalSteps: 7,
         ),
@@ -217,7 +217,7 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
         _MethodCard(
           title: 'Estimate from doses used',
           subtitle: _canUseProtocolDose
-              ? 'ArcticDose will use the protocol dose automatically.'
+              ? 'MODOSE will use the protocol dose automatically.'
               : 'Protocol dose and inventory unit must match.',
           icon: ArcticIcons.calculate_outlined,
           selected: _method == RemainingAmountMethod.dosesUsed,
@@ -234,7 +234,7 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
         _MethodCard(
           title: 'Estimate from opened date',
           subtitle:
-              'ArcticDose will calculate expected use from the protocol schedule.',
+              'MODOSE will calculate expected use from the protocol schedule.',
           icon: ArcticIcons.calendar_month_outlined,
           selected: _method == RemainingAmountMethod.openedDate,
           enabled: false,
@@ -244,7 +244,7 @@ class _RemainingAmountStepState extends State<RemainingAmountStep> {
         const SizedBox(height: AppSpacing.sm),
 
         _MethodCard(
-          title: 'Use ArcticDose dose history',
+          title: 'Use MODOSE dose history',
           subtitle:
               'Automatically calculate doses recorded since the vial was opened.',
           icon: ArcticIcons.history,
@@ -446,3 +446,4 @@ class _MethodCard extends StatelessWidget {
     );
   }
 }
+

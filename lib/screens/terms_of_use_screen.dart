@@ -39,7 +39,7 @@ class TermsOfUseScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'ArcticDose Terms of Use',
+                    'MODOSE Terms of Use',
                     style: TextStyle(
                       fontSize: AppTypography.title,
                       fontWeight: FontWeight.w800,
@@ -47,7 +47,7 @@ class TermsOfUseScreen extends StatelessWidget {
                   ),
                   SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Draft in-app terms for the current pre-release version of ArcticDose.',
+                    'Draft in-app terms for the current pre-release version of MODOSE.',
                     style: TextStyle(
                       fontSize: AppTypography.caption,
                       height: 1.4,
@@ -60,12 +60,12 @@ class TermsOfUseScreen extends StatelessWidget {
             const _TermsSection(
               title: '1. Personal Tracking Tool',
               body:
-                  'ArcticDose is a personal organization and tracking application. It is not a medical provider, pharmacy, diagnostic service, or substitute for professional medical advice.',
+                  'MODOSE is a personal organization and tracking application. It is not a medical provider, pharmacy, diagnostic service, or substitute for professional medical advice.',
             ),
             const _TermsSection(
               title: '2. User Responsibility',
               body:
-                  'You are responsible for verifying any information you enter into ArcticDose, including protocol schedules, dose amounts, inventory values, calculator inputs, reminders, and other tracked information.',
+                  'You are responsible for verifying any information you enter into MODOSE, including protocol schedules, dose amounts, inventory values, calculator inputs, reminders, and other tracked information.',
             ),
             const _TermsSection(
               title: '3. Calculators',
@@ -90,7 +90,7 @@ class TermsOfUseScreen extends StatelessWidget {
             const _TermsSection(
               title: '7. Changes',
               body:
-                  'ArcticDose features and these terms may change before or after release. The published release version should include the final terms that apply to users.',
+                  'MODOSE features and these terms may change before or after release. The published release version should include the final terms that apply to users.',
             ),
             Container(
               width: double.infinity,
@@ -157,3 +157,4 @@ class _TermsSection extends StatelessWidget {
     );
   }
 }
+

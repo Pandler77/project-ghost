@@ -36,16 +36,7 @@ class WeightAnalytics {
   final double? highestWeight;
   final double? lowestWeight;
 
-  /// Current minus starting.
-  ///
-  /// Negative = loss.
-  /// Positive = gain.
   final double? totalChange;
-
-  /// Percentage change from starting weight.
-  ///
-  /// Negative = loss.
-  /// Positive = gain.
   final double? percentChange;
 
   final double? averageWeeklyChange;
@@ -266,9 +257,11 @@ class AnalyticsService {
           final scheduleHasPassed = !record.scheduledFor.isAfter(currentTime);
 
           return wasResolvedEarly || scheduleHasPassed;
-        }).toList()..sort(
-          (first, second) => first.scheduledFor.compareTo(second.scheduledFor),
-        );
+        }).toList()
+          ..sort(
+            (first, second) =>
+                first.scheduledFor.compareTo(second.scheduledFor),
+          );
 
     if (eligibleRecords.isEmpty) {
       return const AdherenceAnalytics(
@@ -307,7 +300,6 @@ class AnalyticsService {
 
     for (final record in eligibleRecords) {
       grouped.putIfAbsent(record.protocolId, () => <DoseRecord>[]);
-
       grouped[record.protocolId]!.add(record);
     }
 
@@ -381,7 +373,6 @@ class AnalyticsService {
     final currentTime = now ?? DateTime.now();
 
     final startOfWeek = _startOfWeek(currentTime);
-
     final startOfMonth = DateTime(currentTime.year, currentTime.month, 1);
 
     final completedRecords = doseRecords.where(

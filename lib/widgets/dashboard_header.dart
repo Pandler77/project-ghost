@@ -81,7 +81,7 @@ class DashboardHeader extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         profileName.trim().isEmpty
-                            ? 'ArcticDose'
+                            ? 'MODOSE'
                             : profileName.trim(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -314,3 +314,4 @@ class _DoseProgressBar extends StatelessWidget {
     );
   }
 }
+

@@ -14,7 +14,7 @@ extension HomeSectionDetails on HomeSection {
   String get title {
     return switch (this) {
       HomeSection.today => 'Today',
-      HomeSection.ghostSupply => 'ArcticDose Supply',
+      HomeSection.ghostSupply => 'MODOSE Supply',
       HomeSection.weight => 'Weight',
       HomeSection.progressPhotos => 'Progress Photos',
       HomeSection.upcoming => 'Upcoming',
@@ -45,3 +45,4 @@ extension HomeSectionDetails on HomeSection {
     return null;
   }
 }
+

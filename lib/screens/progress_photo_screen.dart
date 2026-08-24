@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/progress_photo.dart';
 import '../models/progress_photo_session.dart';
 import '../services/progress_photo_service.dart';
+import '../services/usage_analytics_service.dart';
 import '../theme/app_theme.dart';
 import 'progress_photo_session_screen.dart';
 import '../services/app_data_service.dart';
@@ -38,6 +39,7 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
 
   bool _isLoading = true;
   String? _loadError;
+  DateTime? _selectedDateFilter;
 
   Future<void> _openCompare() async {
     if (!widget.dataService.hasPremium) {
@@ -136,6 +138,10 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
         notes: draft.notes,
       );
 
+      UsageAnalyticsService.instance.track(
+        UsageAnalyticsEvent.photoSessionCreated,
+      );
+
       if (!mounted) {
         return;
       }
@@ -228,6 +234,59 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
     ).showSnackBar(SnackBar(content: Text('$message: $error')));
   }
 
+  List<ProgressPhotoSession> get _visibleSessions {
+    final filter = _selectedDateFilter;
+
+    if (filter == null) {
+      return _sessions;
+    }
+
+    return _sessions
+        .where((session) {
+          final date = session.recordedAt;
+
+          return date.year == filter.year &&
+              date.month == filter.month &&
+              date.day == filter.day;
+        })
+        .toList(growable: false);
+  }
+
+  Future<void> _chooseSessionDateFilter() async {
+    final initialDate =
+        _selectedDateFilter ??
+        (_sessions.isNotEmpty ? _sessions.first.recordedAt : DateTime.now());
+
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedDateFilter = DateTime(
+        selected.year,
+        selected.month,
+        selected.day,
+      );
+    });
+  }
+
+  void _clearSessionDateFilter() {
+    if (_selectedDateFilter == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedDateFilter = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -248,39 +307,27 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('Compare'),
-                  if (!widget.dataService.hasPremium) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'Premium',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
-                        ),
-                      ),
+                  const SizedBox(width: 6),
+                  ColorFiltered(
+                    colorFilter: ColorFilter.mode(
+                      widget.dataService.hasPremium
+                          ? const Color(0xFFE3AA22)
+                          : colors.primary,
+                      BlendMode.srcIn,
                     ),
-                  ],
+                    child: Image.asset(
+                      'assets/branding/modose_premium_mark.png',
+                      width: 24,
+                      height: 24,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _startSession,
-        icon: const Icon(ArcticIcons.add_a_photo_outlined),
-        label: const Text('Start Session'),
       ),
       body: SafeArea(
         child: RefreshIndicator(
@@ -291,7 +338,7 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
               AppSpacing.md,
               AppSpacing.sm,
               AppSpacing.md,
-              110,
+              AppSpacing.lg,
             ),
             children: [
               Container(
@@ -359,6 +406,7 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
                 _EmptyState(onStartSession: _startSession)
               else ...[
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const Expanded(
                       child: Text(
@@ -369,35 +417,133 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> {
                         ),
                       ),
                     ),
-                    Text(
-                      '${_sessions.length} '
-                      '${_sessions.length == 1 ? 'session' : 'sessions'}',
-                      style: TextStyle(
-                        fontSize: AppTypography.caption,
-                        color: colors.onSurfaceVariant,
+                    FilledButton.icon(
+                      onPressed: _startSession,
+                      icon: const Icon(
+                        ArcticIcons.add_a_photo_outlined,
+                        size: 18,
+                      ),
+                      label: const Text(
+                        'New Session',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        visualDensity: VisualDensity.compact,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                for (var index = 0; index < _sessions.length; index++) ...[
-                  _SessionCard(
-                    session: _sessions[index],
-                    photos: _sessionPhotos[_sessions[index].id] ?? const [],
-                    measurementSystem: widget.measurementSystem,
-                    onTap: () {
-                      _openSession(_sessions[index]);
-                    },
-                    onEdit: () {
-                      _openSession(_sessions[index]);
-                    },
-                    onDelete: () {
-                      _deleteSession(_sessions[index]);
-                    },
-                  ),
-                  if (index < _sessions.length - 1)
-                    const SizedBox(height: AppSpacing.sm),
-                ],
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${_sessions.length} '
+                        '${_sessions.length == 1 ? 'session' : 'sessions'}',
+                        style: TextStyle(
+                          fontSize: AppTypography.caption,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _chooseSessionDateFilter,
+                      icon: const Icon(
+                        ArcticIcons.calendar_today_outlined,
+                        size: 17,
+                      ),
+                      label: Text(
+                        _selectedDateFilter == null
+                            ? 'Filter by date'
+                            : _formatDate(_selectedDateFilter!),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 9,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    if (_selectedDateFilter != null) ...[
+                      const SizedBox(width: 6),
+                      IconButton(
+                        tooltip: 'Clear date filter',
+                        onPressed: _clearSessionDateFilter,
+                        icon: const Icon(Icons.close_rounded),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ],
+                ),
+
+                const SizedBox(height: AppSpacing.sm),
+
+                if (_visibleSessions.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: 34,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      border: Border.all(color: colors.outlineVariant),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          ArcticIcons.calendar_today_outlined,
+                          size: 30,
+                          color: colors.primary,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        const Text(
+                          'No sessions on this date',
+                          style: TextStyle(
+                            fontSize: AppTypography.body,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        TextButton(
+                          onPressed: _clearSessionDateFilter,
+                          child: const Text('Show all sessions'),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  for (
+                    var index = 0;
+                    index < _visibleSessions.length;
+                    index++
+                  ) ...[
+                    _SessionCard(
+                      session: _visibleSessions[index],
+                      photos:
+                          _sessionPhotos[_visibleSessions[index].id] ??
+                          const [],
+                      measurementSystem: widget.measurementSystem,
+                      onTap: () {
+                        _openSession(_visibleSessions[index]);
+                      },
+                      onEdit: () {
+                        _openSession(_visibleSessions[index]);
+                      },
+                      onDelete: () {
+                        _deleteSession(_visibleSessions[index]);
+                      },
+                    ),
+                    if (index < _visibleSessions.length - 1)
+                      const SizedBox(height: AppSpacing.sm),
+                  ],
               ],
             ],
           ),

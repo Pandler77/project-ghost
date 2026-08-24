@@ -1,4 +1,5 @@
 import 'cycle_unit.dart';
+import 'dose_details.dart';
 import 'dose_unit.dart';
 import 'injection_site.dart';
 import 'protocol_schedule.dart';
@@ -13,11 +14,7 @@ class Protocol {
     String? id,
     required this.name,
     this.type = ProtocolType.injection,
-
-    // Temporary legacy support lets existing screens continue using:
-    // dose: '3 mg'
     String? dose,
-
     double? doseAmount,
     DoseUnit? doseUnit,
     required this.schedule,
@@ -39,7 +36,10 @@ class Protocol {
     this.missedDoseReminderMinutesAfter = 60,
     this.customReminderTitle,
     this.customReminderBody,
+    this.customFollowUpTitle,
+    this.customFollowUpBody,
     this.category = ProtocolCategory.custom,
+    this.doseDetails,
   }) : assert(
          dose != null || doseAmount != null,
          'Either dose or doseAmount must be provided.',
@@ -56,16 +56,9 @@ class Protocol {
 
   final String id;
   final String name;
-
-  /// Describes how the medication or protocol is administered.
   final ProtocolType type;
-
-  /// Structured numeric dose used for calculations and validation.
   final double doseAmount;
-
-  /// Structured dose unit used for compatibility checking.
   final DoseUnit doseUnit;
-
   final ProtocolSchedule schedule;
 
   ProtocolStatus status;
@@ -88,27 +81,48 @@ class Protocol {
   final bool missedDoseReminderEnabled;
   final int missedDoseReminderMinutesAfter;
 
-  /// Optional protocol-specific notification text.
-  /// These are only used when the global custom notification setting is on.
+  /// Custom text for the primary scheduled reminder only.
   final String? customReminderTitle;
   final String? customReminderBody;
 
+  /// Custom text for the missed-dose follow-up only.
+  /// When null/blank, NotificationService uses the standard MODOSE follow-up.
+  final String? customFollowUpTitle;
+  final String? customFollowUpBody;
+
   final ProtocolCategory category;
+  final DoseDetails? doseDetails;
 
   bool get isInjection => type == ProtocolType.injection;
+  bool get hasAdvancedDoseDetails => doseDetails != null;
 
-  /// Keeps existing UI references such as protocol.dose working.
   String get dose => '${_formatAmount(doseAmount)} ${doseUnit.label}';
+
+  String? get drawUnitsDisplay {
+    final details = doseDetails;
+
+    if (details == null || !details.showDrawUnitsOnCards) {
+      return null;
+    }
+
+    final units = details.drawUnits(
+      scheduledDoseAmount: doseAmount,
+      scheduledDoseUnit: doseUnit,
+    );
+
+    if (units == null) {
+      return null;
+    }
+
+    return 'Draw ${_formatAmount(units)} units';
+  }
 
   Protocol copyWith({
     String? id,
     String? name,
     ProtocolType? type,
     ProtocolCategory? category,
-
-    // Temporary legacy support.
     String? dose,
-
     double? doseAmount,
     DoseUnit? doseUnit,
     ProtocolSchedule? schedule,
@@ -130,9 +144,11 @@ class Protocol {
     int? missedDoseReminderMinutesAfter,
     Object? customReminderTitle = _unset,
     Object? customReminderBody = _unset,
+    Object? customFollowUpTitle = _unset,
+    Object? customFollowUpBody = _unset,
+    Object? doseDetails = _unset,
   }) {
     final parsedLegacyAmount = dose == null ? null : _parseDoseAmount(dose);
-
     final parsedLegacyUnit = dose == null ? null : _parseDoseUnit(dose);
 
     return Protocol(
@@ -142,6 +158,9 @@ class Protocol {
       category: category ?? this.category,
       doseAmount: doseAmount ?? parsedLegacyAmount ?? this.doseAmount,
       doseUnit: doseUnit ?? parsedLegacyUnit ?? this.doseUnit,
+      doseDetails: identical(doseDetails, _unset)
+          ? this.doseDetails
+          : doseDetails as DoseDetails?,
       schedule: schedule ?? this.schedule,
       status: status ?? this.status,
       colorValue: colorValue ?? this.colorValue,
@@ -171,6 +190,12 @@ class Protocol {
       customReminderBody: identical(customReminderBody, _unset)
           ? this.customReminderBody
           : customReminderBody as String?,
+      customFollowUpTitle: identical(customFollowUpTitle, _unset)
+          ? this.customFollowUpTitle
+          : customFollowUpTitle as String?,
+      customFollowUpBody: identical(customFollowUpBody, _unset)
+          ? this.customFollowUpBody
+          : customFollowUpBody as String?,
     );
   }
 
@@ -180,14 +205,10 @@ class Protocol {
       'name': name,
       'protocol_type': type.storageValue,
       'protocol_category': category.storageValue,
-
-      // Legacy column retained temporarily for older app versions/data.
       'dose': dose,
-
-      // Structured dose columns.
       'dose_amount': doseAmount,
       'dose_unit': doseUnit.storageValue,
-
+      'advanced_dose_json': doseDetails?.toJson(),
       'status': status.name,
       'color_value': colorValue,
       'schedule_type': schedule.type.name,
@@ -200,8 +221,6 @@ class Protocol {
           ? null
           : (schedule.specificWeekdays.toList()..sort()).join(','),
       'monthly_day': schedule.monthlyDay,
-
-      // Cycle settings
       'use_cycle': useCycle ? 1 : 0,
       'cycle_start_date': cycleStartDate?.toIso8601String(),
       'cycle_on_duration': cycleOnDuration,
@@ -209,19 +228,17 @@ class Protocol {
       'cycle_off_duration': cycleOffDuration,
       'cycle_off_unit': cycleOffUnit.storageValue,
       'repeat_cycle': repeatCycle ? 1 : 0,
-
-      // Injection rotation settings
       'rotation_enabled': rotationEnabled ? 1 : 0,
       'rotation_mode': rotationMode.storageValue,
       'enabled_injection_sites': _encodeInjectionSites(enabledInjectionSites),
-
-      // Reminder settings
       'reminder_enabled': reminderEnabled ? 1 : 0,
       'reminder_minutes_before': reminderMinutesBefore,
       'missed_dose_reminder_enabled': missedDoseReminderEnabled ? 1 : 0,
       'missed_dose_reminder_minutes_after': missedDoseReminderMinutesAfter,
       'custom_reminder_title': customReminderTitle,
       'custom_reminder_body': customReminderBody,
+      'custom_follow_up_title': customFollowUpTitle,
+      'custom_follow_up_body': customFollowUpBody,
     };
   }
 
@@ -231,7 +248,6 @@ class Protocol {
     );
 
     final startDate = DateTime.parse(map['start_date'] as String);
-
     final hour = (map['hour'] as num).toInt();
     final minute = (map['minute'] as num).toInt();
 
@@ -268,11 +284,8 @@ class Protocol {
     };
 
     final storedCycleStartDate = map['cycle_start_date'] as String?;
-
     final storedDoseAmount = (map['dose_amount'] as num?)?.toDouble();
-
     final storedDoseUnit = map['dose_unit'] as String?;
-
     final legacyDose = map['dose'] as String?;
 
     return Protocol(
@@ -284,13 +297,11 @@ class Protocol {
       category: ProtocolCategoryDetails.fromStorageValue(
         map['protocol_category'] as String?,
       ),
-      // New records use structured values.
-      // Older records fall back to parsing the original dose string.
       doseAmount: storedDoseAmount ?? _parseDoseAmount(legacyDose),
       doseUnit: storedDoseUnit == null
           ? _parseDoseUnit(legacyDose)
           : DoseUnitDetails.fromStorageValue(storedDoseUnit),
-
+      doseDetails: DoseDetails.fromJson(map['advanced_dose_json'] as String?),
       status: ProtocolStatus.values.byName(map['status'] as String),
       colorValue: (map['color_value'] as num?)?.toInt() ?? defaultColorValue,
       schedule: schedule,
@@ -325,33 +336,27 @@ class Protocol {
           (map['missed_dose_reminder_minutes_after'] as num?)?.toInt() ?? 60,
       customReminderTitle: map['custom_reminder_title'] as String?,
       customReminderBody: map['custom_reminder_body'] as String?,
+      customFollowUpTitle: map['custom_follow_up_title'] as String?,
+      customFollowUpBody: map['custom_follow_up_body'] as String?,
     );
   }
 
   static double _parseDoseAmount(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 0;
-    }
+    if (value == null || value.trim().isEmpty) return 0;
 
     final match = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(value);
-
     return double.tryParse(match?.group(1) ?? '') ?? 0;
   }
 
   static DoseUnit _parseDoseUnit(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return DoseUnit.mg;
-    }
+    if (value == null || value.trim().isEmpty) return DoseUnit.mg;
 
     final unitText = value.replaceAll(RegExp(r'[\d.\s]'), '');
-
     return DoseUnitDetails.fromStorageValue(unitText);
   }
 
   static String _formatAmount(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toInt().toString();
-    }
+    if (value == value.roundToDouble()) return value.toInt().toString();
 
     return value
         .toStringAsFixed(3)
@@ -360,30 +365,23 @@ class Protocol {
   }
 
   static Set<int> _parseSpecificWeekdays(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return {};
-    }
+    if (value == null || value.trim().isEmpty) return {};
 
     return value.split(',').map((day) => int.parse(day)).toSet();
   }
 
   static String _encodeInjectionSites(Set<InjectionSite> sites) {
     final values = sites.map((site) => site.storageValue).toList()..sort();
-
     return values.join(',');
   }
 
   static Set<InjectionSite> _decodeInjectionSites(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return {};
-    }
+    if (value == null || value.trim().isEmpty) return {};
 
-    final sites = value
+    return value
         .split(',')
         .map((item) => InjectionSiteDetails.fromStorageValue(item.trim()))
         .whereType<InjectionSite>()
         .toSet();
-
-    return sites;
   }
 }

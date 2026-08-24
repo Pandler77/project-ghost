@@ -379,7 +379,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
         content: Text(
           '${_formatAmount(selected.containerSize)} ${selected.unit} • '
           '${selected.quantity} unopened\n\n'
-          'ArcticDose will open one from this batch and leave '
+          'MODOSE will open one from this batch and leave '
           '${selected.quantity - 1} unopened.',
         ),
         actions: [
@@ -1027,7 +1027,7 @@ class _UnopenedPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '$count ${count == 1 ? 'vial' : 'vials'} • '
+            '$count ${_containerLabel(item.containerType, count)} • '
             '${_formatAmount(total)} ${item.unit}',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
           ),
@@ -1036,7 +1036,7 @@ class _UnopenedPanel extends StatelessWidget {
             label: 'Low-stock threshold',
             value:
                 '${item.lowStockThreshold} '
-                '${item.lowStockThreshold == 1 ? 'vial' : 'vials'}',
+                '${_containerLabel(item.containerType, item.lowStockThreshold)}',
           ),
           _DetailRow(
             label: 'Shipping lead time',
@@ -1439,7 +1439,7 @@ class _ForecastPanel extends StatelessWidget {
           Text(
             hasForecast
                 ? 'Reorder by ${_formatDate(forecast.reorderDate)}'
-                : 'ArcticDose needs compatible dose and inventory units.',
+                : 'MODOSE needs compatible dose and inventory units.',
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -1865,6 +1865,24 @@ IconData _eventIcon(InventoryEventType type) {
   };
 }
 
+String _containerLabel(String containerType, int count) {
+  final value = containerType.trim().toLowerCase();
+
+  if (count == 1) {
+    return value;
+  }
+
+  if (value == 'box') {
+    return 'boxes';
+  }
+
+  if (value.endsWith('s')) {
+    return value;
+  }
+
+  return '${value}s';
+}
+
 String _textOrEmpty(String? value) {
   if (value == null || value.trim().isEmpty) {
     return 'Not recorded';
@@ -1917,3 +1935,4 @@ String _formatAmount(double value) {
       .replaceFirst(RegExp(r'0+$'), '')
       .replaceFirst(RegExp(r'\.$'), '');
 }
+

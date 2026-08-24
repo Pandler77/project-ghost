@@ -42,8 +42,9 @@ class NotificationService {
 
   final SettingsService _settingsService = SettingsService();
 
-  final ValueNotifier<String?> protocolNavigation =
-      ValueNotifier<String?>(null);
+  final ValueNotifier<String?> protocolNavigation = ValueNotifier<String?>(
+    null,
+  );
 
   String? get pendingProtocolId => protocolNavigation.value;
 
@@ -80,16 +81,13 @@ class NotificationService {
   }
 
   Future<void> _loadLaunchNotification() async {
-    final launchDetails =
-        await _plugin.getNotificationAppLaunchDetails();
+    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
 
     if (launchDetails?.didNotificationLaunchApp != true) {
       return;
     }
 
-    _handlePayload(
-      launchDetails?.notificationResponse?.payload,
-    );
+    _handlePayload(launchDetails?.notificationResponse?.payload);
   }
 
   Future<void> _createAndroidChannel() async {
@@ -118,11 +116,7 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin
         >()
-        ?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
+        ?.requestPermissions(alert: true, badge: true, sound: true);
 
     return androidGranted ?? iosGranted ?? true;
   }
@@ -130,7 +124,7 @@ class NotificationService {
   Future<void> showTestNotification() async {
     await _plugin.show(
       1,
-      'ArcticDose',
+      'MODOSE',
       'Notifications are working.',
       _notificationDetails,
     );
@@ -142,18 +136,11 @@ class NotificationService {
     required String profileName,
     DateTime? from,
   }) async {
-    await cancelProtocolReminders(
-      protocol.id,
-      profileId: profileId,
-    );
+    await cancelProtocolReminders(protocol.id, profileId: profileId);
 
-    final preferences =
-        await _settingsService.getNotificationPreferences();
+    final preferences = await _settingsService.getNotificationPreferences();
 
-    if (!_canScheduleProfile(
-          preferences,
-          profileId: profileId,
-        ) ||
+    if (!_canScheduleProfile(preferences, profileId: profileId) ||
         !protocol.reminderEnabled) {
       return;
     }
@@ -165,8 +152,7 @@ class NotificationService {
     );
 
     for (final reminder in reminders) {
-      if (reminder.isFollowUp &&
-          !preferences.missedDoseFollowUpsEnabled) {
+      if (reminder.isFollowUp && !preferences.missedDoseFollowUpsEnabled) {
         continue;
       }
 
@@ -188,8 +174,7 @@ class NotificationService {
   }) async {
     await _cancelAllProtocolReminders();
 
-    final preferences =
-        await _settingsService.getNotificationPreferences();
+    final preferences = await _settingsService.getNotificationPreferences();
 
     if (!preferences.notificationsEnabled ||
         !preferences.protocolRemindersEnabled) {
@@ -217,8 +202,7 @@ class NotificationService {
         );
 
         for (final reminder in reminders) {
-          if (reminder.isFollowUp &&
-              !preferences.missedDoseFollowUpsEnabled) {
+          if (reminder.isFollowUp && !preferences.missedDoseFollowUpsEnabled) {
             continue;
           }
 
@@ -240,15 +224,10 @@ class NotificationService {
       ),
     );
 
-    final limited = candidates.take(
-      _maxPendingProtocolNotifications,
-    );
+    final limited = candidates.take(_maxPendingProtocolNotifications);
 
     for (final candidate in limited) {
-      await _scheduleReminder(
-        candidate,
-        preferences: preferences,
-      );
+      await _scheduleReminder(candidate, preferences: preferences);
     }
   }
 
@@ -260,13 +239,9 @@ class NotificationService {
   }) async {
     await cancelProfileReminders(profileId);
 
-    final preferences =
-        await _settingsService.getNotificationPreferences();
+    final preferences = await _settingsService.getNotificationPreferences();
 
-    if (!_canScheduleProfile(
-      preferences,
-      profileId: profileId,
-    )) {
+    if (!_canScheduleProfile(preferences, profileId: profileId)) {
       return;
     }
 
@@ -316,13 +291,8 @@ class NotificationService {
     // follow-up with no primary reminder.
     if (!notificationTime.isAfter(currentTime)) {
       if (item.reminder.isPrimary &&
-          _isSameMinute(
-            item.reminder.notificationTime,
-            currentTime,
-          )) {
-        notificationTime = currentTime.add(
-          const Duration(seconds: 2),
-        );
+          _isSameMinute(item.reminder.notificationTime, currentTime)) {
+        notificationTime = currentTime.add(const Duration(seconds: 2));
       } else {
         return;
       }
@@ -335,8 +305,7 @@ class NotificationService {
       notificationTime,
       _notificationDetails,
       payload: _payloadFor(item),
-      androidScheduleMode:
-          AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
   }
 
@@ -350,8 +319,7 @@ class NotificationService {
   }
 
   Future<void> _cancelAllProtocolReminders() async {
-    final pending =
-        await _plugin.pendingNotificationRequests();
+    final pending = await _plugin.pendingNotificationRequests();
 
     for (final request in pending) {
       final payload = request.payload;
@@ -364,11 +332,8 @@ class NotificationService {
     }
   }
 
-  Future<void> cancelProfileReminders(
-    String profileId,
-  ) async {
-    final pending =
-        await _plugin.pendingNotificationRequests();
+  Future<void> cancelProfileReminders(String profileId) async {
+    final pending = await _plugin.pendingNotificationRequests();
 
     final prefix = 'ghost:profile:$profileId|';
 
@@ -385,8 +350,7 @@ class NotificationService {
     String protocolId, {
     required String profileId,
   }) async {
-    final pending =
-        await _plugin.pendingNotificationRequests();
+    final pending = await _plugin.pendingNotificationRequests();
 
     final profilePrefix = 'ghost:profile:$profileId|';
     final protocolPart = '|protocol:$protocolId|';
@@ -399,12 +363,12 @@ class NotificationService {
       }
 
       final matchesNewPayload =
-          payload.startsWith(profilePrefix) &&
-          payload.contains(protocolPart);
+          payload.startsWith(profilePrefix) && payload.contains(protocolPart);
 
       // Also clear protocol-only payloads left over from pre-2.0 scheduling.
-      final matchesLegacyPayload =
-          payload.startsWith('ghost:protocol:$protocolId|');
+      final matchesLegacyPayload = payload.startsWith(
+        'ghost:protocol:$protocolId|',
+      );
 
       if (matchesNewPayload || matchesLegacyPayload) {
         await _plugin.cancel(request.id);
@@ -417,47 +381,81 @@ class NotificationService {
     required String protocolId,
     required DateTime scheduledDoseTime,
   }) async {
-    final pending =
-        await _plugin.pendingNotificationRequests();
+    // First cancel the deterministic ID directly. This avoids depending on
+    // pending-notification payload enumeration for the normal case.
+    final directId = _stablePositiveHash(
+      '$profileId|'
+      '$protocolId|'
+      '${scheduledDoseTime.millisecondsSinceEpoch}|'
+      'followUp',
+    );
+
+    await _plugin.cancel(directId);
+
+    final pending = await _plugin.pendingNotificationRequests();
 
     final profilePrefix = 'ghost:profile:$profileId|';
     final protocolPart = '|protocol:$protocolId|';
-
-    final occurrence =
-        scheduledDoseTime.millisecondsSinceEpoch.toString();
+    final exactOccurrence = scheduledDoseTime.millisecondsSinceEpoch;
 
     for (final request in pending) {
       final payload = request.payload;
 
-      if (payload == null) {
+      if (payload == null || !payload.contains('|kind:followUp')) {
         continue;
       }
 
-      final matchesProfile =
-          payload.startsWith(profilePrefix);
+      final matchesNewProfile =
+          payload.startsWith(profilePrefix) && payload.contains(protocolPart);
 
-      final matchesProtocol =
-          payload.contains(protocolPart);
+      final matchesLegacyProtocol = payload.startsWith(
+        'ghost:protocol:$protocolId|',
+      );
 
-      final matchesOccurrence =
-          payload.contains('|occurrence:$occurrence|');
+      if (!matchesNewProfile && !matchesLegacyProtocol) {
+        continue;
+      }
 
-      final isFollowUp =
-          payload.contains('|kind:followUp');
+      final occurrenceMillis = _occurrenceMillisFromPayload(payload);
 
-      final matchesLegacy =
-          payload.startsWith('ghost:protocol:$protocolId|') &&
-          matchesOccurrence &&
-          isFollowUp;
+      if (occurrenceMillis == null) {
+        continue;
+      }
 
-      if ((matchesProfile &&
-              matchesProtocol &&
-              matchesOccurrence &&
-              isFollowUp) ||
-          matchesLegacy) {
+      final exactMatch = occurrenceMillis == exactOccurrence;
+
+      final payloadScheduledTime = DateTime.fromMillisecondsSinceEpoch(
+        occurrenceMillis,
+      );
+
+      final sameScheduledMinute = _isSameMinute(
+        payloadScheduledTime,
+        scheduledDoseTime,
+      );
+
+      if (exactMatch || sameScheduledMinute) {
         await _plugin.cancel(request.id);
       }
     }
+  }
+
+  int? _occurrenceMillisFromPayload(String payload) {
+    const marker = '|occurrence:';
+
+    final startIndex = payload.indexOf(marker);
+
+    if (startIndex == -1) {
+      return null;
+    }
+
+    final valueStart = startIndex + marker.length;
+    final valueEnd = payload.indexOf('|', valueStart);
+
+    if (valueEnd == -1) {
+      return null;
+    }
+
+    return int.tryParse(payload.substring(valueStart, valueEnd));
   }
 
   Future<void> cancelNotification(int id) async {
@@ -472,41 +470,30 @@ class NotificationService {
     protocolNavigation.value = null;
   }
 
-  String _titleFor(
-    _ProfileReminder item,
-    NotificationPreferences preferences,
-  ) {
-    final customTitle =
-        item.protocol.customReminderTitle?.trim();
-
-    if (preferences.customNotificationTextEnabled &&
-        customTitle != null &&
-        customTitle.isNotEmpty) {
-      return customTitle;
-    }
-
+  String _titleFor(_ProfileReminder item, NotificationPreferences preferences) {
     return item.reminder.isPrimary
-        ? '${item.reminder.protocolName} reminder'
-        : '${item.reminder.protocolName} follow-up';
+        ? 'MODOSE'
+        : 'MODOSE - Forgot something?';
   }
 
-  String _bodyFor(
-    _ProfileReminder item,
-    NotificationPreferences preferences,
-  ) {
-    final customBody =
-        item.protocol.customReminderBody?.trim();
+  String _bodyFor(_ProfileReminder item, NotificationPreferences preferences) {
+    if (item.reminder.isPrimary) {
+      final customBody = item.protocol.customReminderBody?.trim();
 
-    final message =
-        preferences.customNotificationTextEnabled &&
-            customBody != null &&
-            customBody.isNotEmpty
-        ? customBody
-        : item.reminder.isPrimary
-        ? 'Your scheduled dose is ${item.reminder.dose}.'
-        : 'This dose has not been marked as taken.';
+      return preferences.customNotificationTextEnabled &&
+              customBody != null &&
+              customBody.isNotEmpty
+          ? customBody
+          : "It's time for your protocol";
+    }
 
-    return '${item.profileName} • $message';
+    final customFollowUpBody = item.protocol.customFollowUpBody?.trim();
+
+    return preferences.customNotificationTextEnabled &&
+            customFollowUpBody != null &&
+            customFollowUpBody.isNotEmpty
+        ? customFollowUpBody
+        : "You haven't logged your protocol today.";
   }
 
   String _payloadFor(_ProfileReminder item) {
@@ -531,8 +518,7 @@ class NotificationService {
 
     for (final codeUnit in value.codeUnits) {
       hash ^= codeUnit;
-      hash =
-          (hash * 0x01000193) & 0x7FFFFFFF;
+      hash = (hash * 0x01000193) & 0x7FFFFFFF;
     }
 
     return hash;
@@ -546,15 +532,12 @@ class NotificationService {
         first.minute == second.minute;
   }
 
-  void _onNotificationPressed(
-    NotificationResponse response,
-  ) {
+  void _onNotificationPressed(NotificationResponse response) {
     _handlePayload(response.payload);
   }
 
   void _handlePayload(String? payload) {
-    final protocolId =
-        _protocolIdFromPayload(payload);
+    final protocolId = _protocolIdFromPayload(payload);
 
     if (protocolId != null) {
       protocolNavigation.value = protocolId;
@@ -598,33 +581,25 @@ class NotificationService {
       return null;
     }
 
-    final protocolId =
-        payload.substring(
-          legacyPrefix.length,
-          separatorIndex,
-        );
+    final protocolId = payload.substring(legacyPrefix.length, separatorIndex);
 
-    return protocolId.isEmpty
-        ? null
-        : protocolId;
+    return protocolId.isEmpty ? null : protocolId;
   }
 
-  static const NotificationDetails _notificationDetails =
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription:
-              'Notifications for scheduled protocol reminders.',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      );
+  static const NotificationDetails _notificationDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: 'Notifications for scheduled protocol reminders.',
+      importance: Importance.high,
+      priority: Priority.high,
+    ),
+    iOS: DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    ),
+  );
 }
 
 class _ProfileReminder {

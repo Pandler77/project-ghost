@@ -30,28 +30,28 @@ class PrivacyScreen extends StatelessWidget {
               icon: ArcticIcons.privacy_tip_outlined,
               title: 'Your data stays under your control',
               subtitle:
-                  'ArcticDose is designed around local-first tracking. This page explains what the app stores and which device permissions it may use.',
+                  'MODOSE is designed around local-first tracking. This page explains what the app stores and which device permissions it may use.',
             ),
             const SizedBox(height: AppSpacing.lg),
             const _Section(
               title: 'Local App Data',
               body:
-                  'Protocol details, dose history, weight logs, tracking preferences, ArcticDose Supply data, notes, and other app settings are stored locally on your device unless a future backup or cloud feature is explicitly enabled by you.',
+                  'Protocol details, dose history, weight logs, tracking preferences, MODOSE Supply data, notes, and other app settings are stored locally on your device unless a future backup or cloud feature is explicitly enabled by you.',
             ),
             const _Section(
               title: 'Progress Photos',
               body:
-                  'Progress photos are selected or captured by you and are used only for your progress tracking experience inside ArcticDose. ArcticDose does not upload them through the current local-only implementation.',
+                  'Progress photos are selected or captured by you and are used only for your progress tracking experience inside MODOSE. MODOSE does not upload them through the current local-only implementation.',
             ),
             const _Section(
               title: 'Notifications',
               body:
-                  'ArcticDose may request notification permission so it can deliver reminders you configure. Notification settings can be changed at any time from ArcticDose Settings or your device settings.',
+                  'MODOSE may request notification permission so it can deliver reminders you configure. Notification settings can be changed at any time from MODOSE Settings or your device settings.',
             ),
             const _Section(
               title: 'Device Permissions',
               body:
-                  'ArcticDose only requests permissions needed for features you choose to use, such as notifications, photos, or camera access. Denying an optional permission may limit the related feature but should not prevent unrelated features from working.',
+                  'MODOSE only requests permissions needed for features you choose to use, such as notifications, photos, or camera access. Denying an optional permission may limit the related feature but should not prevent unrelated features from working.',
             ),
             const _Section(
               title: 'Analytics & Tracking',
@@ -61,7 +61,7 @@ class PrivacyScreen extends StatelessWidget {
             const _Section(
               title: 'Deleting Your Data',
               body:
-                  'Local ArcticDose data can be removed from the app through Reset App Data once that action is enabled, or by uninstalling the app. Platform-level backups may be controlled separately by your device or operating system.',
+                  'Local MODOSE data can be removed from the app through Reset App Data once that action is enabled, or by uninstalling the app. Platform-level backups may be controlled separately by your device or operating system.',
             ),
             Container(
               width: double.infinity,
@@ -196,3 +196,4 @@ class _Section extends StatelessWidget {
     );
   }
 }
+

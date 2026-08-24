@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'models/app_theme_mode.dart';
+import 'models/profile_module.dart';
 import 'screens/main_screen.dart';
 import 'screens/onboarding_setup_screen.dart';
 import 'screens/welcome_screen.dart';
@@ -29,7 +30,13 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
       onPointerDown: (_) {
         FocusManager.instance.primaryFocus?.unfocus();
       },
-      child: child ?? const SizedBox.shrink(),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const _GlobalAppBackground(),
+          child ?? const SizedBox.shrink(),
+        ],
+      ),
     );
   }
 
@@ -159,6 +166,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
         name: result.profileName,
         type: result.profileType,
         heightCm: result.heightCm,
+        enabledModules: Set<ProfileModule>.from(result.enabledModules),
         updatedAt: DateTime.now(),
       ),
     );
@@ -223,7 +231,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'ArcticDose',
+      title: 'MODOSE',
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
       themeMode: _materialThemeMode,
@@ -243,13 +251,13 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
       brightness: Brightness.light,
       colorScheme: colorScheme,
 
-      scaffoldBackgroundColor: ArcticPalette.lightBackground,
+      scaffoldBackgroundColor: Colors.transparent,
 
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        backgroundColor: ArcticPalette.lightBackground,
+        backgroundColor: Colors.transparent,
         foregroundColor: colorScheme.onSurface,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: TextStyle(
@@ -263,7 +271,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
         elevation: 2,
         shadowColor: Colors.black.withValues(alpha: 0.10),
         margin: EdgeInsets.zero,
-        color: ArcticPalette.lightCard,
+        color: ArcticPalette.lightCard.withValues(alpha: 0.94),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -377,16 +385,16 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
       brightness: Brightness.dark,
       colorScheme: colorScheme,
 
-      scaffoldBackgroundColor: ArcticPalette.darkBackground,
+      scaffoldBackgroundColor: Colors.transparent,
 
-      canvasColor: ArcticPalette.darkBackground,
+      canvasColor: Colors.transparent,
       dividerColor: const Color(0xFF303038),
 
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        backgroundColor: ArcticPalette.darkBackground,
+        backgroundColor: Colors.transparent,
         foregroundColor: colorScheme.onSurface,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: TextStyle(
@@ -400,7 +408,7 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
         elevation: 2,
         shadowColor: Colors.black.withValues(alpha: 0.24),
         margin: EdgeInsets.zero,
-        color: ArcticPalette.darkCard,
+        color: ArcticPalette.darkCard.withValues(alpha: 0.92),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -530,6 +538,125 @@ class _ProjectGhostAppState extends State<ProjectGhostApp> {
         elevation: 0,
         highlightElevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+}
+
+class _GlobalAppBackground extends StatelessWidget {
+  const _GlobalAppBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                stops: const [0.0, 0.42, 0.72, 1.0],
+                colors: isDark
+                    ? const [
+                        Color(0xFF0A0E1D),
+                        Color(0xFF17132E),
+                        Color(0xFF101A2E),
+                        Color(0xFF081522),
+                      ]
+                    : const [
+                        Color(0xFFEDE7FF),
+                        Color(0xFFF5F1FF),
+                        Color(0xFFEEF5FF),
+                        Color(0xFFE6F4FF),
+                      ],
+              ),
+            ),
+          ),
+
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: const Alignment(-1.0, -0.35),
+                end: const Alignment(1.0, 0.35),
+                colors: isDark
+                    ? [
+                        const Color(0xFF7C3AED).withValues(alpha: 0.11),
+                        const Color(0xFF6366F1).withValues(alpha: 0.045),
+                        const Color(0xFF0EA5E9).withValues(alpha: 0.10),
+                      ]
+                    : [
+                        const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                        const Color(0xFF818CF8).withValues(alpha: 0.045),
+                        const Color(0xFF38BDF8).withValues(alpha: 0.11),
+                      ],
+              ),
+            ),
+          ),
+
+          Positioned(
+            top: 170,
+            left: -90,
+            right: -90,
+            child: Transform.rotate(
+              angle: -0.10,
+              child: Container(
+                height: 150,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [
+                            const Color(0xFF8B5CF6).withValues(alpha: 0.00),
+                            const Color(0xFF8B5CF6).withValues(alpha: 0.08),
+                            const Color(0xFF38BDF8).withValues(alpha: 0.07),
+                            const Color(0xFF38BDF8).withValues(alpha: 0.00),
+                          ]
+                        : [
+                            const Color(0xFF8B5CF6).withValues(alpha: 0.00),
+                            const Color(0xFF8B5CF6).withValues(alpha: 0.065),
+                            const Color(0xFF38BDF8).withValues(alpha: 0.06),
+                            const Color(0xFF38BDF8).withValues(alpha: 0.00),
+                          ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          Positioned(
+            bottom: 130,
+            left: -100,
+            right: -100,
+            child: Transform.rotate(
+              angle: 0.08,
+              child: Container(
+                height: 180,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [
+                            const Color(0xFF4F46E5).withValues(alpha: 0.00),
+                            const Color(0xFF4F46E5).withValues(alpha: 0.065),
+                            const Color(0xFF0EA5E9).withValues(alpha: 0.055),
+                            const Color(0xFF0EA5E9).withValues(alpha: 0.00),
+                          ]
+                        : [
+                            const Color(0xFF6366F1).withValues(alpha: 0.00),
+                            const Color(0xFF6366F1).withValues(alpha: 0.050),
+                            const Color(0xFF38BDF8).withValues(alpha: 0.050),
+                            const Color(0xFF38BDF8).withValues(alpha: 0.00),
+                          ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

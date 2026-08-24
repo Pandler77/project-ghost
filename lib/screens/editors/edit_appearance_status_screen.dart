@@ -54,7 +54,7 @@ class _EditAppearanceStatusScreenState
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'This color identifies the protocol throughout ArcticDose.',
+              'This color identifies the protocol throughout MODOSE.',
               style: TextStyle(
                 fontSize: AppTypography.caption,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -118,3 +118,4 @@ class _EditAppearanceStatusScreenState
     );
   }
 }
+

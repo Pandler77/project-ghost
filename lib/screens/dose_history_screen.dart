@@ -115,22 +115,20 @@ class _DoseHistoryScreenState extends State<DoseHistoryScreen> {
 
   Future<void> _openRecordDetails(DoseRecord record) async {
     final protocol = _protocolForId(record.protocolId);
-
-    if (protocol == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This protocol could not be found.')),
-      );
-      return;
-    }
-
     final injectionLog = _injectionLogsByDoseRecordId[record.id];
 
     final dose = Dose(
-      protocolId: protocol.id,
-      protocolName: protocol.name,
+      protocolId: record.protocolId,
+      protocolName:
+          record.protocolNameSnapshot ??
+          protocol?.name ??
+          'Unknown Protocol',
       amount: record.actualAmount ?? record.scheduledAmount,
       scheduledFor: record.scheduledFor,
-      protocolColorValue: protocol.colorValue,
+      protocolColorValue:
+          record.protocolColorValueSnapshot ??
+          protocol?.colorValue ??
+          Protocol.defaultColorValue,
       completedAt: record.completedAt,
       injectionSiteLabel: injectionLog?.site.label,
     );
@@ -249,12 +247,22 @@ class _DoseHistoryScreenState extends State<DoseHistoryScreen> {
                       protocol: _protocolForId(
                         groupedRecords[date]![index].protocolId,
                       ),
-                      protocolName: _protocolName(
-                        groupedRecords[date]![index].protocolId,
-                      ),
-                      protocolColor: _protocolColor(
-                        groupedRecords[date]![index].protocolId,
-                      ),
+                      protocolName:
+                          groupedRecords[date]![index].protocolNameSnapshot ??
+                          _protocolName(
+                            groupedRecords[date]![index].protocolId,
+                          ),
+                      protocolColor:
+                          groupedRecords[date]![index]
+                                  .protocolColorValueSnapshot ==
+                              null
+                          ? _protocolColor(
+                              groupedRecords[date]![index].protocolId,
+                            )
+                          : Color(
+                              groupedRecords[date]![index]
+                                  .protocolColorValueSnapshot!,
+                            ),
                       injectionLog:
                           _injectionLogsByDoseRecordId[groupedRecords[date]![index]
                               .id],
@@ -759,7 +767,17 @@ class _DoseHistoryRow extends StatelessWidget {
   }
 
   String _routeLabel() {
-    if (protocol?.isInjection == true &&
+    final snapshotType = record.protocolTypeSnapshot == null
+        ? null
+        : ProtocolTypeDetails.fromStorageValue(
+            record.protocolTypeSnapshot,
+          );
+
+    final isInjection =
+        snapshotType == ProtocolType.injection ||
+        (snapshotType == null && protocol?.isInjection == true);
+
+    if (isInjection &&
         record.status == DoseRecordStatus.taken &&
         injectionLog != null) {
       return 'SITE';
@@ -769,13 +787,23 @@ class _DoseHistoryRow extends StatelessWidget {
   }
 
   String _routeValue() {
-    if (protocol?.isInjection == true &&
+    final snapshotType = record.protocolTypeSnapshot == null
+        ? null
+        : ProtocolTypeDetails.fromStorageValue(
+            record.protocolTypeSnapshot,
+          );
+
+    final isInjection =
+        snapshotType == ProtocolType.injection ||
+        (snapshotType == null && protocol?.isInjection == true);
+
+    if (isInjection &&
         record.status == DoseRecordStatus.taken &&
         injectionLog != null) {
       return injectionLog!.site.label;
     }
 
-    return protocol?.type.label ?? 'Unknown';
+    return snapshotType?.label ?? protocol?.type.label ?? 'Unknown';
   }
 
   String _recordTimeText(DoseRecord record) {

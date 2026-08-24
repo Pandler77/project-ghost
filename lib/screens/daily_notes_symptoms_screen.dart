@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/protocol.dart';
 import '../models/symptom_entry.dart';
 import '../services/symptom_service.dart';
+import '../services/usage_analytics_service.dart';
 import '../theme/app_theme.dart';
 import 'symptom_history_screen.dart';
 import '../theme/arctic_icons.dart';
@@ -161,6 +162,13 @@ class _DailyNotesSymptomsScreenState extends State<DailyNotesSymptomsScreen> {
           protocolIds: result.protocolIds,
         );
       }
+
+      UsageAnalyticsService.instance.track(
+        UsageAnalyticsEvent.symptomLogged,
+        properties: {
+          'entry_count': results.length,
+        },
+      );
 
       if (!mounted) {
         return;

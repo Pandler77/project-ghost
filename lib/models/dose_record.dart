@@ -9,6 +9,10 @@ class DoseRecord {
     required this.status,
     this.completedAt,
     this.actualAmount,
+    this.protocolNameSnapshot,
+    this.protocolTypeSnapshot,
+    this.protocolColorValueSnapshot,
+    this.advancedDoseJsonSnapshot,
   });
 
   final String id;
@@ -19,6 +23,38 @@ class DoseRecord {
   final String? actualAmount;
   final DoseRecordStatus status;
 
+  /// Immutable presentation/context captured when the record is saved.
+  /// These are nullable so records created before database v38 remain valid.
+  final String? protocolNameSnapshot;
+  final String? protocolTypeSnapshot;
+  final int? protocolColorValueSnapshot;
+  final String? advancedDoseJsonSnapshot;
+
+  DoseRecord copyWithSnapshot({
+    String? protocolNameSnapshot,
+    String? protocolTypeSnapshot,
+    int? protocolColorValueSnapshot,
+    String? advancedDoseJsonSnapshot,
+  }) {
+    return DoseRecord(
+      id: id,
+      protocolId: protocolId,
+      scheduledFor: scheduledFor,
+      completedAt: completedAt,
+      scheduledAmount: scheduledAmount,
+      actualAmount: actualAmount,
+      status: status,
+      protocolNameSnapshot:
+          protocolNameSnapshot ?? this.protocolNameSnapshot,
+      protocolTypeSnapshot:
+          protocolTypeSnapshot ?? this.protocolTypeSnapshot,
+      protocolColorValueSnapshot:
+          protocolColorValueSnapshot ?? this.protocolColorValueSnapshot,
+      advancedDoseJsonSnapshot:
+          advancedDoseJsonSnapshot ?? this.advancedDoseJsonSnapshot,
+    );
+  }
+
   Map<String, Object?> toMap() {
     return {
       'id': id,
@@ -28,6 +64,10 @@ class DoseRecord {
       'scheduled_amount': scheduledAmount,
       'actual_amount': actualAmount,
       'status': status.name,
+      'protocol_name_snapshot': protocolNameSnapshot,
+      'protocol_type_snapshot': protocolTypeSnapshot,
+      'protocol_color_value_snapshot': protocolColorValueSnapshot,
+      'advanced_dose_json_snapshot': advancedDoseJsonSnapshot,
     };
   }
 
@@ -42,6 +82,12 @@ class DoseRecord {
       scheduledAmount: map['scheduled_amount'] as String,
       actualAmount: map['actual_amount'] as String?,
       status: DoseRecordStatus.values.byName(map['status'] as String),
+      protocolNameSnapshot: map['protocol_name_snapshot'] as String?,
+      protocolTypeSnapshot: map['protocol_type_snapshot'] as String?,
+      protocolColorValueSnapshot:
+          (map['protocol_color_value_snapshot'] as num?)?.toInt(),
+      advancedDoseJsonSnapshot:
+          map['advanced_dose_json_snapshot'] as String?,
     );
   }
 }

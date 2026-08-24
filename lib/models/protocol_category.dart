@@ -15,7 +15,7 @@ enum ProtocolCategory {
 extension ProtocolCategoryDetails on ProtocolCategory {
   String get label {
     return switch (this) {
-      ProtocolCategory.peptide => 'Peptides & Research',
+      ProtocolCategory.peptide => 'Peptides & Hormones',
       ProtocolCategory.hormonesAndTrt => 'Hormones & TRT',
       ProtocolCategory.medication => 'Medication',
       ProtocolCategory.supplementsAndVitamins => 'Supplements & Vitamins',
@@ -30,8 +30,7 @@ extension ProtocolCategoryDetails on ProtocolCategory {
       ProtocolCategory.peptide => 'peptide',
       ProtocolCategory.hormonesAndTrt => 'hormones_and_trt',
       ProtocolCategory.medication => 'medication',
-      ProtocolCategory.supplementsAndVitamins =>
-        'supplements_and_vitamins',
+      ProtocolCategory.supplementsAndVitamins => 'supplements_and_vitamins',
       ProtocolCategory.otherWellness => 'other_wellness',
       ProtocolCategory.researchCompound => 'research_compound',
       ProtocolCategory.custom => 'custom',
@@ -40,8 +39,15 @@ extension ProtocolCategoryDetails on ProtocolCategory {
 
   bool get showInAddProtocol {
     return switch (this) {
+      ProtocolCategory.peptide => true,
+      ProtocolCategory.medication => true,
+      ProtocolCategory.supplementsAndVitamins => true,
+      ProtocolCategory.custom => true,
+
+      // Legacy/internal categories.
+      ProtocolCategory.hormonesAndTrt => false,
+      ProtocolCategory.otherWellness => false,
       ProtocolCategory.researchCompound => false,
-      _ => true,
     };
   }
 
@@ -50,8 +56,7 @@ extension ProtocolCategoryDetails on ProtocolCategory {
       'peptide' => ProtocolCategory.peptide,
       'hormones_and_trt' => ProtocolCategory.hormonesAndTrt,
       'medication' => ProtocolCategory.medication,
-      'supplements_and_vitamins' =>
-        ProtocolCategory.supplementsAndVitamins,
+      'supplements_and_vitamins' => ProtocolCategory.supplementsAndVitamins,
       'other_wellness' => ProtocolCategory.otherWellness,
       'research_compound' => ProtocolCategory.researchCompound,
       'custom' => ProtocolCategory.custom,

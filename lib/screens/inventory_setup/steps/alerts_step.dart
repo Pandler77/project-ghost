@@ -32,7 +32,7 @@ class AlertsStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const StepHeader(
-          title: 'When should ArcticDose warn you?',
+          title: 'When should MODOSE warn you?',
           subtitle: 'Set your low-supply threshold and typical shipping time.',
           currentStep: 6,
           totalSteps: 7,
@@ -47,7 +47,7 @@ class AlertsStep extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'ArcticDose will warn you when this many unopened $plural remain.',
+          'MODOSE will warn you when this many unopened $plural remain.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: colors.onSurfaceVariant,
@@ -74,7 +74,7 @@ class AlertsStep extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'ArcticDose uses this to estimate when you should reorder.',
+          'MODOSE uses this to estimate when you should reorder.',
           style: TextStyle(
             fontSize: AppTypography.caption,
             color: colors.onSurfaceVariant,
@@ -136,7 +136,7 @@ class AlertsStep extends StatelessWidget {
         ? '1 day'
         : '$shippingDays days';
 
-    return 'ArcticDose will warn you when $containerText remain. '
+    return 'MODOSE will warn you when $containerText remain. '
         'Your typical shipping time is $shippingText.';
   }
 
@@ -150,3 +150,4 @@ class AlertsStep extends StatelessWidget {
     return '${value}s';
   }
 }
+

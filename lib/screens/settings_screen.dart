@@ -6,12 +6,13 @@ import '../models/app_theme_mode.dart';
 import '../models/display_preferences.dart';
 import '../models/measurement_system.dart';
 import '../models/tracking_preferences.dart';
+import '../services/usage_analytics_service.dart';
 import '../services/app_data_service.dart';
 import '../services/app_reset_service.dart';
 import '../services/notification_service.dart';
 import '../services/settings_service.dart';
 import '../theme/app_theme.dart';
-import 'about_arcticdose_screen.dart';
+import 'about_modose_screen.dart';
 import 'display_preferences_screen.dart';
 import 'notification_settings_screen.dart';
 import 'premium_screen.dart';
@@ -57,6 +58,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoadingCelebrations = true;
   bool _isSavingCelebrations = false;
 
+  bool _anonymousAnalyticsEnabled = true;
+  bool _isLoadingAnonymousAnalytics = true;
+  bool _isSavingAnonymousAnalytics = false;
+
   bool get _hasPremium => _dataService.hasPremium;
 
   @override
@@ -69,6 +74,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadDisplayPreferences();
     _loadMeasurementSystem();
     _loadCelebrations();
+    _loadAnonymousAnalytics();
   }
 
   Future<void> _loadTrackingPreferences() async {
@@ -139,6 +145,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() {
           _isSavingCelebrations = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadAnonymousAnalytics() async {
+    final enabled = await _settingsService.getAnonymousAnalyticsEnabled();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _anonymousAnalyticsEnabled = enabled;
+      _isLoadingAnonymousAnalytics = false;
+    });
+  }
+
+  Future<void> _setAnonymousAnalyticsEnabled(bool enabled) async {
+    if (_isSavingAnonymousAnalytics) {
+      return;
+    }
+
+    setState(() {
+      _isSavingAnonymousAnalytics = true;
+      _anonymousAnalyticsEnabled = enabled;
+    });
+
+    try {
+      await UsageAnalyticsService.instance.setEnabled(enabled);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingAnonymousAnalytics = false;
         });
       }
     }
@@ -246,10 +286,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _openAboutArcticDose() async {
+  Future<void> _openAboutMODOSE() async {
     await Navigator.push<void>(
       context,
-      MaterialPageRoute(builder: (_) => const AboutArcticDoseScreen()),
+      MaterialPageRoute(builder: (_) => const AboutMODOSEScreen()),
     );
   }
 
@@ -285,7 +325,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: AppSpacing.xs),
 
                 Text(
-                  'Choose how measurements are displayed throughout ArcticDose.',
+                  'Choose how measurements are displayed throughout MODOSE.',
                   style: TextStyle(
                     fontSize: AppTypography.caption,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -380,10 +420,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             LucideIcons.triangleAlert,
             color: Theme.of(dialogContext).colorScheme.error,
           ),
-          title: const Text('Reset all ArcticDose data?'),
+          title: const Text('Reset all MODOSE data?'),
           content: const Text(
             'This permanently deletes protocols, dose history, weight data, '
-            'ArcticDose Supply, progress photos, symptoms, profiles, and local '
+            'MODOSE Supply, progress photos, symptoms, profiles, and local '
             'settings from this device. This cannot be undone.',
           ),
           actions: [
@@ -429,7 +469,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'This is the final confirmation. All local ArcticDose data '
+                    'This is the final confirmation. All local MODOSE data '
                     'will be erased.',
                   ),
 
@@ -468,7 +508,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Navigator.pop(dialogContext, true);
                         }
                       : null,
-                  child: const Text('Reset ArcticDose'),
+                  child: const Text('Reset MODOSE'),
                 ),
               ],
             );
@@ -503,7 +543,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not reset ArcticDose data: $error')),
+        SnackBar(content: Text('Could not reset MODOSE data: $error')),
       );
     }
   }
@@ -515,7 +555,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return AlertDialog(
           title: const Text('Reset onboarding?'),
           content: const Text(
-            'ArcticDose will show onboarding again the next time the onboarding flow is checked.',
+            'MODOSE will show onboarding again the next time the onboarding flow is checked.',
           ),
           actions: [
             TextButton(
@@ -550,14 +590,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ).showSnackBar(const SnackBar(content: Text('Onboarding reset.')));
   }
 
-  Future<void> _resetArcticDoseSupplyBeta() async {
+  Future<void> _resetMODOSESupplyBeta() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Reset ArcticDose Supply beta notice?'),
+          title: const Text('Reset MODOSE Supply beta notice?'),
           content: const Text(
-            'The ArcticDose Supply beta notice will be allowed to appear again.',
+            'The MODOSE Supply beta notice will be allowed to appear again.',
           ),
           actions: [
             TextButton(
@@ -588,7 +628,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('ArcticDose Supply beta notice reset.')),
+      const SnackBar(content: Text('MODOSE Supply beta notice reset.')),
     );
   }
 
@@ -661,7 +701,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             const _SettingsSectionHeader(
               title: 'Account',
-              subtitle: 'Premium access and membership status.',
+              subtitle: 'Premium access and account status.',
             ),
 
             const SizedBox(height: AppSpacing.sm),
@@ -672,8 +712,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const _SettingsSectionHeader(
               title: 'Preferences',
-              subtitle:
-                  'Control how ArcticDose looks, tracks, and displays data.',
+              subtitle: 'Control how MODOSE looks, tracks, and displays data.',
             ),
 
             const SizedBox(height: AppSpacing.sm),
@@ -716,7 +755,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: AppSpacing.xs),
 
                               Text(
-                                'Choose how ArcticDose appears on this device.',
+                                'Choose how MODOSE appears on this device.',
                                 style: TextStyle(
                                   fontSize: AppTypography.caption,
                                   color: Theme.of(
@@ -860,34 +899,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const _SettingsSectionHeader(
               title: 'Data & Privacy',
-              subtitle: 'Manage and protect your ArcticDose data.',
+              subtitle: 'Manage and protect your MODOSE data.',
             ),
 
             const SizedBox(height: AppSpacing.sm),
 
             _SettingsCard(
               children: [
-                const _ComingSoonTile(
-                  icon: LucideIcons.download,
-                  title: 'Export Data',
-                  subtitle: 'Export a copy of your ArcticDose data.',
-                ),
-
-                const _SettingsDivider(),
-
-                const _ComingSoonTile(
-                  icon: LucideIcons.cloud,
-                  title: 'Backup & Restore',
-                  subtitle: 'Protect and restore your ArcticDose data.',
-                ),
-
-                const _SettingsDivider(),
-
                 _SettingsTile(
                   icon: LucideIcons.shieldCheck,
                   title: 'Privacy',
-                  subtitle: 'Review how ArcticDose stores and uses your data.',
+                  subtitle: 'Review how MODOSE stores and uses your data.',
                   onTap: _openPrivacy,
+                ),
+
+                const _SettingsDivider(),
+
+                _SettingsSwitchTile(
+                  icon: LucideIcons.chartNoAxesColumnIncreasing,
+                  title: 'Anonymous Usage Analytics',
+                  subtitle:
+                      'Share anonymous feature usage to help improve MODOSE. '
+                      'Medication names, doses, weights, notes, symptoms, and '
+                      'photos are never included.',
+                  value: _anonymousAnalyticsEnabled,
+                  isLoading:
+                      _isLoadingAnonymousAnalytics ||
+                      _isSavingAnonymousAnalytics,
+                  onChanged:
+                      _isLoadingAnonymousAnalytics ||
+                          _isSavingAnonymousAnalytics
+                      ? null
+                      : _setAnonymousAnalyticsEnabled,
                 ),
 
                 const _SettingsDivider(),
@@ -896,8 +939,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: LucideIcons.trash2,
                   title: 'Reset App Data',
                   subtitle: _isResettingAppData
-                      ? 'Resetting ArcticDose...'
-                      : 'Erase locally stored ArcticDose data.',
+                      ? 'Resetting MODOSE...'
+                      : 'Erase all locally stored MODOSE data.',
                   onTap: _isResettingAppData ? null : _resetAppData,
                   isLoading: _isResettingAppData,
                   destructive: true,
@@ -908,67 +951,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: AppSpacing.lg),
 
             const _SettingsSectionHeader(
-              title: 'Premium',
-              subtitle: 'Manage purchases and premium access.',
-            ),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            _SettingsCard(
-              children: [
-                _SettingsTile(
-                  icon: LucideIcons.crown,
-                  title: _hasPremium
-                      ? 'ArcticDose Premium'
-                      : 'Upgrade to Premium',
-                  subtitle: _hasPremium
-                      ? 'Premium features are active.'
-                      : 'Unlock analytics, ArcticDose Supply™, comparisons, and more.',
-                  onTap: _openPremium,
-                ),
-
-                const _SettingsDivider(),
-
-                const _ComingSoonTile(
-                  icon: LucideIcons.refreshCcw,
-                  title: 'Restore Purchases',
-                  subtitle:
-                      'Restore a previous App Store or Play Store purchase.',
-                ),
-              ],
-            ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            const _SettingsSectionHeader(
               title: 'App',
-              subtitle: 'Support and application information.',
+              subtitle: 'Legal and application information.',
             ),
 
             const SizedBox(height: AppSpacing.sm),
 
             _SettingsCard(
               children: [
-                const _ComingSoonTile(
-                  icon: LucideIcons.bug,
-                  title: 'Report a Bug',
-                  subtitle: 'Send feedback when something is not working.',
-                ),
-
-                const _SettingsDivider(),
-
-                const _ComingSoonTile(
-                  icon: LucideIcons.circleHelp,
-                  title: 'Support',
-                  subtitle: 'Get help with ArcticDose.',
-                ),
-
-                const _SettingsDivider(),
-
                 _SettingsTile(
                   icon: LucideIcons.fileText,
                   title: 'Terms of Use',
-                  subtitle: 'Review ArcticDose terms and conditions.',
+                  subtitle: 'Review MODOSE terms and conditions.',
                   onTap: _openTermsOfUse,
                 ),
 
@@ -976,9 +970,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 _SettingsTile(
                   icon: LucideIcons.info,
-                  title: 'About ArcticDose',
+                  title: 'About MODOSE',
                   subtitle: 'Version, licenses, and application information.',
-                  onTap: _openAboutArcticDose,
+                  onTap: _openAboutMODOSE,
                 ),
               ],
             ),
@@ -1016,10 +1010,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   _SettingsTile(
                     icon: LucideIcons.package,
-                    title: 'Reset ArcticDose Supply Beta Notice',
+                    title: 'Reset MODOSE Supply Beta Notice',
                     subtitle:
-                        'Allow the ArcticDose Supply beta notice to appear again.',
-                    onTap: _resetArcticDoseSupplyBeta,
+                        'Allow the MODOSE Supply beta notice to appear again.',
+                    onTap: _resetMODOSESupplyBeta,
                   ),
                 ],
               ),
@@ -1040,30 +1034,41 @@ class _PremiumCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-
     final brightness = Theme.of(context).brightness;
 
-    final cardStart = brightness == Brightness.dark
+    const premiumGold = Color(0xFFE3AA22);
+    const premiumGoldDark = Color(0xFFB77A00);
+
+    final accent = hasPremium ? premiumGold : colors.primary;
+
+    final cardStart = hasPremium
         ? Color.alphaBlend(
-            colors.primary.withValues(alpha: 0.26),
+            premiumGold.withValues(
+              alpha: brightness == Brightness.dark ? 0.20 : 0.15,
+            ),
             colors.surface,
           )
         : Color.alphaBlend(
-            colors.primary.withValues(alpha: 0.12),
+            colors.primary.withValues(
+              alpha: brightness == Brightness.dark ? 0.26 : 0.12,
+            ),
             colors.surface,
           );
 
-    final cardEnd = brightness == Brightness.dark
+    final cardEnd = hasPremium
         ? Color.alphaBlend(
-            colors.primary.withValues(alpha: 0.10),
+            premiumGold.withValues(
+              alpha: brightness == Brightness.dark ? 0.08 : 0.05,
+            ),
             colors.surface,
           )
         : Color.alphaBlend(
-            colors.primary.withValues(alpha: 0.05),
+            colors.primary.withValues(
+              alpha: brightness == Brightness.dark ? 0.10 : 0.05,
+            ),
             colors.surface,
           );
 
-    final gold = Colors.amber.shade500;
     final activeGreen = Colors.green.shade500;
 
     return Material(
@@ -1081,12 +1086,12 @@ class _PremiumCard extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(AppRadius.card),
             border: Border.all(
-              color: colors.primary.withValues(alpha: 0.55),
-              width: 1.25,
+              color: accent.withValues(alpha: hasPremium ? 0.72 : 0.55),
+              width: hasPremium ? 1.5 : 1.25,
             ),
             boxShadow: [
               BoxShadow(
-                color: colors.primary.withValues(alpha: 0.08),
+                color: accent.withValues(alpha: hasPremium ? 0.12 : 0.08),
                 blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
@@ -1094,21 +1099,22 @@ class _PremiumCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
+              SizedBox(
                 width: 62,
                 height: 62,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(
-                    color: colors.primary.withValues(alpha: 0.18),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: ColorFiltered(
+                    colorFilter: ColorFilter.mode(
+                      hasPremium ? premiumGold : colors.primary,
+                      BlendMode.srcIn,
+                    ),
+                    child: Image.asset(
+                      'assets/branding/modose_premium_mark.png',
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
-                ),
-                child: Icon(
-                  hasPremium ? LucideIcons.crown : LucideIcons.lock,
-                  size: 32,
-                  color: hasPremium ? gold : colors.primary,
                 ),
               ),
 
@@ -1119,12 +1125,12 @@ class _PremiumCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'ARCTICDOSE PREMIUM',
+                      'MODOSE PREMIUM',
                       style: TextStyle(
                         fontSize: AppTypography.micro,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.8,
-                        color: colors.primary,
+                        color: hasPremium ? premiumGoldDark : colors.primary,
                       ),
                     ),
 
@@ -1136,7 +1142,7 @@ class _PremiumCard extends StatelessWidget {
                           child: Text(
                             hasPremium
                                 ? 'Premium Active'
-                                : 'Unlock ArcticDose Premium',
+                                : 'Upgrade to MODOSE Premium',
                             style: const TextStyle(
                               fontSize: AppTypography.title,
                               fontWeight: FontWeight.w900,
@@ -1192,7 +1198,7 @@ class _PremiumCard extends StatelessWidget {
                     Text(
                       hasPremium
                           ? 'All premium features unlocked.'
-                          : 'Get access to advanced tracking, analytics, ArcticDose Supply™, and more.',
+                          : 'Get access to advanced tracking, analytics, MODOSE Supply™, and more.',
                       style: TextStyle(
                         fontSize: AppTypography.caption,
                         height: 1.35,
@@ -1205,7 +1211,10 @@ class _PremiumCard extends StatelessWidget {
 
               const SizedBox(width: AppSpacing.sm),
 
-              Icon(Icons.chevron_right_rounded, color: colors.primary),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: hasPremium ? premiumGoldDark : colors.primary,
+              ),
             ],
           ),
         ),
@@ -1381,69 +1390,6 @@ class _SettingsSwitchTile extends StatelessWidget {
             )
           : Switch(value: value, onChanged: onChanged),
       onTap: isLoading || onChanged == null ? null : () => onChanged!(!value),
-    );
-  }
-}
-
-class _ComingSoonTile extends StatelessWidget {
-  const _ComingSoonTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: 6,
-      ),
-      leading: _SettingsIcon(icon: icon),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: colors.onSurface,
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color: colors.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            child: Text(
-              'Coming Soon',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: AppTypography.caption,
-          color: colors.onSurfaceVariant,
-        ),
-      ),
     );
   }
 }

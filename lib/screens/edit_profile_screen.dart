@@ -763,7 +763,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: AppSpacing.xs),
 
             Text(
-              'This color identifies the profile throughout ArcticDose.',
+              'This color identifies the profile throughout MODOSE.',
               style: TextStyle(
                 fontSize: AppTypography.caption,
                 color: colors.onSurfaceVariant,
@@ -942,3 +942,4 @@ IconData _profileTypeIcon(ProfileType type) {
     ProfileType.other => ArcticIcons.account_circle,
   };
 }
+

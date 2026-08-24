@@ -37,6 +37,9 @@ class SettingsService {
   static const String _awardedMilestonesKey = 'awarded_milestones';
   static const String _pendingMilestonesKey = 'pending_milestones';
 
+  static const String _anonymousAnalyticsEnabledKey =
+      'anonymous_analytics_enabled';
+
   final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
   // ------------------------
@@ -394,6 +397,22 @@ class SettingsService {
     } catch (_) {
       return <MilestoneAchievement>[];
     }
+  }
+
+  // ------------------------
+  // Anonymous product analytics
+  // ------------------------
+
+  Future<bool> getAnonymousAnalyticsEnabled() async {
+    return await _preferences.getBool(_anonymousAnalyticsEnabledKey) ?? true;
+  }
+
+  Future<void> saveAnonymousAnalyticsEnabled(bool enabled) async {
+    await _preferences.setBool(_anonymousAnalyticsEnabledKey, enabled);
+  }
+
+  Future<void> resetAnonymousAnalyticsEnabled() async {
+    await _preferences.remove(_anonymousAnalyticsEnabledKey);
   }
 
   // ------------------------

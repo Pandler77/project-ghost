@@ -6,7 +6,6 @@ import '../models/injection_site_suggestion.dart';
 import '../models/protocol.dart';
 import '../models/take_dose_result.dart';
 import '../theme/app_theme.dart';
-import 'injection_body_map.dart';
 import '../theme/arctic_icons.dart';
 
 class TakeDoseSheet extends StatefulWidget {
@@ -206,7 +205,7 @@ class _TakeDoseSheetState extends State<TakeDoseSheet> {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.md,
-        AppSpacing.md,
+        10,
         AppSpacing.md,
         AppSpacing.md + keyboardInset,
       ),
@@ -225,91 +224,89 @@ class _TakeDoseSheetState extends State<TakeDoseSheet> {
                 ),
               ),
             ),
-
             const SizedBox(height: AppSpacing.md),
-
             Text(
               'Take Dose',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
             ),
-
-            const SizedBox(height: AppSpacing.lg),
-
+            const SizedBox(height: 3),
+            Text(
+              widget.protocol.name,
+              style: TextStyle(
+                fontSize: AppTypography.body,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             _SectionCard(
               child: _isEditingDose
                   ? _buildDoseEditor(context)
                   : _buildScheduledDose(context),
             ),
-
             if (_doseWasChanged) ...[
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
               _buildDoseChangeScope(context),
             ],
-
             if (_shouldShowInjectionSite) ...[
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
               _buildInjectionSiteCard(context),
             ],
-
-            const SizedBox(height: AppSpacing.lg),
-
-            Center(
-              child: SizedBox(
-                width: 240,
-                child: FilledButton.icon(
-                  onPressed: _canConfirm ? _confirm : null,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _canConfirm ? _confirm : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
                   ),
-                  icon: const Icon(Icons.check_circle_outline, size: 20),
-                  label: const Text(
-                    'Confirm Dose',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
+                ),
+                icon: const Icon(Icons.check_circle_outline, size: 20),
+                label: const Text(
+                  'Confirm Dose',
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
             ),
-
             const SizedBox(height: AppSpacing.sm),
-
-            Center(
-              child: SizedBox(
-                width: 240,
-                child: OutlinedButton.icon(
-                  onPressed: _skipDose,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.orange.shade700,
-                    backgroundColor: Colors.orange.shade50,
-                    side: BorderSide(color: Colors.orange.shade600, width: 1.5),
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _skipDose,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange.shade700,
+                  backgroundColor: Colors.orange.withValues(alpha: 0.08),
+                  side: BorderSide(color: Colors.orange.shade600, width: 1.4),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
                   ),
-                  icon: const Icon(Icons.remove_circle_outline, size: 20),
-                  label: const Text(
-                    'Skip Dose',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
+                ),
+                icon: const Icon(Icons.remove_circle_outline, size: 20),
+                label: const Text(
+                  'Skip Dose',
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
             ),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            Center(
+            const SizedBox(height: AppSpacing.xs),
+            SizedBox(
+              width: double.infinity,
               child: TextButton(
                 onPressed: () {
                   Navigator.pop(context);
                 },
-                child: const Text('Cancel'),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ],
@@ -322,7 +319,23 @@ class _TakeDoseSheetState extends State<TakeDoseSheet> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.10),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            widget.protocol.isInjection
+                ? ArcticIcons.vaccines_outlined
+                : ArcticIcons.medication_outlined,
+            color: colorScheme.primary,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,21 +344,34 @@ class _TakeDoseSheetState extends State<TakeDoseSheet> {
                 'Scheduled dose',
                 style: TextStyle(
                   fontSize: AppTypography.caption,
+                  fontWeight: FontWeight.w600,
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: 2),
               Text(
                 widget.protocol.dose,
                 style: const TextStyle(
-                  fontSize: AppTypography.title,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _formatScheduledTime(
+                  widget.protocol.schedule.hour,
+                  widget.protocol.schedule.minute,
+                ),
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
           ),
         ),
-
         IconButton(
           tooltip: 'Edit dose',
           onPressed: () {
@@ -357,6 +383,18 @@ class _TakeDoseSheetState extends State<TakeDoseSheet> {
         ),
       ],
     );
+  }
+
+  String _formatScheduledTime(int hour, int minute) {
+    final displayHour = hour == 0
+        ? 12
+        : hour > 12
+        ? hour - 12
+        : hour;
+    final formattedMinute = minute.toString().padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+
+    return 'Scheduled for $displayHour:$formattedMinute $period';
   }
 
   Widget _buildDoseEditor(BuildContext context) {
@@ -446,8 +484,92 @@ class _TakeDoseSheetState extends State<TakeDoseSheet> {
             color: colorScheme.onSurfaceVariant,
           ),
         ),
+
+        if (_updatedDrawUnits != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              border: Border.all(
+                color: colorScheme.primary.withValues(alpha: 0.24),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Using the same vial and reconstitution:',
+                  style: TextStyle(
+                    fontSize: AppTypography.caption,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$_formattedEditedDose = Draw ${_formatDoseNumber(_updatedDrawUnits!)} units',
+                  style: TextStyle(
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
+  }
+
+  double? get _updatedDrawUnits {
+    final details = widget.protocol.doseDetails;
+
+    if (!widget.protocol.isInjection ||
+        details == null ||
+        !details.hasReconstitution) {
+      return null;
+    }
+
+    final amount = double.tryParse(_doseController.text.trim());
+
+    if (amount == null || amount <= 0) {
+      return null;
+    }
+
+    return details.drawUnits(
+      scheduledDoseAmount: amount,
+      scheduledDoseUnit: _selectedDoseUnit,
+    );
+  }
+
+  String get _formattedEditedDose {
+    final amount = double.tryParse(_doseController.text.trim());
+
+    if (amount == null) {
+      return '';
+    }
+
+    return '${_formatDoseNumber(amount)} ${_selectedDoseUnit.label}';
+  }
+
+  String _formatDoseNumber(double value) {
+    final rounded = value.roundToDouble();
+
+    // Draw-unit math can produce tiny floating-point leftovers such as
+    // 14.000000000000002. Treat values that are effectively whole numbers
+    // as integers so the UI never shows "14." or "56.".
+    if ((value - rounded).abs() < 0.000001) {
+      return rounded.toInt().toString();
+    }
+
+    return value
+        .toStringAsFixed(2)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   Widget _buildDoseChangeScope(BuildContext context) {
@@ -511,89 +633,146 @@ class _TakeDoseSheetState extends State<TakeDoseSheet> {
 
   Widget _buildInjectionSiteCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final site = _selectedInjectionSite;
+    final selectedSite = _selectedInjectionSite;
+    final enabledSites = widget.protocol.enabledInjectionSites.toList();
 
     return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Injection site',
-            style: TextStyle(
-              fontSize: AppTypography.caption,
-              color: colorScheme.onSurfaceVariant,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Injection site',
+                  style: TextStyle(
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (!_isLoadingInjectionSite && selectedSite != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'Recommended',
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+            ],
           ),
 
           const SizedBox(height: AppSpacing.sm),
 
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
+          if (_isLoadingInjectionSite)
+            Row(
+              children: [
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                child: Center(
-                  child: _isLoadingInjectionSite
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(
-                          ArcticIcons.location_on_outlined,
-                          color: colorScheme.primary,
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  'Finding recommended site...',
+                  style: TextStyle(
+                    fontSize: AppTypography.caption,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            )
+          else if (enabledSites.isNotEmpty)
+            DropdownButtonFormField<InjectionSite>(
+              initialValue:
+                  selectedSite != null && enabledSites.contains(selectedSite)
+                  ? selectedSite
+                  : enabledSites.first,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Site',
+                prefixIcon: Icon(
+                  ArcticIcons.location_on_outlined,
+                  color: colorScheme.primary,
+                ),
+                border: const OutlineInputBorder(),
+              ),
+              items: [
+                for (final site in enabledSites)
+                  DropdownMenuItem<InjectionSite>(
+                    value: site,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            site.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                ),
-              ),
-
-              const SizedBox(width: AppSpacing.md),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _isLoadingInjectionSite
-                          ? 'Finding recommended site...'
-                          : 'Recommended site',
-                      style: TextStyle(
-                        fontSize: AppTypography.caption,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                        if (site == _previousInjectionSite) ...[
+                          const SizedBox(width: AppSpacing.sm),
+                          Icon(
+                            Icons.history_rounded,
+                            size: 16,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _isLoadingInjectionSite
-                          ? 'Please wait'
-                          : site?.label ?? 'Choose an injection site',
-                      style: const TextStyle(
-                        fontSize: AppTypography.body,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+                  ),
+              ],
+              onChanged: (site) {
+                if (site == null) {
+                  return;
+                }
 
-          if (!_isLoadingInjectionSite) ...[
-            const SizedBox(height: AppSpacing.md),
-
-            InjectionBodyMap(
-              enabledSites: widget.protocol.enabledInjectionSites,
-              selectedSite: _selectedInjectionSite,
-              previousSite: _previousInjectionSite,
-              showDisabledSites: false,
-              onSiteSelected: (site) {
                 setState(() {
                   _selectedInjectionSite = site;
                 });
               },
+            )
+          else
+            Text(
+              'No injection sites are enabled for this protocol.',
+              style: TextStyle(
+                fontSize: AppTypography.caption,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+
+          if (!_isLoadingInjectionSite &&
+              selectedSite != null &&
+              selectedSite == _previousInjectionSite) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                Icon(
+                  Icons.history_rounded,
+                  size: 15,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    'This was your previous injection site.',
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ],

@@ -4,8 +4,8 @@ import '../../models/protocol.dart';
 import '../../models/protocol_schedule.dart';
 import '../../models/schedule_type.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/ios_time_picker.dart';
 import '../../theme/arctic_icons.dart';
+import '../../widgets/ios_time_picker.dart';
 
 class EditScheduleScreen extends StatefulWidget {
   const EditScheduleScreen({required this.protocol, super.key});
@@ -29,16 +29,24 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
   @override
   void initState() {
     super.initState();
+
     final schedule = widget.protocol.schedule;
 
     _intervalController = TextEditingController(
       text: schedule.intervalDays?.toString() ?? '7',
     );
+
     _monthlyDayController = TextEditingController(
-      text: schedule.monthlyDay?.toString() ?? '1',
+      text:
+          schedule.monthlyDay?.toString() ?? schedule.startDate.day.toString(),
     );
+
     _selectedType = schedule.type;
-    _startDate = schedule.startDate;
+    _startDate = DateTime(
+      schedule.startDate.year,
+      schedule.startDate.month,
+      schedule.startDate.day,
+    );
     _time = TimeOfDay(hour: schedule.hour, minute: schedule.minute);
     _weekday = schedule.weekday ?? schedule.startDate.weekday;
     _weekdays = Set<int>.from(schedule.specificWeekdays);
@@ -56,6 +64,8 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
   }
 
   Future<void> _selectStartDate() async {
+    FocusScope.of(context).unfocus();
+
     final selected = await showDatePicker(
       context: context,
       initialDate: _startDate,
@@ -63,18 +73,65 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
       lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
 
-    if (selected == null || !mounted) return;
-    setState(() => _startDate = selected);
+    if (selected == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _startDate = DateTime(selected.year, selected.month, selected.day);
+
+      // When changing the anchor date on a weekly schedule, keep the schedule
+      // intuitive by moving the weekly weekday with the newly selected date.
+      if (_selectedType == ScheduleType.weekly) {
+        _weekday = _startDate.weekday;
+      }
+
+      // For a newly-created monthly configuration, use the selected start
+      // date's day as the sensible default.
+      if (_selectedType == ScheduleType.monthly &&
+          int.tryParse(_monthlyDayController.text.trim()) == null) {
+        _monthlyDayController.text = _startDate.day.toString();
+      }
+    });
   }
 
   Future<void> _selectTime() async {
+    FocusScope.of(context).unfocus();
+
     final selected = await showIosTimePicker(
       context: context,
       initialTime: _time,
     );
 
-    if (selected == null || !mounted) return;
+    if (selected == null || !mounted) {
+      return;
+    }
+
     setState(() => _time = selected);
+  }
+
+  void _changeScheduleType(ScheduleType value) {
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _selectedType = value;
+
+      if (value == ScheduleType.weekly) {
+        _weekday = _startDate.weekday;
+      }
+
+      if (value == ScheduleType.specificDays && _weekdays.isEmpty) {
+        _weekdays.add(_startDate.weekday);
+      }
+
+      if (value == ScheduleType.monthly) {
+        final currentDay = int.tryParse(_monthlyDayController.text.trim());
+
+        if (currentDay == null || currentDay < 1 || currentDay > 31) {
+          _monthlyDayController.text = _startDate.day.toString();
+        }
+      }
+    });
   }
 
   void _toggleWeekday(int weekday) {
@@ -96,17 +153,23 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
   }
 
   ProtocolSchedule? _createSchedule() {
+    final normalizedStartDate = DateTime(
+      _startDate.year,
+      _startDate.month,
+      _startDate.day,
+    );
+
     switch (_selectedType) {
       case ScheduleType.daily:
         return ProtocolSchedule.daily(
-          startDate: _startDate,
+          startDate: normalizedStartDate,
           hour: _time.hour,
           minute: _time.minute,
         );
 
       case ScheduleType.weekly:
         return ProtocolSchedule.weekly(
-          startDate: _startDate,
+          startDate: normalizedStartDate,
           hour: _time.hour,
           minute: _time.minute,
           weekday: _weekday,
@@ -114,13 +177,14 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
 
       case ScheduleType.everyXDays:
         final interval = int.tryParse(_intervalController.text.trim());
+
         if (interval == null || interval < 1) {
           _showMessage('Enter a valid interval of at least 1 day.');
           return null;
         }
 
         return ProtocolSchedule.everyXDays(
-          startDate: _startDate,
+          startDate: normalizedStartDate,
           hour: _time.hour,
           minute: _time.minute,
           intervalDays: interval,
@@ -133,7 +197,7 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
         }
 
         return ProtocolSchedule.specificDays(
-          startDate: _startDate,
+          startDate: normalizedStartDate,
           hour: _time.hour,
           minute: _time.minute,
           weekdays: Set<int>.from(_weekdays),
@@ -141,13 +205,14 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
 
       case ScheduleType.monthly:
         final day = int.tryParse(_monthlyDayController.text.trim());
+
         if (day == null || day < 1 || day > 31) {
           _showMessage('Enter a monthly day between 1 and 31.');
           return null;
         }
 
         return ProtocolSchedule.monthly(
-          startDate: _startDate,
+          startDate: normalizedStartDate,
           hour: _time.hour,
           minute: _time.minute,
           day: day,
@@ -156,19 +221,27 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
   }
 
   void _save() {
+    FocusScope.of(context).unfocus();
+
     final schedule = _createSchedule();
-    if (schedule == null) return;
+
+    if (schedule == null) {
+      return;
+    }
 
     Navigator.pop(context, widget.protocol.copyWith(schedule: schedule));
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Schedule')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
             const Text(
               'Schedule',
@@ -177,7 +250,17 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Change when this protocol is scheduled. Existing completed '
+              'dose history is not changed.',
+              style: TextStyle(
+                fontSize: AppTypography.caption,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: AppSpacing.lg),
+
             DropdownButtonFormField<ScheduleType>(
               initialValue: _selectedType,
               decoration: const InputDecoration(
@@ -207,12 +290,16 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                 ),
               ],
               onChanged: (value) {
-                if (value == null) return;
-                setState(() => _selectedType = value);
+                if (value == null) {
+                  return;
+                }
+
+                _changeScheduleType(value);
               },
             ),
-            const SizedBox(height: AppSpacing.md),
-            if (_selectedType == ScheduleType.weekly)
+
+            if (_selectedType == ScheduleType.weekly) ...[
+              const SizedBox(height: AppSpacing.md),
               DropdownButtonFormField<int>(
                 initialValue: _weekday,
                 decoration: const InputDecoration(
@@ -250,13 +337,20 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                   ),
                 ],
                 onChanged: (value) {
-                  if (value == null) return;
+                  if (value == null) {
+                    return;
+                  }
+
                   setState(() => _weekday = value);
                 },
               ),
-            if (_selectedType == ScheduleType.everyXDays)
+            ],
+
+            if (_selectedType == ScheduleType.everyXDays) ...[
+              const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: _intervalController,
+                autofocus: false,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'Interval',
@@ -264,7 +358,10 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
-            if (_selectedType == ScheduleType.specificDays)
+            ],
+
+            if (_selectedType == ScheduleType.specificDays) ...[
+              const SizedBox(height: AppSpacing.md),
               Wrap(
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
@@ -285,17 +382,25 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                     ),
                 ],
               ),
-            if (_selectedType == ScheduleType.monthly)
+            ],
+
+            if (_selectedType == ScheduleType.monthly) ...[
+              const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: _monthlyDayController,
+                autofocus: false,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'Day of month',
-                  helperText: 'For shorter months, ArcticDose uses the final day.',
+                  helperText:
+                      'For shorter months, MODOSE uses the final day.',
                   border: OutlineInputBorder(),
                 ),
               ),
+            ],
+
             const SizedBox(height: AppSpacing.md),
+
             _SelectionTile(
               label: 'Start date',
               value: _formatDate(_startDate),
@@ -309,7 +414,9 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
               icon: ArcticIcons.schedule_outlined,
               onTap: _selectTime,
             ),
+
             const SizedBox(height: AppSpacing.lg),
+
             SizedBox(
               width: double.infinity,
               child: FilledButton(onPressed: _save, child: const Text('Save')),
@@ -320,12 +427,15 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
     );
   }
 
-  String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
+  String _formatDate(DateTime date) {
+    return '${date.month}/${date.day}/${date.year}';
+  }
 
   String _formatTime(TimeOfDay time) {
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final minute = time.minute.toString().padLeft(2, '0');
     final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+
     return '$hour:$minute $period';
   }
 }
@@ -392,3 +502,4 @@ class _SelectionTile extends StatelessWidget {
     );
   }
 }
+

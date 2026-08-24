@@ -232,7 +232,7 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          'Choose your dose and target syringe line. ArcticDose will calculate the liquid volume.',
+                          'Choose your dose and target syringe line. The calculator will determine the liquid volume.',
                           style: TextStyle(
                             fontSize: AppTypography.caption,
                             height: 1.35,
@@ -1065,3 +1065,4 @@ class _ResultRow extends StatelessWidget {
     );
   }
 }
+

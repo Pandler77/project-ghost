@@ -1,21 +1,39 @@
 import 'package:flutter/material.dart';
 
 import '../services/app_data_service.dart';
+import '../services/usage_analytics_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
 
-class PremiumScreen extends StatelessWidget {
+class PremiumScreen extends StatefulWidget {
   const PremiumScreen({required this.dataService, super.key});
 
   final AppDataService dataService;
 
   @override
+  State<PremiumScreen> createState() => _PremiumScreenState();
+}
+
+class _PremiumScreenState extends State<PremiumScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    UsageAnalyticsService.instance.track(
+      UsageAnalyticsEvent.premiumScreenViewed,
+      properties: {
+        'premium_active': widget.dataService.hasPremium,
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final hasPremium = dataService.hasPremium;
+    final hasPremium = widget.dataService.hasPremium;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('ArcticDose Premium')),
+      appBar: AppBar(title: const Text('MODOSE Premium')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
@@ -29,34 +47,59 @@ class PremiumScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: BoxDecoration(
-                color: colors.primaryContainer,
+                gradient: LinearGradient(
+                  colors: hasPremium
+                      ? [
+                          const Color(0xFFE3AA22).withValues(alpha: 0.20),
+                          const Color(0xFFE3AA22).withValues(alpha: 0.07),
+                        ]
+                      : [
+                          colors.primary.withValues(alpha: 0.18),
+                          colors.primary.withValues(alpha: 0.06),
+                        ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(
+                  color: hasPremium
+                      ? const Color(0xFFE3AA22).withValues(alpha: 0.70)
+                      : colors.primary.withValues(alpha: 0.45),
+                  width: hasPremium ? 1.5 : 1.25,
+                ),
               ),
               child: Column(
                 children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: colors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      ArcticIcons.workspace_premium_outlined,
-                      size: 38,
-                      color: colors.onPrimary,
+                  SizedBox(
+                    width: 82,
+                    height: 82,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: ColorFiltered(
+                        colorFilter: ColorFilter.mode(
+                          hasPremium ? const Color(0xFFE3AA22) : colors.primary,
+                          BlendMode.srcIn,
+                        ),
+                        child: Image.asset(
+                          'assets/branding/modose_premium_mark.png',
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
                     hasPremium
-                        ? 'ArcticDose Premium is active'
-                        : 'Unlock the full ArcticDose experience',
+                        ? 'MODOSE Premium is active'
+                        : 'Unlock the full MODOSE experience',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: colors.onPrimaryContainer,
+                      color: hasPremium
+                          ? const Color(0xFFB77A00)
+                          : colors.primary,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -97,7 +140,7 @@ class PremiumScreen extends StatelessWidget {
 
             const _PremiumFeatureCard(
               icon: ArcticIcons.inventory_2_outlined,
-              title: 'ArcticDose Supply™',
+              title: 'MODOSE Supply™',
               description:
                   'Track inventory, remaining doses, open containers, low stock, vendors, and reorder timing.',
             ),
@@ -141,11 +184,10 @@ class PremiumScreen extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
 
             const _PremiumFeatureCard(
-              icon: ArcticIcons.file_download_outlined,
-              title: 'Data export',
+              icon: ArcticIcons.calculate_outlined,
+              title: 'Advanced calculators',
               description:
-                  'Export dose, protocol, weight, and inventory data when this feature launches.',
-              badge: 'Coming later',
+                  'Unlock specialized dosing calculators including Dose from Units and BAC Water.',
             ),
 
             const SizedBox(height: AppSpacing.lg),
@@ -160,6 +202,12 @@ class PremiumScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
+                    Icon(
+                      ArcticIcons.verified_outlined,
+                      size: 30,
+                      color: colors.primary,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
                     const Text(
                       'Premium subscription',
                       style: TextStyle(
@@ -169,32 +217,11 @@ class PremiumScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Pricing and free-trial details will appear here once store purchases are connected.',
+                      'Subscription options will appear here when store purchases are enabled.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: AppTypography.caption,
                         color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          _showPurchasesNotReady(context);
-                        },
-                        icon: const Icon(ArcticIcons.workspace_premium_outlined),
-                        label: const Text('Unlock ArcticDose Premium'),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          _showPurchasesNotReady(context);
-                        },
-                        child: const Text('Restore Purchases'),
                       ),
                     ),
                   ],
@@ -204,7 +231,7 @@ class PremiumScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
 
               Text(
-                'Subscriptions will be managed through the App Store or Google Play. ArcticDose will not process payment information directly.',
+                'Subscriptions will be managed through the App Store or Google Play. MODOSE will not process payment information directly.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: AppTypography.caption,
@@ -215,15 +242,18 @@ class PremiumScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: 0.10),
+                  color: const Color(0xFFE3AA22).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(AppRadius.card),
                   border: Border.all(
-                    color: colors.primary.withValues(alpha: 0.35),
+                    color: const Color(0xFFE3AA22).withValues(alpha: 0.35),
                   ),
                 ),
                 child: Row(
                   children: [
-                    Icon(ArcticIcons.verified_outlined, color: colors.primary),
+                    const Icon(
+                      ArcticIcons.verified_outlined,
+                      color: Color(0xFFB77A00),
+                    ),
                     const SizedBox(width: AppSpacing.md),
                     const Expanded(
                       child: Text(
@@ -240,28 +270,6 @@ class PremiumScreen extends StatelessWidget {
       ),
     );
   }
-
-  void _showPurchasesNotReady(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Purchases not connected yet'),
-          content: const Text(
-            'The Premium screen is ready, but App Store and Google Play purchases will be connected during store preparation.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
 
 class _PremiumFeatureCard extends StatelessWidget {
@@ -269,13 +277,11 @@ class _PremiumFeatureCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.description,
-    this.badge,
   });
 
   final IconData icon;
   final String title;
   final String description;
-  final String? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -316,27 +322,6 @@ class _PremiumFeatureCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (badge != null) ...[
-                      const SizedBox(width: AppSpacing.sm),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.primaryContainer,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          badge!,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: colors.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xs),

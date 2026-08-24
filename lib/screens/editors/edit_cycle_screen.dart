@@ -27,15 +27,24 @@ class _EditCycleScreenState extends State<EditCycleScreen> {
   @override
   void initState() {
     super.initState();
+
     _onController = TextEditingController(
       text: widget.protocol.cycleOnDuration.toString(),
     );
+
     _offController = TextEditingController(
       text: widget.protocol.cycleOffDuration.toString(),
     );
+
     _useCycle = widget.protocol.useCycle;
-    _cycleStartDate =
-        widget.protocol.cycleStartDate ?? widget.protocol.schedule.startDate;
+    _cycleStartDate = DateTime(
+      (widget.protocol.cycleStartDate ?? widget.protocol.schedule.startDate)
+          .year,
+      (widget.protocol.cycleStartDate ?? widget.protocol.schedule.startDate)
+          .month,
+      (widget.protocol.cycleStartDate ?? widget.protocol.schedule.startDate)
+          .day,
+    );
     _onUnit = widget.protocol.cycleOnUnit;
     _offUnit = widget.protocol.cycleOffUnit;
     _repeatCycle = widget.protocol.repeatCycle;
@@ -49,6 +58,8 @@ class _EditCycleScreenState extends State<EditCycleScreen> {
   }
 
   void _save() {
+    FocusScope.of(context).unfocus();
+
     final onDuration = int.tryParse(_onController.text.trim());
     final offDuration = int.tryParse(_offController.text.trim());
 
@@ -90,12 +101,33 @@ class _EditCycleScreenState extends State<EditCycleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Cycle')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
+            const Text(
+              'Cycle',
+              style: TextStyle(
+                fontSize: AppTypography.title,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Configure optional on/off phases for this protocol. '
+              'Changing the cycle does not change its saved dose details.',
+              style: TextStyle(
+                fontSize: AppTypography.caption,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
             ProtocolCycleEditor(
               useCycle: _useCycle,
               cycleStartDate: _cycleStartDate,
@@ -105,15 +137,25 @@ class _EditCycleScreenState extends State<EditCycleScreen> {
               offUnit: _offUnit,
               repeatCycle: _repeatCycle,
               onUseCycleChanged: (value) {
+                FocusScope.of(context).unfocus();
+
                 setState(() {
                   _useCycle = value;
+
                   if (value && widget.protocol.cycleStartDate == null) {
-                    _cycleStartDate = widget.protocol.schedule.startDate;
+                    final start = widget.protocol.schedule.startDate;
+                    _cycleStartDate = DateTime(
+                      start.year,
+                      start.month,
+                      start.day,
+                    );
                   }
                 });
               },
               onCycleStartDateChanged: (date) {
-                setState(() => _cycleStartDate = date);
+                setState(() {
+                  _cycleStartDate = DateTime(date.year, date.month, date.day);
+                });
               },
               onOnUnitChanged: (unit) {
                 setState(() => _onUnit = unit);
@@ -128,7 +170,9 @@ class _EditCycleScreenState extends State<EditCycleScreen> {
                 setState(() {});
               },
             ),
+
             const SizedBox(height: AppSpacing.lg),
+
             SizedBox(
               width: double.infinity,
               child: FilledButton(onPressed: _save, child: const Text('Save')),

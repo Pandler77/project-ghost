@@ -197,7 +197,7 @@ class _NotificationSettingsScreenState
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'ArcticDose Notifications',
+                                'MODOSE Notifications',
                                 style: TextStyle(
                                   fontSize: AppTypography.title,
                                   fontWeight: FontWeight.w800,
@@ -229,7 +229,7 @@ class _NotificationSettingsScreenState
                           style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                         subtitle: const Text(
-                          'Master switch for ArcticDose notifications.',
+                          'Master switch for MODOSE notifications.',
                         ),
                         value: _preferences.notificationsEnabled,
                         onChanged: _isSaving
@@ -399,7 +399,7 @@ class _NotificationSettingsScreenState
                           style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                         subtitle: const Text(
-                          'Ask the device to allow ArcticDose notifications.',
+                          'Ask the device to allow MODOSE notifications.',
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: _requestPermissions,
@@ -489,3 +489,4 @@ class _NotificationCard extends StatelessWidget {
     );
   }
 }
+

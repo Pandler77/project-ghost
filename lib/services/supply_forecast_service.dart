@@ -12,7 +12,10 @@ class SupplyForecastService {
     required double totalRemaining,
     required int unopenedContainerCount,
   }) {
-    final usagePerDay = _dailyUsage(protocol);
+    final usagePerDay = _dailyUsage(
+      item: item,
+      protocol: protocol,
+    );
     final now = DateTime.now();
 
     if (usagePerDay <= 0) {
@@ -106,10 +109,16 @@ class SupplyForecastService {
     return (totalRemaining / capacity).clamp(0.0, 1.0);
   }
 
-  double _dailyUsage(Protocol protocol) {
-    final dose = protocol.doseAmount;
+  double _dailyUsage({
+    required InventoryItem item,
+    required Protocol protocol,
+  }) {
+    final amountPerDose = _inventoryAmountPerDose(
+      item: item,
+      protocol: protocol,
+    );
 
-    if (dose <= 0) {
+    if (amountPerDose <= 0) {
       return 0;
     }
 
@@ -117,23 +126,74 @@ class SupplyForecastService {
 
     switch (schedule.type) {
       case ScheduleType.daily:
-        return dose;
+        return amountPerDose;
+
       case ScheduleType.everyXDays:
         final intervalDays = schedule.intervalDays ?? 1;
+
         if (intervalDays <= 0) {
           return 0;
         }
-        return dose / intervalDays;
+
+        return amountPerDose / intervalDays;
+
       case ScheduleType.weekly:
-        return dose / 7.0;
+        return amountPerDose / 7.0;
+
       case ScheduleType.specificDays:
         final dosesPerWeek = schedule.specificWeekdays.length;
+
         if (dosesPerWeek <= 0) {
           return 0;
         }
-        return (dose * dosesPerWeek) / 7.0;
+
+        return (amountPerDose * dosesPerWeek) / 7.0;
+
       case ScheduleType.monthly:
-        return dose / 30.0;
+        return amountPerDose / 30.0;
     }
+  }
+
+  double _inventoryAmountPerDose({
+    required InventoryItem item,
+    required Protocol protocol,
+  }) {
+    final details = protocol.doseDetails;
+
+    // Inventory for tablets/capsules/etc. is tracked as physical units.
+    // Protocol.doseAmount is the active medication amount (for example,
+    // 1000 mg for 2 x 500 mg tablets), so using it directly would incorrectly
+    // forecast 1000 capsules/day. Use scheduledQuantity instead.
+    if (_isPhysicalInventoryUnit(item.unit) &&
+        details != null &&
+        details.hasPhysicalDose &&
+        details.scheduledQuantity != null &&
+        details.scheduledQuantity! > 0) {
+      return details.scheduledQuantity!;
+    }
+
+    return protocol.doseAmount;
+  }
+
+  bool _isPhysicalInventoryUnit(String unit) {
+    final normalized = unit.trim().toLowerCase();
+
+    return switch (normalized) {
+      'tablet' ||
+      'tablets' ||
+      'capsule' ||
+      'capsules' ||
+      'pill' ||
+      'pills' ||
+      'softgel' ||
+      'softgels' ||
+      'patch' ||
+      'patches' ||
+      'drop' ||
+      'drops' ||
+      'serving' ||
+      'servings' => true,
+      _ => false,
+    };
   }
 }

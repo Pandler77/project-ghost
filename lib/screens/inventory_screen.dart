@@ -4,7 +4,7 @@ import '../models/inventory_item.dart';
 import '../models/protocol.dart';
 import '../models/protocol_category.dart';
 import '../services/app_data_service.dart';
-import '../services/settings_service.dart';
+import '../services/usage_analytics_service.dart';
 import '../theme/app_theme.dart';
 import 'inventory_detail_screen.dart';
 import 'inventory_setup/inventory_setup_screen.dart';
@@ -29,21 +29,21 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final SettingsService _settingsService = SettingsService();
-
   List<InventoryItem> _items = [];
   final Map<String, List<InventoryBatch>> _batchesByItemId = {};
 
   bool _isLoading = true;
   String? _loadError;
   String _searchQuery = '';
-  bool _showBetaInformation = false;
-
   @override
   void initState() {
     super.initState();
+
+    UsageAnalyticsService.instance.track(
+      UsageAnalyticsEvent.supplyOpened,
+    );
+
     _loadInventory();
-    _loadBetaInformationPreference();
   }
 
   @override
@@ -118,30 +118,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
-  Future<void> _loadBetaInformationPreference() async {
-    final dismissed = await _settingsService.getGhostSupplyBetaDismissed();
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _showBetaInformation = !dismissed;
-    });
-  }
-
-  Future<void> _dismissBetaInformation() async {
-    await _settingsService.saveGhostSupplyBetaDismissed(true);
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _showBetaInformation = false;
-    });
-  }
-
   Future<void> _openSetup({InventoryItem? item}) async {
     final availableProtocols = item == null
         ? widget.protocols.where((protocol) {
@@ -155,7 +131,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Every protocol already has ArcticDose Supply configured.',
+            'Every protocol already has MODOSE Supply configured.',
           ),
         ),
       );
@@ -175,6 +151,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
 
     if (changed == true && mounted) {
+      if (item == null) {
+        UsageAnalyticsService.instance.track(
+          UsageAnalyticsEvent.inventoryItemCreated,
+        );
+      }
+
       await _loadInventory();
     }
   }
@@ -348,7 +330,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             '${_formatNumber(selectedBatch.containerSize)} '
             '${selectedBatch.unit} • '
             '${selectedBatch.quantity} unopened\n\n'
-            'ArcticDose will open one from this batch and leave '
+            'MODOSE will open one from this batch and leave '
             '${selectedBatch.quantity - 1} unopened.',
           ),
           actions: [
@@ -413,9 +395,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Remove ArcticDose Supply?'),
+          title: const Text('Remove MODOSE Supply?'),
           content: const Text(
-            'This removes the ArcticDose Supply record. '
+            'This removes the MODOSE Supply record. '
             'The protocol and dose history will remain.',
           ),
           actions: [
@@ -531,7 +513,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return _PremiumInventoryPreview(dataService: widget.dataService);
     }
     return Scaffold(
-      appBar: AppBar(title: const _GhostSupplyTitle()),
+      appBar: AppBar(title: const Text('MODOSE Supply™')),
       body: SafeArea(child: _buildBody()),
     );
   }
@@ -551,7 +533,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               const Icon(ArcticIcons.error_outline, size: 44),
               const SizedBox(height: 12),
               const Text(
-                'Could not load ArcticDose Supply.',
+                'Could not load MODOSE Supply.',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -583,10 +565,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
           48,
         ),
         children: [
-          if (_showBetaInformation) ...[
-            _GhostSupplyBetaInformation(onDismiss: _dismissBetaInformation),
-            const SizedBox(height: AppSpacing.md),
-          ],
           _EmptyInventoryState(
             onAddPressed: () {
               _openSetup();
@@ -608,10 +586,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
           48,
         ),
         children: [
-          if (_showBetaInformation) ...[
-            _GhostSupplyBetaInformation(onDismiss: _dismissBetaInformation),
-            const SizedBox(height: AppSpacing.md),
-          ],
           Row(
             children: [
               Expanded(
@@ -689,39 +663,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ],
         ],
       ),
-    );
-  }
-}
-
-class _GhostSupplyTitle extends StatelessWidget {
-  const _GhostSupplyTitle();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text('ArcticDose Supply™'),
-        const SizedBox(width: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-          decoration: BoxDecoration(
-            color: colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            'BETA',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.4,
-              color: colorScheme.onSecondaryContainer,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1126,138 +1067,6 @@ class _WarningIndicator extends StatelessWidget {
   }
 }
 
-class _GhostSupplyBetaInformation extends StatefulWidget {
-  const _GhostSupplyBetaInformation({required this.onDismiss});
-
-  final Future<void> Function() onDismiss;
-
-  @override
-  State<_GhostSupplyBetaInformation> createState() =>
-      _GhostSupplyBetaInformationState();
-}
-
-class _GhostSupplyBetaInformationState
-    extends State<_GhostSupplyBetaInformation> {
-  bool _isExpanded = true;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isExpanded = !_isExpanded;
-              });
-            },
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-              child: Row(
-                children: [
-                  Icon(ArcticIcons.info_outline, color: colorScheme.primary),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'ArcticDose Supply Beta Information',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
-                  IconButton(
-                    tooltip: 'Dismiss',
-                    onPressed: widget.onDismiss,
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_isExpanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'ArcticDose Supply is currently in beta. Automatic '
-                    'deductions work best when the protocol dose and '
-                    'inventory use compatible units.',
-                    style: TextStyle(
-                      color: colorScheme.onSurfaceVariant,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Commonly supported units',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  const _BetaUnitRow(label: 'Mass', units: 'mcg, mg, g'),
-                  const _BetaUnitRow(label: 'Volume', units: 'mL'),
-                  const _BetaUnitRow(
-                    label: 'Count',
-                    units:
-                        'IU, units, tablets, capsules, pills, softgels, drops',
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Custom units can still be tracked. Automatic '
-                    'deduction may be unavailable unless the protocol '
-                    'and inventory units match.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.onSurfaceVariant,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BetaUnitRow extends StatelessWidget {
-  const _BetaUnitRow({required this.label, required this.units});
-
-  final String label;
-  final String units;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 17,
-            color: colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '$label: $units',
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _NoMatchingInventory extends StatelessWidget {
   const _NoMatchingInventory();
 
@@ -1309,38 +1118,10 @@ class _EmptyInventoryState extends StatelessWidget {
 
             const SizedBox(height: AppSpacing.md),
 
-            Wrap(
-              alignment: WrapAlignment.center,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                const Text(
-                  'Set up ArcticDose Supply™',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.secondaryContainer,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                  child: Text(
-                    'BETA',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.6,
-                      color: colors.onSecondaryContainer,
-                    ),
-                  ),
-                ),
-              ],
+            const Text(
+              'Set up MODOSE Supply™',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 8),
@@ -1376,7 +1157,7 @@ class _PremiumInventoryPreview extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const _GhostSupplyTitle()),
+      appBar: AppBar(title: const Text('MODOSE Supply™')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(24),
@@ -1417,7 +1198,7 @@ class _PremiumInventoryPreview extends StatelessWidget {
               text: 'Estimated shipping and depletion timing',
             ),
             const SizedBox(height: 28),
-            FilledButton(
+            FilledButton.icon(
               onPressed: () {
                 Navigator.push<void>(
                   context,
@@ -1426,7 +1207,23 @@ class _PremiumInventoryPreview extends StatelessWidget {
                   ),
                 );
               },
-              child: const Text('Upgrade to Premium'),
+              icon: ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  colorScheme.onPrimary,
+                  BlendMode.srcIn,
+                ),
+                child: Image.asset(
+                  'assets/branding/modose_premium_mark.png',
+                  width: 23,
+                  height: 23,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
+              label: const Text(
+                'Upgrade to MODOSE Premium',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
             ),
           ],
         ),
@@ -1455,3 +1252,4 @@ class _PremiumFeature extends StatelessWidget {
     );
   }
 }
+

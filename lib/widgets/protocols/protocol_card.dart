@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../models/cycle_status.dart';
 import '../../models/display_preferences.dart';
+import '../../models/dose_details.dart';
+import '../../models/dose_unit.dart';
 import '../../models/protocol.dart';
 import '../../models/protocol_status.dart';
 import '../../models/schedule_type.dart';
@@ -33,13 +35,14 @@ class ProtocolCard extends StatelessWidget {
     final useProtocolColor = displayPreferences.showProtocolColors;
 
     final background = switch (protocol.status) {
-      ProtocolStatus.active => useProtocolColor
-          ? protocolColor.withValues(alpha: 0.10)
-          : Theme.of(context).cardTheme.color ?? colorScheme.surface,
+      ProtocolStatus.active =>
+        useProtocolColor
+            ? protocolColor.withValues(alpha: 0.10)
+            : Theme.of(context).cardTheme.color ?? colorScheme.surface,
       ProtocolStatus.paused => Colors.amber.withValues(alpha: 0.12),
       ProtocolStatus.archived => colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.65,
-        ),
+        alpha: 0.65,
+      ),
     };
 
     final contentOpacity = protocol.status == ProtocolStatus.archived
@@ -111,9 +114,7 @@ class ProtocolCard extends StatelessWidget {
                     ],
                   ),
                   SizedBox(
-                    height: displayPreferences.compactMode
-                        ? 2
-                        : AppSpacing.xs,
+                    height: displayPreferences.compactMode ? 2 : AppSpacing.xs,
                   ),
                   Text(
                     protocol.dose,
@@ -123,6 +124,17 @@ class ProtocolCard extends StatelessWidget {
                       color: colorScheme.onSurface,
                     ),
                   ),
+                  if (_advancedDoseLine(protocol) case final line?) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      line,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 2),
                   Text(
                     _formatSchedule(protocol),
@@ -166,6 +178,46 @@ class ProtocolCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String? _advancedDoseLine(Protocol protocol) {
+    final draw = protocol.drawUnitsDisplay;
+
+    if (draw != null) {
+      return draw;
+    }
+
+    final details = protocol.doseDetails;
+
+    if (details == null) {
+      return null;
+    }
+
+    if (details.hasOralStrength) {
+      final quantity = _formatAmount(details.scheduledQuantity!);
+      final form = details.form?.label.toLowerCase() ?? 'item';
+      final strength = _formatAmount(details.strengthAmount!);
+
+      return '$quantity ${quantity == '1' ? form : '${form}s'} • '
+          '$strength ${details.strengthUnit!.label} each';
+    }
+
+    if (details.blendComponents.isNotEmpty) {
+      return '${details.blendComponents.length} component blend';
+    }
+
+    return null;
+  }
+
+  String _formatAmount(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+
+    return value
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   String _cycleSecondaryText(CycleStatus status) {

@@ -297,7 +297,7 @@ class _ContainerStepState extends State<ContainerStep> {
       children: [
         const StepHeader(
           title: 'What are you adding?',
-          subtitle: 'Tell ArcticDose what each container is and how much it holds.',
+          subtitle: 'Tell MODOSE what each container is and how much it holds.',
           currentStep: 2,
           totalSteps: 7,
         ),
@@ -326,7 +326,7 @@ class _ContainerStepState extends State<ContainerStep> {
               Text(
                 widget.preset == null
                     ? 'Enter the inventory that matches what you physically have.'
-                    : 'ArcticDose filled in a common starting point. Change anything that does not match your supply.',
+                    : 'MODOSE filled in a common starting point. Change anything that does not match your supply.',
                 style: TextStyle(color: colorScheme.onSurfaceVariant),
               ),
             ],
@@ -507,3 +507,4 @@ class _ContainerStepState extends State<ContainerStep> {
         .replaceFirst(RegExp(r'\.$'), '');
   }
 }
+

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/measurement_system.dart';
 import '../services/app_data_service.dart';
 import '../services/settings_service.dart';
+import '../services/usage_analytics_service.dart';
 import '../theme/app_theme.dart';
 import 'bac_water_calculator_screen.dart';
 import 'calorie_protein_calculator_screen.dart';
@@ -66,21 +67,12 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
       return;
     }
 
-    if (!_dataService.hasPremium) {
-      await Navigator.push<void>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PremiumScreen(dataService: _dataService),
-        ),
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {});
-      return;
-    }
+    UsageAnalyticsService.instance.track(
+      UsageAnalyticsEvent.calculatorOpened,
+      properties: {
+        'calculator_type': 'calories_protein',
+      },
+    );
 
     await Navigator.push<void>(
       context,
@@ -89,6 +81,63 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
           dataService: _dataService,
           measurementSystem: _measurementSystem,
         ),
+      ),
+    );
+  }
+
+  Future<void> _openPremium() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PremiumScreen(dataService: _dataService),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
+  }
+
+  Future<void> _openDoseFromUnitsCalculator() async {
+    if (!_dataService.hasPremium) {
+      await _openPremium();
+      return;
+    }
+
+    UsageAnalyticsService.instance.track(
+      UsageAnalyticsEvent.calculatorOpened,
+      properties: {
+        'calculator_type': 'dose_from_units',
+      },
+    );
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const DoseFromUnitsCalculatorScreen(),
+      ),
+    );
+  }
+
+  Future<void> _openBacWaterCalculator() async {
+    if (!_dataService.hasPremium) {
+      await _openPremium();
+      return;
+    }
+
+    UsageAnalyticsService.instance.track(
+      UsageAnalyticsEvent.calculatorOpened,
+      properties: {
+        'calculator_type': 'bac_water',
+      },
+    );
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const BacWaterCalculatorScreen(),
       ),
     );
   }
@@ -157,7 +206,7 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   const Text(
-                    'ArcticDose Calculator',
+                    'Calculator',
                     style: TextStyle(
                       fontSize: AppTypography.pageTitle,
                       fontWeight: FontWeight.w800,
@@ -178,11 +227,25 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
 
             const SizedBox(height: AppSpacing.lg),
 
+            const _SectionLabel(
+              title: 'EVERYDAY CALCULATORS',
+              subtitle: 'Core tools available to everyone.',
+            ),
+
+            const SizedBox(height: AppSpacing.sm),
+
             _CalculatorTile(
               icon: ArcticIcons.science_outlined,
               title: 'Reconstitution',
               subtitle: 'Calculate how many syringe units to draw.',
               onTap: () {
+                UsageAnalyticsService.instance.track(
+                  UsageAnalyticsEvent.calculatorOpened,
+                  properties: {
+                    'calculator_type': 'reconstitution',
+                  },
+                );
+
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -195,17 +258,30 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
             const SizedBox(height: AppSpacing.sm),
 
             _CalculatorTile(
+              icon: ArcticIcons.restaurant_menu_outlined,
+              title: 'Calories & Protein',
+              subtitle: 'Estimate maintenance calories and daily targets.',
+              onTap: _openCalorieProteinCalculator,
+            ),
+
+            const SizedBox(height: AppSpacing.lg),
+
+            _SectionLabel(
+              title: 'ADVANCED CALCULATORS',
+              subtitle: _dataService.hasPremium
+                  ? 'Premium tools unlocked.'
+                  : 'Specialized dosing tools included with MODOSE Premium.',
+            ),
+
+            const SizedBox(height: AppSpacing.sm),
+
+            _CalculatorTile(
               icon: ArcticIcons.vaccines_outlined,
               title: 'Dose from Units',
               subtitle: 'Calculate the dose contained in syringe units.',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DoseFromUnitsCalculatorScreen(),
-                  ),
-                );
-              },
+              premium: true,
+              premiumActive: _dataService.hasPremium,
+              onTap: _openDoseFromUnitsCalculator,
             ),
 
             const SizedBox(height: AppSpacing.sm),
@@ -214,24 +290,9 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
               icon: ArcticIcons.water_drop_outlined,
               title: 'BAC Water',
               subtitle: 'Calculate how much BAC water to add.',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const BacWaterCalculatorScreen(),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            _CalculatorTile(
-              icon: ArcticIcons.restaurant_menu_outlined,
-              title: 'Calories & Protein',
-              subtitle: 'Estimate maintenance calories and daily targets.',
-              badge: _dataService.hasPremium ? null : 'Premium',
-              onTap: _openCalorieProteinCalculator,
+              premium: true,
+              premiumActive: _dataService.hasPremium,
+              onTap: _openBacWaterCalculator,
             ),
 
             const SizedBox(height: AppSpacing.lg),
@@ -284,20 +345,61 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.9,
+            color: colors.onSurface,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: AppTypography.caption,
+            height: 1.3,
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _CalculatorTile extends StatelessWidget {
   const _CalculatorTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.badge,
+    this.premium = false,
+    this.premiumActive = false,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final String? badge;
+  final bool premium;
+  final bool premiumActive;
 
   @override
   Widget build(BuildContext context) {
@@ -355,23 +457,21 @@ class _CalculatorTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (badge != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colors.primaryContainer,
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.pill),
-                            ),
-                            child: Text(
-                              badge!,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: colors.onPrimaryContainer,
+                        if (premium)
+                          SizedBox(
+                            width: 30,
+                            height: 30,
+                            child: ColorFiltered(
+                              colorFilter: ColorFilter.mode(
+                                premiumActive
+                                    ? const Color(0xFFE3AA22)
+                                    : colors.primary,
+                                BlendMode.srcIn,
+                              ),
+                              child: Image.asset(
+                                'assets/branding/modose_premium_mark.png',
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
                               ),
                             ),
                           ),
@@ -415,3 +515,4 @@ class _CalculatorTile extends StatelessWidget {
     );
   }
 }
+

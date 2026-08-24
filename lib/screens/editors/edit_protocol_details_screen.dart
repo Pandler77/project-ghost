@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../models/dose_unit.dart';
 import '../../models/protocol.dart';
+import '../../models/protocol_type.dart';
 import '../../theme/app_theme.dart';
 
 class EditProtocolDetailsScreen extends StatefulWidget {
@@ -14,73 +16,104 @@ class EditProtocolDetailsScreen extends StatefulWidget {
 }
 
 class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
-  static const List<String> _commonUnits = [
-    'mg',
-    'mcg',
-    'g',
-    'IU',
-    'mL',
-    'units',
-    'tablet',
-    'capsule',
-    'drop',
-    'patch',
-    'serving',
+  static const List<DoseUnit> _injectionUnits = [
+    DoseUnit.mg,
+    DoseUnit.mcg,
+    DoseUnit.g,
+    DoseUnit.iu,
+    DoseUnit.mL,
+    DoseUnit.units,
+  ];
+
+  static const List<DoseUnit> _oralUnits = [
+    DoseUnit.tablets,
+    DoseUnit.capsules,
+    DoseUnit.pills,
+    DoseUnit.mg,
+    DoseUnit.mcg,
+    DoseUnit.g,
+    DoseUnit.mL,
+    DoseUnit.servings,
+  ];
+
+  static const List<DoseUnit> _topicalUnits = [
+    DoseUnit.mg,
+    DoseUnit.g,
+    DoseUnit.mL,
+    DoseUnit.patches,
+  ];
+
+  static const List<DoseUnit> _nasalUnits = [
+    DoseUnit.sprays,
+    DoseUnit.drops,
+    DoseUnit.mg,
+    DoseUnit.mcg,
+  ];
+
+  static const List<DoseUnit> _sublingualUnits = [
+    DoseUnit.drops,
+    DoseUnit.mg,
+    DoseUnit.mcg,
+    DoseUnit.mL,
+  ];
+
+  static const List<DoseUnit> _otherUnits = [
+    DoseUnit.mg,
+    DoseUnit.mcg,
+    DoseUnit.g,
+    DoseUnit.iu,
+    DoseUnit.mL,
+    DoseUnit.units,
+    DoseUnit.tablets,
+    DoseUnit.capsules,
+    DoseUnit.pills,
+    DoseUnit.sprays,
+    DoseUnit.drops,
+    DoseUnit.patches,
+    DoseUnit.servings,
   ];
 
   late final TextEditingController _nameController;
   late final TextEditingController _doseAmountController;
-  late final TextEditingController _customUnitController;
+  late DoseUnit _selectedUnit;
 
-  String? _selectedUnit;
-  bool _useCustomUnit = false;
+  List<DoseUnit> get _availableUnits {
+    return switch (widget.protocol.type) {
+      ProtocolType.injection => _injectionUnits,
+      ProtocolType.oral => _oralUnits,
+      ProtocolType.topical => _topicalUnits,
+      ProtocolType.nasal => _nasalUnits,
+      ProtocolType.sublingual => _sublingualUnits,
+      ProtocolType.other => _otherUnits,
+    };
+  }
 
   @override
   void initState() {
     super.initState();
 
     _nameController = TextEditingController(text: widget.protocol.name);
+    _doseAmountController = TextEditingController(
+      text: _formatNumber(widget.protocol.doseAmount),
+    );
 
-    final parsedDose = _parseDose(widget.protocol.dose);
-
-    _doseAmountController = TextEditingController(text: parsedDose.amount);
-
-    final normalizedUnit = _normalizeUnit(parsedDose.unit);
-
-    if (_commonUnits.contains(normalizedUnit)) {
-      _selectedUnit = normalizedUnit;
-      _useCustomUnit = false;
-      _customUnitController = TextEditingController();
-    } else {
-      _selectedUnit = null;
-      _useCustomUnit = true;
-      _customUnitController = TextEditingController(text: parsedDose.unit);
-    }
+    _selectedUnit = _availableUnits.contains(widget.protocol.doseUnit)
+        ? widget.protocol.doseUnit
+        : _availableUnits.first;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _doseAmountController.dispose();
-    _customUnitController.dispose();
-
     super.dispose();
   }
 
-  String get _currentUnit {
-    if (_useCustomUnit) {
-      return _customUnitController.text.trim();
-    }
-
-    return _selectedUnit?.trim() ?? '';
-  }
-
   void _save() {
+    FocusScope.of(context).unfocus();
+
     final name = _nameController.text.trim();
-
     final amount = double.tryParse(_doseAmountController.text.trim());
-
-    final unit = _currentUnit;
 
     if (name.isEmpty) {
       _showError('Protocol name is required.');
@@ -92,16 +125,13 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
       return;
     }
 
-    if (unit.isEmpty) {
-      _showError('Dose unit is required.');
-      return;
-    }
-
-    final formattedDose = '${_formatNumber(amount)} $unit';
-
     Navigator.pop(
       context,
-      widget.protocol.copyWith(name: name, dose: formattedDose),
+      widget.protocol.copyWith(
+        name: name,
+        doseAmount: amount,
+        doseUnit: _selectedUnit,
+      ),
     );
   }
 
@@ -111,63 +141,28 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  _ParsedDose _parseDose(String dose) {
-    final trimmed = dose.trim();
-
-    final match = RegExp(r'^([0-9]+(?:\.[0-9]+)?)\s*(.*)$').firstMatch(trimmed);
-
-    if (match == null) {
-      return const _ParsedDose(amount: '', unit: 'mg');
-    }
-
-    final amount = match.group(1) ?? '';
-    final unit = match.group(2)?.trim() ?? '';
-
-    return _ParsedDose(amount: amount, unit: unit.isEmpty ? 'mg' : unit);
-  }
-
-  String _normalizeUnit(String unit) {
-    final normalized = unit.trim().toLowerCase();
-
-    return switch (normalized) {
-      'mg' => 'mg',
-      'mcg' || 'µg' || 'ug' => 'mcg',
-      'g' => 'g',
-      'iu' || 'i.u.' => 'IU',
-      'ml' => 'mL',
-      'unit' || 'units' || 'u' => 'units',
-      'tablet' || 'tablets' || 'tab' || 'tabs' => 'tablet',
-      'capsule' || 'capsules' || 'cap' || 'caps' => 'capsule',
-      'drop' || 'drops' => 'drop',
-      'patch' || 'patches' => 'patch',
-      'serving' || 'servings' => 'serving',
-      _ => unit.trim(),
-    };
-  }
-
   String _formatNumber(double value) {
     if (value == value.roundToDouble()) {
       return value.toInt().toString();
     }
 
-    return value.toStringAsFixed(6).replaceFirst(RegExp(r'\.?0+$'), '');
+    return value
+        .toStringAsFixed(6)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    final dropdownValue = _useCustomUnit
-        ? 'Other'
-        : _commonUnits.contains(_selectedUnit)
-        ? _selectedUnit
-        : null;
+    final hasAdvancedDetails = widget.protocol.hasAdvancedDoseDetails;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Protocol')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
             const Text(
               'Protocol details',
@@ -178,7 +173,7 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Update the protocol name, dose amount, or measurement unit.',
+              'Update the protocol name and scheduled dose.',
               style: TextStyle(
                 fontSize: AppTypography.caption,
                 color: colorScheme.onSurfaceVariant,
@@ -188,6 +183,7 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
 
             TextField(
               controller: _nameController,
+              autofocus: false,
               textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(
                 labelText: 'Protocol name',
@@ -199,63 +195,42 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
 
             TextField(
               controller: _doseAmountController,
+              autofocus: false,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
               decoration: const InputDecoration(
                 labelText: 'Dose amount',
-                hintText: '10',
+                hintText: '3',
                 border: OutlineInputBorder(),
               ),
             ),
 
             const SizedBox(height: AppSpacing.md),
 
-            DropdownButtonFormField<String>(
-              key: ValueKey(dropdownValue),
-              initialValue: dropdownValue,
+            DropdownButtonFormField<DoseUnit>(
+              initialValue: _selectedUnit,
               decoration: const InputDecoration(
                 labelText: 'Unit',
                 border: OutlineInputBorder(),
               ),
-              hint: const Text('Choose a unit'),
               items: [
-                for (final unit in _commonUnits)
-                  DropdownMenuItem<String>(value: unit, child: Text(unit)),
-                const DropdownMenuItem<String>(
-                  value: 'Other',
-                  child: Text('Other...'),
-                ),
+                for (final unit in _availableUnits)
+                  DropdownMenuItem<DoseUnit>(
+                    value: unit,
+                    child: Text(unit.label),
+                  ),
               ],
               onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+
                 setState(() {
-                  if (value == 'Other') {
-                    _useCustomUnit = true;
-                    _selectedUnit = null;
-                  } else {
-                    _useCustomUnit = false;
-                    _selectedUnit = value;
-                    _customUnitController.clear();
-                  }
+                  _selectedUnit = value;
                 });
               },
             ),
-
-            if (_useCustomUnit) ...[
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _customUnitController,
-                textCapitalization: TextCapitalization.none,
-                onChanged: (_) {
-                  setState(() {});
-                },
-                decoration: const InputDecoration(
-                  labelText: 'Custom unit',
-                  hintText: 'pump, scoop, spray...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
 
             const SizedBox(height: AppSpacing.md),
 
@@ -267,13 +242,33 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
                 borderRadius: BorderRadius.circular(AppRadius.button),
                 border: Border.all(color: colorScheme.outlineVariant),
               ),
-              child: Text(
-                'Saved doses will appear as amount plus unit, such as '
-                '10 mg, 500 mcg, or 2 mL.',
-                style: TextStyle(
-                  fontSize: AppTypography.caption,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    hasAdvancedDetails
+                        ? Icons.sync_outlined
+                        : Icons.info_outline,
+                    size: 20,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      hasAdvancedDetails
+                          ? 'Advanced Dose Details will stay attached to this '
+                                'protocol. Draw-unit calculations will update '
+                                'automatically from the dose saved here.'
+                          : 'Only units that match this protocol\'s '
+                                'administration method are shown.',
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        height: 1.4,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -288,11 +283,4 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
       ),
     );
   }
-}
-
-class _ParsedDose {
-  const _ParsedDose({required this.amount, required this.unit});
-
-  final String amount;
-  final String unit;
 }

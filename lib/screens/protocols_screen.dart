@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/display_preferences.dart';
 import '../models/protocol.dart';
 import '../models/protocol_status.dart';
+import '../services/app_data_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/protocols/empty_protocols_state.dart';
 import '../widgets/protocols/protocol_card.dart';
@@ -41,6 +42,7 @@ class ProtocolsScreen extends StatefulWidget {
 
 class _ProtocolsScreenState extends State<ProtocolsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final AppDataService _dataService = AppDataService();
 
   String _searchQuery = '';
   ProtocolStatus? _statusFilter;
@@ -115,14 +117,51 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
   }
 
   Future<void> _openProtocolDetails(Protocol protocol) async {
-    final updatedProtocol = await Navigator.push<Protocol>(
+    final result = await Navigator.push<ProtocolDetailsResult>(
       context,
       MaterialPageRoute(
         builder: (_) => ProtocolDetailsScreen(protocol: protocol),
       ),
     );
 
-    if (updatedProtocol == null || !mounted) {
+    if (result == null || !mounted) {
+      return;
+    }
+
+    if (result.action == ProtocolDetailsAction.deleted) {
+      try {
+        await _dataService.deleteProtocol(protocol.id);
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not delete protocol: $error')),
+        );
+        return;
+      }
+
+      widget.protocols.removeWhere((item) => item.id == protocol.id);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {});
+
+      widget.onProtocolsChanged();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Protocol deleted.')),
+      );
+
+      return;
+    }
+
+    final updatedProtocol = result.protocol;
+
+    if (updatedProtocol == null) {
       return;
     }
 

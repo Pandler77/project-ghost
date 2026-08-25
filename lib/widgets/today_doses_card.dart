@@ -240,6 +240,10 @@ class _PendingDoseRowState extends State<_PendingDoseRow> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final protocolColor = Color(widget.dose.protocolColorValue);
+    final buttonForeground =
+        ThemeData.estimateBrightnessForColor(protocolColor) == Brightness.light
+        ? Colors.black87
+        : Colors.white;
 
     return Container(
       width: double.infinity,
@@ -323,12 +327,12 @@ class _PendingDoseRowState extends State<_PendingDoseRow> {
                           ),
                         ),
                       ),
-                      child: const SizedBox(
+                      child: SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: buttonForeground,
                         ),
                       ),
                     ),
@@ -338,7 +342,7 @@ class _PendingDoseRowState extends State<_PendingDoseRow> {
                     onPressed: _markTaken,
                     style: FilledButton.styleFrom(
                       backgroundColor: protocolColor,
-                      foregroundColor: Colors.white,
+                      foregroundColor: buttonForeground,
                       minimumSize: const Size(96, 42),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       shape: RoundedRectangleBorder(
@@ -465,7 +469,7 @@ class _CompletedDoseRow extends StatelessWidget {
                       Icon(
                         Icons.location_on_outlined,
                         size: 14,
-                        color: protocolColor,
+                        color: colorScheme.onSurface,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -474,7 +478,7 @@ class _CompletedDoseRow extends StatelessWidget {
                           style: TextStyle(
                             fontSize: AppTypography.caption,
                             fontWeight: FontWeight.w600,
-                            color: protocolColor,
+                            color: colorScheme.onSurface,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),

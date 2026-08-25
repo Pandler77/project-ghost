@@ -579,7 +579,33 @@ class _MainScreenState extends State<MainScreen> {
         return;
       }
 
-      await _profileService.updateProfile(updatedProfile);
+      var normalizedProfile = updatedProfile;
+
+      final normalizedModules = Set<ProfileModule>.from(
+        updatedProfile.enabledModules,
+      );
+
+      if (normalizedModules.contains(ProfileModule.protocols)) {
+        normalizedModules.add(ProfileModule.inventory);
+      } else {
+        normalizedModules.remove(ProfileModule.inventory);
+      }
+
+      normalizedProfile = updatedProfile.copyWith(
+        enabledModules: normalizedModules,
+        updatedAt: DateTime.now(),
+      );
+
+      final updatedTrackingPreferences = _trackingPreferences.copyWith(
+        trackWeight: normalizedModules.contains(ProfileModule.weight),
+        trackPhotos: normalizedModules.contains(ProfileModule.photos),
+        trackNotes: normalizedModules.contains(ProfileModule.notes),
+      );
+
+      await Future.wait([
+        _profileService.updateProfile(normalizedProfile),
+        _settingsService.saveTrackingPreferences(updatedTrackingPreferences),
+      ]);
 
       final profiles = await _profileService.getProfiles();
       final activeProfile = await _profileService.getActiveProfile();
@@ -593,6 +619,7 @@ class _MainScreenState extends State<MainScreen> {
       setState(() {
         _profiles = profiles;
         _activeProfile = activeProfile;
+        _trackingPreferences = updatedTrackingPreferences;
         _dataRevision++;
       });
 

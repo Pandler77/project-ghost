@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../app_select_field.dart';
+
 import '../../models/cycle_unit.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/arctic_icons.dart';
@@ -331,21 +333,12 @@ class _DurationCard extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
-                  child: DropdownButtonFormField<CycleUnit>(
-                    initialValue: selectedUnit,
-                    decoration: const InputDecoration(
-                      labelText: 'Unit',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      for (final unit in CycleUnit.values)
-                        DropdownMenuItem(value: unit, child: Text(unit.label)),
-                    ],
-                    onChanged: (unit) {
-                      if (unit != null) {
-                        onUnitChanged(unit);
-                      }
-                    },
+                  child: AppSelectField<CycleUnit>(
+                    value: selectedUnit,
+                    values: CycleUnit.values,
+                    label: 'Unit',
+                    labelBuilder: (unit) => unit.label,
+                    onChanged: onUnitChanged,
                   ),
                 ),
               ],

@@ -8,6 +8,7 @@ import '../services/profile_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/weight_display.dart';
 import '../theme/arctic_icons.dart';
+import '../widgets/app_select_field.dart';
 
 enum CalorieSex {
   male('Male'),
@@ -333,22 +334,12 @@ class _CalorieProteinCalculatorScreenState
 
                   const SizedBox(height: AppSpacing.md),
 
-                  DropdownButtonFormField<CalorieSex>(
-                    initialValue: _sex,
-                    decoration: const InputDecoration(
-                      labelText: 'Sex used by calorie equation',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      for (final option in CalorieSex.values)
-                        DropdownMenuItem(
-                          value: option,
-                          child: Text(option.label),
-                        ),
-                    ],
+                  AppSelectField<CalorieSex>(
+                    value: _sex,
+                    values: CalorieSex.values,
+                    label: 'Sex used by calorie equation',
+                    labelBuilder: (value) => value.label,
                     onChanged: (value) {
-                      if (value == null) return;
-
                       setState(() {
                         _sex = value;
                       });

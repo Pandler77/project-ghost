@@ -9,6 +9,7 @@ import '../services/progress_photo_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/weight_display.dart';
 import '../theme/arctic_icons.dart';
+import '../widgets/app_select_field.dart';
 
 enum _ComparisonMode { sideBySide, slider }
 
@@ -385,25 +386,13 @@ class _SessionSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<ProgressPhotoSession>(
-      initialValue: value,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
-      items: sessions
-          .map(
-            (session) => DropdownMenuItem(
-              value: session,
-              child: Text(
-                _formatDate(session.recordedAt),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          )
-          .toList(growable: false),
-      onChanged: onChanged,
+    return AppSelectField<ProgressPhotoSession>(
+      value: value,
+      values: sessions,
+      label: label,
+      placeholder: 'Choose a session',
+      labelBuilder: (session) => _formatDate(session.recordedAt),
+      onChanged: (session) => onChanged(session),
     );
   }
 }

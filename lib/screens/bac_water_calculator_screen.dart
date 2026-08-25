@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
+import '../widgets/app_select_field.dart';
 
 class BacWaterCalculatorScreen extends StatefulWidget {
   const BacWaterCalculatorScreen({super.key});
@@ -485,23 +486,12 @@ class _AmountUnitField extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: DropdownButtonFormField<String>(
-            initialValue: selectedUnit,
-            decoration: InputDecoration(
-              labelText: 'Unit',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.button),
-              ),
-            ),
-            items: const [
-              DropdownMenuItem(value: 'mg', child: Text('mg')),
-              DropdownMenuItem(value: 'mcg', child: Text('mcg')),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                onUnitChanged(value);
-              }
-            },
+          child: AppSelectField<String>(
+            value: selectedUnit,
+            values: const ['mg', 'mcg'],
+            label: 'Unit',
+            labelBuilder: (value) => value,
+            onChanged: onUnitChanged,
           ),
         ),
       ],

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/app_select_field.dart';
+
 import '../models/dose_details.dart';
 import '../models/dose_unit.dart';
 import '../models/protocol_type.dart';
@@ -156,20 +158,12 @@ class _AdvancedDoseDetailsScreenState extends State<AdvancedDoseDetailsScreen> {
                   if (!_isInjection) ...[
                     _sectionTitle('Form & strength'),
                     const SizedBox(height: AppSpacing.sm),
-                    DropdownButtonFormField<DoseForm>(
-                      initialValue: _form,
-                      decoration: const InputDecoration(
-                        labelText: 'Dose form',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _formsForType(widget.protocolType)
-                          .map(
-                            (form) => DropdownMenuItem(
-                              value: form,
-                              child: Text(form.label),
-                            ),
-                          )
-                          .toList(),
+                    AppSelectField<DoseForm>(
+                      value: _form,
+                      values: _formsForType(widget.protocolType),
+                      label: 'Dose form',
+                      placeholder: 'Choose a form',
+                      labelBuilder: (form) => form.label,
                       onChanged: (form) => setState(() => _form = form),
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -193,22 +187,12 @@ class _AdvancedDoseDetailsScreenState extends State<AdvancedDoseDetailsScreen> {
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
-                          child: DropdownButtonFormField<DoseUnit>(
-                            initialValue: _strengthUnit,
-                            decoration: const InputDecoration(
-                              labelText: 'Unit',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: _strengthUnits
-                                .map(
-                                  (unit) => DropdownMenuItem(
-                                    value: unit,
-                                    child: Text(unit.label),
-                                  ),
-                                )
-                                .toList(),
+                          child: AppSelectField<DoseUnit>(
+                            value: _strengthUnit,
+                            values: _strengthUnits,
+                            label: 'Unit',
+                            labelBuilder: (unit) => unit.label,
                             onChanged: (unit) {
-                              if (unit == null) return;
                               setState(() => _strengthUnit = unit);
                             },
                           ),
@@ -258,22 +242,12 @@ class _AdvancedDoseDetailsScreenState extends State<AdvancedDoseDetailsScreen> {
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
-                          child: DropdownButtonFormField<DoseUnit>(
-                            initialValue: _vialUnit,
-                            decoration: const InputDecoration(
-                              labelText: 'Unit',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: _injectableUnits
-                                .map(
-                                  (unit) => DropdownMenuItem(
-                                    value: unit,
-                                    child: Text(unit.label),
-                                  ),
-                                )
-                                .toList(),
+                          child: AppSelectField<DoseUnit>(
+                            value: _vialUnit,
+                            values: _injectableUnits,
+                            label: 'Unit',
+                            labelBuilder: (unit) => unit.label,
                             onChanged: (unit) {
-                              if (unit == null) return;
                               setState(() => _vialUnit = unit);
                             },
                           ),
@@ -294,20 +268,13 @@ class _AdvancedDoseDetailsScreenState extends State<AdvancedDoseDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    DropdownButtonFormField<String>(
-                      initialValue: _syringeType,
-                      decoration: const InputDecoration(
-                        labelText: 'Syringe type',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'U-100',
-                          child: Text('U-100 insulin syringe'),
-                        ),
-                      ],
+                    AppSelectField<String>(
+                      value: _syringeType,
+                      values: const ['U-100'],
+                      label: 'Syringe type',
+                      labelBuilder: (value) =>
+                          value == 'U-100' ? 'U-100 insulin syringe' : value,
                       onChanged: (value) {
-                        if (value == null) return;
                         setState(() => _syringeType = value);
                       },
                     ),
@@ -767,36 +734,18 @@ class _BlendComponentEditor extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               flex: 2,
-              child: DropdownButtonFormField<DoseUnit>(
-                initialValue: row.unit,
-                decoration: const InputDecoration(
-                  labelText: 'Unit',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: DoseUnit.mg,
-                    child: Text('mg'),
-                  ),
-                  DropdownMenuItem(
-                    value: DoseUnit.mcg,
-                    child: Text('mcg'),
-                  ),
-                  DropdownMenuItem(
-                    value: DoseUnit.g,
-                    child: Text('g'),
-                  ),
-                  DropdownMenuItem(
-                    value: DoseUnit.units,
-                    child: Text('units'),
-                  ),
-                  DropdownMenuItem(
-                    value: DoseUnit.iu,
-                    child: Text('IU'),
-                  ),
+              child: AppSelectField<DoseUnit>(
+                value: row.unit,
+                values: const [
+                  DoseUnit.mg,
+                  DoseUnit.mcg,
+                  DoseUnit.g,
+                  DoseUnit.units,
+                  DoseUnit.iu,
                 ],
+                label: 'Unit',
+                labelBuilder: (unit) => unit.label,
                 onChanged: (unit) {
-                  if (unit == null) return;
                   row.unit = unit;
                   onChanged();
                 },

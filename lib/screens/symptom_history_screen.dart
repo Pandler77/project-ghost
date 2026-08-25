@@ -6,6 +6,7 @@ import '../models/symptom_entry.dart';
 import '../services/symptom_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
+import '../widgets/app_select_field.dart';
 
 enum _SymptomRange { sevenDays, thirtyDays, ninetyDays, sixMonths, oneYear }
 
@@ -233,22 +234,14 @@ class _SymptomHistoryScreenState extends State<SymptomHistoryScreen> {
   }
 
   Widget _buildSymptomSelector() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedSymptom,
-      decoration: const InputDecoration(
-        labelText: 'Symptom',
-        prefixIcon: Icon(ArcticIcons.monitor_heart_outlined),
-        border: OutlineInputBorder(),
-      ),
-      items: [
-        for (final symptom in _symptomNames)
-          DropdownMenuItem(value: symptom, child: Text(symptom)),
-      ],
+    return AppSelectField<String>(
+      value: _selectedSymptom,
+      values: _symptomNames,
+      label: 'Symptom',
+      placeholder: 'Choose a symptom',
+      prefixIcon: const Icon(ArcticIcons.monitor_heart_outlined),
+      labelBuilder: (value) => value,
       onChanged: (value) {
-        if (value == null) {
-          return;
-        }
-
         setState(() {
           _selectedSymptom = value;
         });

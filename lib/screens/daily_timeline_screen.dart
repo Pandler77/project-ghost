@@ -21,6 +21,7 @@ import 'progress_photo_session_screen.dart';
 import '../models/measurement_system.dart';
 import '../utils/weight_display.dart';
 import '../theme/arctic_icons.dart';
+import '../widgets/app_select_field.dart';
 
 class DailyTimelineScreen extends StatefulWidget {
   const DailyTimelineScreen({
@@ -1236,21 +1237,12 @@ class _HistoricalDoseSheetState extends State<_HistoricalDoseSheet> {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            DropdownButtonFormField<Protocol>(
-              initialValue: _selectedProtocol,
-              decoration: const InputDecoration(
-                labelText: 'Protocol',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                for (final protocol in widget.protocols)
-                  DropdownMenuItem(value: protocol, child: Text(protocol.name)),
-              ],
+            AppSelectField<Protocol>(
+              value: _selectedProtocol,
+              values: widget.protocols,
+              label: 'Protocol',
+              labelBuilder: (protocol) => protocol.name,
               onChanged: (protocol) {
-                if (protocol == null) {
-                  return;
-                }
-
                 setState(() {
                   _selectedProtocol = protocol;
                   _doseController.text = protocol.dose;

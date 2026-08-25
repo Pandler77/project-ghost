@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/app_select_field.dart';
+
 import '../models/cycle_unit.dart';
 import '../models/dose_details.dart';
 import '../models/dose_unit.dart';
@@ -1025,22 +1027,12 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
           ),
           const SizedBox(height: AppSpacing.lg),
 
-          DropdownButtonFormField<DoseForm>(
-            initialValue: _physicalDoseForm,
-            decoration: const InputDecoration(
-              labelText: 'Dose form',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              for (final form in _availablePhysicalForms)
-                DropdownMenuItem<DoseForm>(
-                  value: form,
-                  child: Text(form.label),
-                ),
-            ],
+          AppSelectField<DoseForm>(
+            value: _physicalDoseForm,
+            values: _availablePhysicalForms,
+            label: 'Dose form',
+            labelBuilder: (form) => form.label,
             onChanged: (value) {
-              if (value == null) return;
-
               setState(() {
                 _physicalDoseForm = value;
               });
@@ -1070,22 +1062,12 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: DropdownButtonFormField<DoseUnit>(
-                  initialValue: _physicalStrengthUnit,
-                  decoration: const InputDecoration(
-                    labelText: 'Unit',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    for (final unit in _physicalStrengthUnits)
-                      DropdownMenuItem<DoseUnit>(
-                        value: unit,
-                        child: Text(unit.label),
-                      ),
-                  ],
+                child: AppSelectField<DoseUnit>(
+                  value: _physicalStrengthUnit,
+                  values: _physicalStrengthUnits,
+                  label: 'Unit',
+                  labelBuilder: (unit) => unit.label,
                   onChanged: (value) {
-                    if (value == null) return;
-
                     setState(() {
                       _physicalStrengthUnit = value;
                     });
@@ -1194,18 +1176,13 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
         const SizedBox(height: AppSpacing.md),
 
-        DropdownButtonFormField<String>(
+        AppSelectField<String>(
           key: ValueKey(dropdownValue),
-          initialValue: dropdownValue,
-          decoration: const InputDecoration(
-            labelText: 'Unit',
-            border: OutlineInputBorder(),
-          ),
-          hint: const Text('Choose a unit'),
-          items: [
-            for (final unit in _availableUnits)
-              DropdownMenuItem(value: unit, child: Text(unit)),
-          ],
+          value: dropdownValue,
+          values: _availableUnits,
+          label: 'Unit',
+          placeholder: 'Choose a unit',
+          labelBuilder: (unit) => unit,
           onChanged: (value) {
             setState(() {
               _selectedUnit = value;
@@ -1342,14 +1319,21 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         ),
         if (_selectedSchedule == ScheduleOption.weekly) ...[
           const SizedBox(height: AppSpacing.sm),
-          DropdownButtonFormField<int>(
+          AppSelectField<int>(
             key: ValueKey(_selectedWeeklyDay),
-            initialValue: _selectedWeeklyDay,
-            decoration: const InputDecoration(
-              labelText: 'Day of the week',
-              border: OutlineInputBorder(),
-            ),
-            items: _weekdayItems(),
+            value: _selectedWeeklyDay,
+            values: const [
+              DateTime.monday,
+              DateTime.tuesday,
+              DateTime.wednesday,
+              DateTime.thursday,
+              DateTime.friday,
+              DateTime.saturday,
+              DateTime.sunday,
+            ],
+            label: 'Day of the week',
+            placeholder: 'Choose a day',
+            labelBuilder: _weekdayName,
             onChanged: (value) {
               setState(() {
                 _selectedWeeklyDay = value;
@@ -1421,17 +1405,13 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         ),
         if (_selectedSchedule == ScheduleOption.monthly) ...[
           const SizedBox(height: AppSpacing.sm),
-          DropdownButtonFormField<int>(
+          AppSelectField<int>(
             key: ValueKey(_selectedMonthlyDay),
-            initialValue: _selectedMonthlyDay,
-            decoration: const InputDecoration(
-              labelText: 'Day of the month',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              for (var day = 1; day <= 31; day++)
-                DropdownMenuItem(value: day, child: Text('Day $day')),
-            ],
+            value: _selectedMonthlyDay,
+            values: List<int>.generate(31, (index) => index + 1),
+            label: 'Day of the month',
+            placeholder: 'Choose a day',
+            labelBuilder: (day) => 'Day $day',
             onChanged: (value) {
               setState(() {
                 _selectedMonthlyDay = value;
@@ -2562,17 +2542,6 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     );
   }
 
-  List<DropdownMenuItem<int>> _weekdayItems() {
-    return const [
-      DropdownMenuItem(value: DateTime.monday, child: Text('Monday')),
-      DropdownMenuItem(value: DateTime.tuesday, child: Text('Tuesday')),
-      DropdownMenuItem(value: DateTime.wednesday, child: Text('Wednesday')),
-      DropdownMenuItem(value: DateTime.thursday, child: Text('Thursday')),
-      DropdownMenuItem(value: DateTime.friday, child: Text('Friday')),
-      DropdownMenuItem(value: DateTime.saturday, child: Text('Saturday')),
-      DropdownMenuItem(value: DateTime.sunday, child: Text('Sunday')),
-    ];
-  }
 
   String _searchHint(ProtocolCategory category) {
     return switch (category) {

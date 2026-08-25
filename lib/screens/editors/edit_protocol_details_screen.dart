@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/app_select_field.dart';
+
 import '../../models/dose_unit.dart';
 import '../../models/protocol.dart';
 import '../../models/protocol_type.dart';
@@ -208,24 +210,12 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
 
             const SizedBox(height: AppSpacing.md),
 
-            DropdownButtonFormField<DoseUnit>(
-              initialValue: _selectedUnit,
-              decoration: const InputDecoration(
-                labelText: 'Unit',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                for (final unit in _availableUnits)
-                  DropdownMenuItem<DoseUnit>(
-                    value: unit,
-                    child: Text(unit.label),
-                  ),
-              ],
+            AppSelectField<DoseUnit>(
+              value: _selectedUnit,
+              values: _availableUnits,
+              label: 'Unit',
+              labelBuilder: (unit) => unit.label,
               onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-
                 setState(() {
                   _selectedUnit = value;
                 });

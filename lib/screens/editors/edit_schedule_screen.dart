@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/app_select_field.dart';
+
 import '../../models/protocol.dart';
 import '../../models/protocol_schedule.dart';
 import '../../models/schedule_type.dart';
@@ -261,86 +263,51 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            DropdownButtonFormField<ScheduleType>(
-              initialValue: _selectedType,
-              decoration: const InputDecoration(
-                labelText: 'Schedule type',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: ScheduleType.daily,
-                  child: Text('Daily'),
-                ),
-                DropdownMenuItem(
-                  value: ScheduleType.weekly,
-                  child: Text('Weekly'),
-                ),
-                DropdownMenuItem(
-                  value: ScheduleType.everyXDays,
-                  child: Text('Every X days'),
-                ),
-                DropdownMenuItem(
-                  value: ScheduleType.specificDays,
-                  child: Text('Specific weekdays'),
-                ),
-                DropdownMenuItem(
-                  value: ScheduleType.monthly,
-                  child: Text('Monthly'),
-                ),
+            AppSelectField<ScheduleType>(
+              value: _selectedType,
+              values: const [
+                ScheduleType.daily,
+                ScheduleType.weekly,
+                ScheduleType.everyXDays,
+                ScheduleType.specificDays,
+                ScheduleType.monthly,
               ],
-              onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-
-                _changeScheduleType(value);
+              label: 'Schedule type',
+              labelBuilder: (value) => switch (value) {
+                ScheduleType.daily => 'Daily',
+                ScheduleType.weekly => 'Weekly',
+                ScheduleType.everyXDays => 'Every X days',
+                ScheduleType.specificDays => 'Specific weekdays',
+                ScheduleType.monthly => 'Monthly',
               },
+              onChanged: _changeScheduleType,
             ),
 
             if (_selectedType == ScheduleType.weekly) ...[
               const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<int>(
-                initialValue: _weekday,
-                decoration: const InputDecoration(
-                  labelText: 'Weekday',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: DateTime.monday,
-                    child: Text('Monday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.tuesday,
-                    child: Text('Tuesday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.wednesday,
-                    child: Text('Wednesday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.thursday,
-                    child: Text('Thursday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.friday,
-                    child: Text('Friday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.saturday,
-                    child: Text('Saturday'),
-                  ),
-                  DropdownMenuItem(
-                    value: DateTime.sunday,
-                    child: Text('Sunday'),
-                  ),
+              AppSelectField<int>(
+                value: _weekday,
+                values: const [
+                  DateTime.monday,
+                  DateTime.tuesday,
+                  DateTime.wednesday,
+                  DateTime.thursday,
+                  DateTime.friday,
+                  DateTime.saturday,
+                  DateTime.sunday,
                 ],
+                label: 'Weekday',
+                labelBuilder: (value) => switch (value) {
+                  DateTime.monday => 'Monday',
+                  DateTime.tuesday => 'Tuesday',
+                  DateTime.wednesday => 'Wednesday',
+                  DateTime.thursday => 'Thursday',
+                  DateTime.friday => 'Friday',
+                  DateTime.saturday => 'Saturday',
+                  DateTime.sunday => 'Sunday',
+                  _ => '',
+                },
                 onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-
                   setState(() => _weekday = value);
                 },
               ),

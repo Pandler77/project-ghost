@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/app_select_field.dart';
+
 import '../../models/dose_details.dart';
 import '../../models/dose_unit.dart';
 import '../../models/protocol.dart';
@@ -320,21 +322,12 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
             const SizedBox(height: AppSpacing.md),
 
             if (_usesPhysicalDoseEditor) ...[
-              DropdownButtonFormField<DoseForm>(
-                initialValue: _doseForm,
-                decoration: const InputDecoration(
-                  labelText: 'Dose form',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final form in _availableForms)
-                    DropdownMenuItem<DoseForm>(
-                      value: form,
-                      child: Text(form.label),
-                    ),
-                ],
+              AppSelectField<DoseForm>(
+                value: _doseForm,
+                values: _availableForms,
+                label: 'Dose form',
+                labelBuilder: (form) => form.label,
                 onChanged: (value) {
-                  if (value == null) return;
                   setState(() => _doseForm = value);
                 },
               ),
@@ -361,21 +354,12 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: DropdownButtonFormField<DoseUnit>(
-                      initialValue: _strengthUnit,
-                      decoration: const InputDecoration(
-                        labelText: 'Unit',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: [
-                        for (final unit in _strengthUnits)
-                          DropdownMenuItem<DoseUnit>(
-                            value: unit,
-                            child: Text(unit.label),
-                          ),
-                      ],
+                    child: AppSelectField<DoseUnit>(
+                      value: _strengthUnit,
+                      values: _strengthUnits,
+                      label: 'Unit',
+                      labelBuilder: (unit) => unit.label,
                       onChanged: (value) {
-                        if (value == null) return;
                         setState(() => _strengthUnit = value);
                       },
                     ),
@@ -433,21 +417,12 @@ class _EditProtocolDetailsScreenState extends State<EditProtocolDetailsScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<DoseUnit>(
-                initialValue: _selectedUnit,
-                decoration: const InputDecoration(
-                  labelText: 'Unit',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final unit in _availableUnits)
-                    DropdownMenuItem<DoseUnit>(
-                      value: unit,
-                      child: Text(unit.label),
-                    ),
-                ],
+              AppSelectField<DoseUnit>(
+                value: _selectedUnit,
+                values: _availableUnits,
+                label: 'Unit',
+                labelBuilder: (unit) => unit.label,
                 onChanged: (value) {
-                  if (value == null) return;
                   setState(() => _selectedUnit = value);
                 },
               ),

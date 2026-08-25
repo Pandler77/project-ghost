@@ -4,6 +4,7 @@ import '../../models/protocol.dart';
 import '../../models/protocol_status.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_color_picker.dart';
+import '../../widgets/app_select_field.dart';
 
 class EditAppearanceStatusScreen extends StatefulWidget {
   const EditAppearanceStatusScreen({required this.protocol, super.key});
@@ -82,28 +83,20 @@ class _EditAppearanceStatusScreenState
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            DropdownButtonFormField<ProtocolStatus>(
-              initialValue: _selectedStatus,
-              decoration: const InputDecoration(
-                labelText: 'Protocol status',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: ProtocolStatus.active,
-                  child: Text('Active'),
-                ),
-                DropdownMenuItem(
-                  value: ProtocolStatus.paused,
-                  child: Text('Paused'),
-                ),
-                DropdownMenuItem(
-                  value: ProtocolStatus.archived,
-                  child: Text('Archived'),
-                ),
+            AppSelectField<ProtocolStatus>(
+              value: _selectedStatus,
+              values: const [
+                ProtocolStatus.active,
+                ProtocolStatus.paused,
+                ProtocolStatus.archived,
               ],
+              label: 'Protocol status',
+              labelBuilder: (value) => switch (value) {
+                ProtocolStatus.active => 'Active',
+                ProtocolStatus.paused => 'Paused',
+                ProtocolStatus.archived => 'Archived',
+              },
               onChanged: (value) {
-                if (value == null) return;
                 setState(() => _selectedStatus = value);
               },
             ),

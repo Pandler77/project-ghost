@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_theme.dart';
+import '../../../widgets/app_select_field.dart';
 import '../calendar_helpers.dart';
 
 class MonthYearPickerDialog extends StatefulWidget {
@@ -39,21 +40,12 @@ class _MonthYearPickerDialogState extends State<MonthYearPickerDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DropdownButtonFormField<int>(
-              initialValue: _selectedYear,
-              decoration: const InputDecoration(
-                labelText: 'Year',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                for (final year in availableYears)
-                  DropdownMenuItem(value: year, child: Text('$year')),
-              ],
+            AppSelectField<int>(
+              value: _selectedYear,
+              values: availableYears,
+              label: 'Year',
+              labelBuilder: (value) => '$value',
               onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-
                 setState(() {
                   _selectedYear = value;
                 });

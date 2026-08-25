@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_select_field.dart';
+
 import '../models/dose_unit.dart';
 import '../models/injection_site.dart';
 import '../models/injection_site_suggestion.dart';
@@ -451,21 +453,12 @@ class _TakeDoseSheetState extends State<TakeDoseSheet> {
             const SizedBox(width: AppSpacing.sm),
 
             Expanded(
-              child: DropdownButtonFormField<DoseUnit>(
-                initialValue: _selectedDoseUnit,
-                decoration: const InputDecoration(
-                  labelText: 'Unit',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final unit in DoseUnit.values)
-                    DropdownMenuItem(value: unit, child: Text(unit.label)),
-                ],
+              child: AppSelectField<DoseUnit>(
+                value: _selectedDoseUnit,
+                values: DoseUnit.values,
+                label: 'Unit',
+                labelBuilder: (unit) => unit.label,
                 onChanged: (unit) {
-                  if (unit == null) {
-                    return;
-                  }
-
                   setState(() {
                     _selectedDoseUnit = unit;
                   });
@@ -694,49 +687,39 @@ class _TakeDoseSheetState extends State<TakeDoseSheet> {
               ],
             )
           else if (enabledSites.isNotEmpty)
-            DropdownButtonFormField<InjectionSite>(
-              initialValue:
+            AppSelectField<InjectionSite>(
+              value:
                   selectedSite != null && enabledSites.contains(selectedSite)
                   ? selectedSite
                   : enabledSites.first,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'Site',
-                prefixIcon: Icon(
-                  ArcticIcons.location_on_outlined,
-                  color: colorScheme.primary,
-                ),
-                border: const OutlineInputBorder(),
+              values: enabledSites,
+              label: 'Site',
+              labelBuilder: (site) => site.label,
+              prefixIcon: Icon(
+                ArcticIcons.location_on_outlined,
+                color: colorScheme.primary,
               ),
-              items: [
-                for (final site in enabledSites)
-                  DropdownMenuItem<InjectionSite>(
-                    value: site,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            site.label,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (site == _previousInjectionSite) ...[
-                          const SizedBox(width: AppSpacing.sm),
-                          Icon(
-                            Icons.history_rounded,
-                            size: 16,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ],
-                      ],
+              optionBuilder: (context, site, isSelected) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        site.label,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-              ],
+                    if (site == _previousInjectionSite) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      Icon(
+                        Icons.history_rounded,
+                        size: 16,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ],
+                );
+              },
               onChanged: (site) {
-                if (site == null) {
-                  return;
-                }
-
                 setState(() {
                   _selectedInjectionSite = site;
                 });

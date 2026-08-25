@@ -935,15 +935,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   bool get _needsInitialSetup {
-    final modules = _setupModules;
-
-    if (modules.isEmpty) {
+    // Weight, Progress Photos, and Notes/Symptoms are optional modules.
+    // Enabling any of them later must never send an established profile back
+    // to the Get Started screen.
+    //
+    // Only Protocols can gate the initial setup experience, and only while
+    // that module is enabled and no protocol has been created yet.
+    if (!widget.profile.hasModule(ProfileModule.protocols)) {
       return false;
     }
 
-    // Get Started reflects only the modules this profile explicitly tracks.
-    // It remains visible while any selected module still needs its first entry.
-    return modules.any((module) => !_hasStartedModule(module));
+    return widget.protocols.isEmpty;
   }
 
   Widget _buildGetStartedCard() {

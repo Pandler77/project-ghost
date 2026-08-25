@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
+import '../widgets/app_select_field.dart';
 
 class DoseFromUnitsCalculatorScreen extends StatefulWidget {
   const DoseFromUnitsCalculatorScreen({super.key});
@@ -506,23 +507,12 @@ class _AmountUnitField extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: DropdownButtonFormField<String>(
-            initialValue: selectedUnit,
-            decoration: InputDecoration(
-              labelText: 'Unit',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-            ),
-            items: const [
-              DropdownMenuItem(value: 'mg', child: Text('mg')),
-              DropdownMenuItem(value: 'mcg', child: Text('mcg')),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                onUnitChanged(value);
-              }
-            },
+          child: AppSelectField<String>(
+            value: selectedUnit,
+            values: const ['mg', 'mcg'],
+            label: 'Unit',
+            labelBuilder: (value) => value,
+            onChanged: onUnitChanged,
           ),
         ),
       ],

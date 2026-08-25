@@ -3760,25 +3760,104 @@ class _ReminderTimingDropdown extends StatelessWidget {
   final String Function(int value) labelBuilder;
   final ValueChanged<int> onChanged;
 
+  Future<void> _showPicker(BuildContext context) async {
+    final safeValue = values.contains(value) ? value : values.first;
+    final colors = Theme.of(context).colorScheme;
+
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: colors.surface,
+      builder: (sheetContext) {
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: AppTypography.body,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              Divider(height: 1, color: colors.outlineVariant),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: values.length,
+                  itemBuilder: (context, index) {
+                    final item = values[index];
+                    final isSelected = item == safeValue;
+
+                    return ListTile(
+                      title: Text(labelBuilder(item)),
+                      trailing: isSelected
+                          ? Icon(Icons.check_rounded, color: colors.primary)
+                          : null,
+                      onTap: () => Navigator.pop(sheetContext, item),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected != null && selected != value) {
+      onChanged(selected);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final safeValue = values.contains(value) ? value : values.first;
+    final colors = Theme.of(context).colorScheme;
 
-    return DropdownButtonFormField<int>(
-      initialValue: safeValue,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showPicker(context),
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  labelBuilder(safeValue),
+                  style: TextStyle(
+                    fontSize: AppTypography.body,
+                    color: colors.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: colors.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
       ),
-      items: [
-        for (final item in values)
-          DropdownMenuItem<int>(value: item, child: Text(labelBuilder(item))),
-      ],
-      onChanged: (selected) {
-        if (selected != null) {
-          onChanged(selected);
-        }
-      },
     );
   }
 }

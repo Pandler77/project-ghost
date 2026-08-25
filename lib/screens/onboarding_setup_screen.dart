@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/measurement_system.dart';
 import '../models/profile.dart';
@@ -619,7 +620,7 @@ class _TrackingSelectionPage extends StatelessWidget {
           'Choose what you want MODOSE to focus on. You can change these choices later.',
       children: [
         _TrackingSwitchTile(
-          icon: ArcticIcons.medication_outlined,
+          icon: LucideIcons.syringe,
           title: 'Protocols',
           subtitle: 'Schedules, doses, cycles, reminders, and history.',
           value: selectedModules.contains(ProfileModule.protocols),
@@ -684,7 +685,7 @@ class _CustomizeTrackingPage extends StatelessWidget {
       children: [
         if (selectedModules.contains(ProfileModule.protocols))
           const _EnabledTrackingCard(
-            icon: ArcticIcons.medication_outlined,
+            icon: LucideIcons.syringe,
             title: 'Protocols',
             subtitle: 'Create your first protocol from Home after setup.',
           ),
@@ -778,7 +779,7 @@ class _FinishSetupPage extends StatelessWidget {
             ),
             const _SummaryDivider(),
             _SummaryRow(
-              icon: ArcticIcons.medication_outlined,
+              icon: LucideIcons.syringe,
               title: 'Protocols',
               value: selectedModules.contains(ProfileModule.protocols)
                   ? 'Enabled'

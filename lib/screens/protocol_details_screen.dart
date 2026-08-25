@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/protocol.dart';
 import '../models/protocol_status.dart';
@@ -488,7 +489,7 @@ class _ProtocolInformationCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
 
           _InformationRow(
-            icon: ArcticIcons.medication_outlined,
+            icon: LucideIcons.syringe,
             label: 'Dose',
             value: dose,
           ),

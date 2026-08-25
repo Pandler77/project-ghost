@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../models/daily_protocol_item.dart';
 import '../../models/measurement_system.dart';
@@ -192,7 +193,7 @@ class _EditDaySheetState extends State<EditDaySheet> {
                 children: [
                   const _SectionTitle(
                     title: 'Protocols',
-                    icon: ArcticIcons.medication_outlined,
+                    icon: LucideIcons.syringe,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   if (_protocolStates.isEmpty)

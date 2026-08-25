@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../theme/app_theme.dart';
 import '../../theme/arctic_icons.dart';
@@ -13,7 +14,7 @@ class EmptyProtocolsState extends StatelessWidget {
       child: Column(
         children: [
           Icon(
-            ArcticIcons.medication_outlined,
+            LucideIcons.syringe,
             size: 40,
             color: Theme.of(context).colorScheme.outline,
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/arcticdose_logo.dart';
@@ -113,7 +114,7 @@ class AboutMODOSEScreen extends StatelessWidget {
                       ).createShader(bounds);
                     },
                     child: const Icon(
-                      ArcticIcons.medication_outlined,
+                      LucideIcons.syringe,
                       size: 24,
                       color: Colors.white,
                     ),

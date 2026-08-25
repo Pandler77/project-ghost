@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/cycle_unit.dart';
 import '../models/dose_details.dart';
@@ -112,7 +113,7 @@ class _EditProtocolScreenState extends State<EditProtocolScreen> {
                   const SizedBox(height: AppSpacing.md),
 
                   _EditSectionTile(
-                    icon: ArcticIcons.medication_outlined,
+                    icon: LucideIcons.syringe,
                     title: 'Protocol',
                     subtitle: '${_draft.name} • ${_draft.dose}',
                     onTap: () {

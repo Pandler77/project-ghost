@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/dose_record.dart';
 import '../models/measurement_system.dart';
@@ -1570,7 +1571,7 @@ class _AdherenceSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!analytics.hasData) {
       return const _EmptyAnalyticsCard(
-        icon: ArcticIcons.medication_outlined,
+        icon: LucideIcons.syringe,
         text: 'Dose history will appear here as records are logged.',
       );
     }
@@ -1876,7 +1877,7 @@ class _ProtocolAdherenceCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: Icon(
-                  ArcticIcons.medication_outlined,
+                  LucideIcons.syringe,
                   color: colors.primary,
                   size: AppIcon.sm,
                 ),
@@ -2073,7 +2074,7 @@ class _PremiumAnalyticsPreview extends StatelessWidget {
           text: 'BMI trends and change over time',
         ),
         const _AnalyticsPremiumFeature(
-          icon: ArcticIcons.medication_outlined,
+          icon: LucideIcons.syringe,
           text: 'Protocol adherence and streak tracking',
         ),
         const _AnalyticsPremiumFeature(

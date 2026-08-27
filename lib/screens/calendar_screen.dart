@@ -6,6 +6,7 @@ import '../models/dose_record.dart';
 import '../models/measurement_system.dart';
 import '../models/progress_photo_session.dart';
 import '../models/protocol.dart';
+import '../models/schedule_override.dart';
 import '../models/symptom_entry.dart';
 import '../services/app_data_service.dart';
 import '../services/progress_photo_service.dart';
@@ -53,6 +54,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   late final int _currentMonthIndex;
   late DateTime _selectedDate;
 
+  List<ScheduleOverride> _scheduleOverrides = [];
+
   final Map<String, List<DoseRecord>> _recordsByMonth = {};
   final Map<String, List<SymptomEntry>> _symptomsByMonth = {};
   final Map<String, List<ProgressPhotoSession>> _photoSessionsByMonth = {};
@@ -84,7 +87,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _currentMonthIndex = _pastMonthCount;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ensureMonthLoaded(currentMonth);
+      _reloadCalendar();
     });
   }
 
@@ -179,7 +182,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _reloadCalendar() async {
+    final overrides = await widget.dataService.getScheduleOverrides();
+
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
+      _scheduleOverrides = overrides;
       _recordsByMonth.clear();
       _symptomsByMonth.clear();
       _photoSessionsByMonth.clear();
@@ -238,7 +248,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   List<Protocol> _protocolsForDate(DateTime date) {
-    return _scheduleService.protocolsForDate(widget.protocols, date);
+    final occurrences = _scheduleService.occurrencesForDate(
+      widget.protocols,
+      date,
+      overrides: _scheduleOverrides,
+    );
+
+    final protocolById = <String, Protocol>{
+      for (final protocol in widget.protocols) protocol.id: protocol,
+    };
+
+    return occurrences
+        .map((occurrence) => protocolById[occurrence.protocolId])
+        .whereType<Protocol>()
+        .toList();
   }
 
   CalendarDaySummary _summaryForDate({

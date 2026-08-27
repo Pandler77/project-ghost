@@ -6,6 +6,9 @@ import '../models/dose_record.dart';
 import '../models/injection_log.dart';
 import '../models/injection_site.dart';
 import '../models/protocol.dart';
+import '../models/protocol_schedule.dart';
+import '../models/schedule_type.dart';
+import '../models/schedule_override.dart';
 import '../models/weight_record.dart';
 import '../services/app_data_service.dart';
 import '../services/protocol_schedule_service.dart';
@@ -58,6 +61,7 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
   late final TabController _tabController;
 
   WeightRecord? _weightRecord;
+  late List<Protocol> _activeProtocols;
   List<DailyProtocolItem> _protocolItems = [];
   Map<String, InjectionLog> _injectionLogsByDoseRecordId = {};
 
@@ -69,8 +73,18 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
     super.initState();
 
     _tabController = TabController(length: 2, vsync: this);
+    _activeProtocols = List<Protocol>.from(widget.protocols);
 
     _loadDay();
+  }
+
+  @override
+  void didUpdateWidget(covariant DailyTimelineScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!identical(oldWidget.protocols, widget.protocols)) {
+      _activeProtocols = List<Protocol>.from(widget.protocols);
+    }
   }
 
   @override
@@ -90,6 +104,7 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
         widget.dataService.getWeightRecordForDate(widget.date),
         widget.dataService.getDoseRecordsForDate(widget.date),
         widget.dataService.getAllInjectionLogs(),
+        widget.dataService.getScheduleOverrides(),
         _symptomService.getEntriesForDate(widget.date),
         _progressPhotoService.getSessionsForDate(widget.date),
       ]);
@@ -97,8 +112,9 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
       final weightRecord = results[0] as WeightRecord?;
       final doseRecords = results[1] as List<DoseRecord>;
       final injectionLogs = results[2] as List<InjectionLog>;
-      final symptomEntries = results[3] as List<SymptomEntry>;
-      final photoSessions = results[4] as List<ProgressPhotoSession>;
+      final scheduleOverrides = results[3] as List<ScheduleOverride>;
+      final symptomEntries = results[4] as List<SymptomEntry>;
+      final photoSessions = results[5] as List<ProgressPhotoSession>;
 
       final injectionLogsByDoseRecordId = <String, InjectionLog>{
         for (final log in injectionLogs) log.doseRecordId: log,
@@ -116,20 +132,27 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
           _doseKey(record.protocolId, record.scheduledFor): record,
       };
 
-      final scheduledProtocols = _scheduleService.protocolsForDate(
-        widget.protocols,
+      final occurrences = _scheduleService.occurrencesForDate(
+        _activeProtocols,
         widget.date,
+        overrides: scheduleOverrides,
       );
+
+      final protocolById = <String, Protocol>{
+        for (final protocol in _activeProtocols) protocol.id: protocol,
+      };
 
       final items = <DailyProtocolItem>[];
       final representedRecordIds = <String>{};
 
-      for (final protocol in scheduledProtocols) {
-        final scheduledFor = _scheduleService.scheduledDateTime(
-          protocol,
-          widget.date,
-        );
+      for (final occurrence in occurrences) {
+        final protocol = protocolById[occurrence.protocolId];
 
+        if (protocol == null) {
+          continue;
+        }
+
+        final scheduledFor = occurrence.scheduledFor;
         final record = recordsByDose[_doseKey(protocol.id, scheduledFor)];
 
         if (record != null) {
@@ -154,7 +177,7 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
 
         Protocol? protocol;
 
-        for (final candidate in widget.protocols) {
+        for (final candidate in _activeProtocols) {
           if (candidate.id == record.protocolId) {
             protocol = candidate;
             break;
@@ -212,6 +235,7 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
         return EditDaySheet(
           date: widget.date,
           protocolItems: _protocolItems,
+          allProtocols: _activeProtocols,
           weightRecord: _weightRecord,
           measurementSystem: widget.measurementSystem,
           onSave: (result) {
@@ -232,6 +256,7 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
     try {
       await _saveWeightChanges(result);
       await _saveProtocolChanges(result);
+      await _saveExtraOccurrences(result);
 
       if (!mounted) {
         return;
@@ -300,6 +325,12 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
       final item = change.item;
       final existingRecord = item.record;
 
+      if (change.shiftFutureSchedule) {
+        await _reanchorIntervalSchedule(change);
+      } else {
+        await _saveOneOffScheduleChange(change);
+      }
+
       if (!change.isTaken) {
         if (existingRecord != null) {
           await widget.dataService.deleteDoseRecord(
@@ -336,8 +367,134 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
     }
   }
 
+  Future<void> _saveOneOffScheduleChange(
+    EditDayProtocolResult change,
+  ) async {
+    if (change.item.record != null) {
+      return;
+    }
+
+    if (change.oneOffAction.name == 'none') {
+      return;
+    }
+
+    final original = change.item.scheduledFor;
+    final now = DateTime.now();
+
+    if (change.oneOffAction.name == 'move') {
+      final movedTo = DateTime(
+        change.oneOffDate.year,
+        change.oneOffDate.month,
+        change.oneOffDate.day,
+        change.oneOffTime.hour,
+        change.oneOffTime.minute,
+      );
+
+      await widget.dataService.saveScheduleOverride(
+        ScheduleOverride(
+          id:
+              '${change.item.protocol.id}-move-'
+              '${original.microsecondsSinceEpoch}',
+          protocolId: change.item.protocol.id,
+          type: ScheduleOverrideType.moveOccurrence,
+          originalScheduledFor: original,
+          overrideScheduledFor: movedTo,
+          createdAt: now,
+        ),
+      );
+      return;
+    }
+
+    if (change.oneOffAction.name == 'suppress') {
+      await widget.dataService.saveScheduleOverride(
+        ScheduleOverride(
+          id:
+              '${change.item.protocol.id}-suppress-'
+              '${original.microsecondsSinceEpoch}',
+          protocolId: change.item.protocol.id,
+          type: ScheduleOverrideType.suppressOccurrence,
+          originalScheduledFor: original,
+          createdAt: now,
+        ),
+      );
+    }
+  }
+
+  Future<void> _saveExtraOccurrences(EditDayResult result) async {
+    for (final extra in result.extraOccurrences) {
+      final scheduledFor = DateTime(
+        widget.date.year,
+        widget.date.month,
+        widget.date.day,
+        extra.time.hour,
+        extra.time.minute,
+      );
+
+      await widget.dataService.saveScheduleOverride(
+        ScheduleOverride(
+          id:
+              '${extra.protocol.id}-extra-'
+              '${DateTime.now().microsecondsSinceEpoch}-'
+              '${scheduledFor.microsecondsSinceEpoch}',
+          protocolId: extra.protocol.id,
+          type: ScheduleOverrideType.extraOccurrence,
+          overrideScheduledFor: scheduledFor,
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _reanchorIntervalSchedule(
+    EditDayProtocolResult change,
+  ) async {
+    final protocol = change.item.protocol;
+    final schedule = protocol.schedule;
+
+    if (schedule.type != ScheduleType.everyXDays) {
+      return;
+    }
+
+    final intervalDays = schedule.intervalDays;
+
+    if (intervalDays == null || intervalDays <= 0) {
+      return;
+    }
+
+    if (change.item.record != null) {
+      throw StateError(
+        'A completed or logged dose cannot be used to shift the future schedule.',
+      );
+    }
+
+    final shiftedStart = DateTime(
+      change.shiftedDate.year,
+      change.shiftedDate.month,
+      change.shiftedDate.day,
+    );
+
+    final shiftedSchedule = ProtocolSchedule.everyXDays(
+      startDate: shiftedStart,
+      hour: change.shiftedTime.hour,
+      minute: change.shiftedTime.minute,
+      intervalDays: intervalDays,
+    );
+
+    final updatedProtocol = protocol.copyWith(schedule: shiftedSchedule);
+
+    await widget.dataService.updateProtocol(updatedProtocol);
+
+    final index = _activeProtocols.indexWhere(
+      (candidate) => candidate.id == updatedProtocol.id,
+    );
+
+    if (index >= 0) {
+      _activeProtocols[index] = updatedProtocol;
+    }
+  }
+
   Future<void> _addHistoricalDose() async {
-    if (widget.protocols.isEmpty) {
+    if (_activeProtocols.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Create a protocol first.')));
@@ -352,7 +509,7 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
       builder: (_) {
         return _HistoricalDoseSheet(
           date: widget.date,
-          protocols: widget.protocols,
+          protocols: _activeProtocols,
         );
       },
     );
@@ -540,7 +697,7 @@ class _DailyTimelineScreenState extends State<DailyTimelineScreen>
             children: [
               _NotesSymptomsTab(
                 date: widget.date,
-                protocols: widget.protocols,
+                protocols: _activeProtocols,
                 entries: _symptomEntries,
                 onChanged: _loadDay,
               ),

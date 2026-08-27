@@ -5,6 +5,7 @@ import '../models/dose_details.dart';
 import '../models/injection_log.dart';
 import '../models/inventory_item.dart';
 import '../models/protocol.dart';
+import '../models/schedule_override.dart';
 import '../models/weight_record.dart';
 import 'entitlement_service.dart';
 import 'inventory_service.dart';
@@ -63,6 +64,96 @@ class AppDataService {
 
   bool get hasPremium => _entitlementService.hasPremium;
 
+  Future<bool> hasDoseSafetyAcknowledgement({
+    required String acknowledgementType,
+    required int version,
+  }) {
+    return _repository.hasDoseSafetyAcknowledgement(
+      acknowledgementType: acknowledgementType,
+      version: version,
+    );
+  }
+
+  Future<void> saveDoseSafetyAcknowledgement({
+    required String acknowledgementType,
+    required int version,
+    required DateTime acceptedAt,
+  }) {
+    return _repository.saveDoseSafetyAcknowledgement(
+      acknowledgementType: acknowledgementType,
+      version: version,
+      acceptedAt: acceptedAt,
+    );
+  }
+
+  Future<DateTime?> getDoseSafetyAcknowledgementAcceptedAt({
+    required String acknowledgementType,
+    required int version,
+  }) {
+    return _repository.getDoseSafetyAcknowledgementAcceptedAt(
+      acknowledgementType: acknowledgementType,
+      version: version,
+    );
+  }
+
+  Future<List<ScheduleOverride>> getScheduleOverrides() {
+    return _repository.getScheduleOverrides();
+  }
+
+  Future<List<ScheduleOverride>> getScheduleOverridesForProtocol(
+    String protocolId,
+  ) {
+    return _repository.getScheduleOverridesForProtocol(protocolId);
+  }
+
+  Future<void> saveScheduleOverride(ScheduleOverride override) async {
+    final original = override.originalScheduledFor;
+
+    if (original != null) {
+      await _repository.deleteScheduleOverrideForOccurrence(
+        protocolId: override.protocolId,
+        originalScheduledFor: original,
+      );
+    }
+
+    await _repository.saveScheduleOverride(override);
+    await _rescheduleProtocolAfterOverride(override.protocolId);
+  }
+
+  Future<void> deleteScheduleOverride(String id, String protocolId) async {
+    await _repository.deleteScheduleOverride(id);
+    await _rescheduleProtocolAfterOverride(protocolId);
+  }
+
+  Future<void> _rescheduleProtocolAfterOverride(String protocolId) async {
+    final protocols = await _repository.getProtocols();
+
+    Protocol? protocol;
+
+    for (final candidate in protocols) {
+      if (candidate.id == protocolId) {
+        protocol = candidate;
+        break;
+      }
+    }
+
+    if (protocol == null) {
+      return;
+    }
+
+    final profile = await _profileService.getActiveProfile();
+    final overrides = await _repository.getScheduleOverridesForProtocol(
+      protocolId,
+    );
+
+    await _notificationService.scheduleProtocolReminders(
+      protocol,
+      profileId: profile.id,
+      profileName: profile.name,
+      overrides: overrides,
+    );
+  }
+
   Future<List<Protocol>> getProtocols() {
     return _repository.getProtocols();
   }
@@ -89,16 +180,23 @@ class AppDataService {
     await _removeStaleMissedDoseRecords(protocol);
 
     final profile = await _profileService.getActiveProfile();
+    final overrides = await _repository.getScheduleOverridesForProtocol(
+      protocol.id,
+    );
 
     await _notificationService.scheduleProtocolReminders(
       protocol,
       profileId: profile.id,
       profileName: profile.name,
+      overrides: overrides,
     );
   }
 
   Future<void> _removeStaleMissedDoseRecords(Protocol protocol) async {
     final records = await _repository.getDoseRecordsForProtocol(protocol.id);
+    final overrides = await _repository.getScheduleOverridesForProtocol(
+      protocol.id,
+    );
 
     for (final record in records) {
       if (record.status != DoseRecordStatus.missed) {
@@ -111,12 +209,20 @@ class AppDataService {
         record.scheduledFor.day,
       );
 
-      final shouldStillExist = _protocolScheduleService.isScheduledOnDate(
-        protocol,
+      final scheduledOccurrences = _protocolScheduleService.occurrencesForDate(
+        [protocol],
         scheduledDate,
+        overrides: overrides,
       );
 
-      if (!shouldStillExist) {
+      final matchingOccurrence = scheduledOccurrences.any(
+        (occurrence) => _sameScheduledTime(
+          occurrence.scheduledFor,
+          record.scheduledFor,
+        ),
+      );
+
+      if (!matchingOccurrence) {
         await _repository.deleteDoseRecord(
           protocolId: record.protocolId,
           scheduledFor: record.scheduledFor,
@@ -125,17 +231,6 @@ class AppDataService {
         continue;
       }
 
-      final expectedScheduledFor = _protocolScheduleService.scheduledDateTime(
-        protocol,
-        scheduledDate,
-      );
-
-      if (!_sameScheduledTime(record.scheduledFor, expectedScheduledFor)) {
-        await _repository.deleteDoseRecord(
-          protocolId: record.protocolId,
-          scheduledFor: record.scheduledFor,
-        );
-      }
     }
   }
 

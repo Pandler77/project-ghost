@@ -32,9 +32,13 @@ class UsageAnalyticsService {
 
   static final UsageAnalyticsService instance = UsageAnalyticsService._();
 
+  // Aptabase app keys are client-side identifiers and are expected to ship
+  // with the app. Keep the dart-define override for alternate environments,
+  // while providing the production MODOSE key so Xcode/TestFlight archives
+  // do not silently disable analytics when no APTABASE_APP_KEY define is set.
   static const String _appKey = String.fromEnvironment(
     'APTABASE_APP_KEY',
-    defaultValue: '',
+    defaultValue: 'A-US-3312060022',
   );
 
   final SettingsService _settingsService = SettingsService();

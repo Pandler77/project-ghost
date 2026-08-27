@@ -40,6 +40,9 @@ class SettingsService {
   static const String _anonymousAnalyticsEnabledKey =
       'anonymous_analytics_enabled';
 
+  static const String _doseSafetyAcknowledgementVersionKey =
+      'dose_safety_acknowledgement_version';
+
   final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
   // ------------------------
@@ -416,6 +419,22 @@ class SettingsService {
   }
 
   // ------------------------
+  // Medication & dose calculation safety
+  // ------------------------
+
+  Future<int> getDoseSafetyAcknowledgementVersion() async {
+    return await _preferences.getInt(_doseSafetyAcknowledgementVersionKey) ?? 0;
+  }
+
+  Future<void> saveDoseSafetyAcknowledgementVersion(int version) async {
+    await _preferences.setInt(_doseSafetyAcknowledgementVersionKey, version);
+  }
+
+  Future<void> resetDoseSafetyAcknowledgementVersion() async {
+    await _preferences.remove(_doseSafetyAcknowledgementVersionKey);
+  }
+
+  // ------------------------
   // Measurement system
   // ------------------------
 
@@ -493,6 +512,7 @@ class SettingsService {
       _preferences.remove(_celebrationsEnabledKey),
       _preferences.remove(_awardedMilestonesKey),
       _preferences.remove(_pendingMilestonesKey),
+      _preferences.remove(_doseSafetyAcknowledgementVersionKey),
     ]);
   }
 }

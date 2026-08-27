@@ -6,6 +6,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../models/notification_preferences.dart';
 import '../models/protocol.dart';
+import '../models/schedule_override.dart';
 import 'reminder_schedule_service.dart';
 import 'settings_service.dart';
 
@@ -14,11 +15,13 @@ class ProfileNotificationSchedule {
     required this.profileId,
     required this.profileName,
     required this.protocols,
+    this.overrides = const [],
   });
 
   final String profileId;
   final String profileName;
   final List<Protocol> protocols;
+  final List<ScheduleOverride> overrides;
 }
 
 class NotificationService {
@@ -135,6 +138,7 @@ class NotificationService {
     required String profileId,
     required String profileName,
     DateTime? from,
+    List<ScheduleOverride> overrides = const [],
   }) async {
     await cancelProtocolReminders(protocol.id, profileId: profileId);
 
@@ -149,6 +153,7 @@ class NotificationService {
       protocol,
       from: from,
       occurrenceLimit: _occurrenceLimitPerProtocol,
+      overrides: overrides,
     );
 
     for (final reminder in reminders) {
@@ -199,6 +204,7 @@ class NotificationService {
           protocol,
           from: from,
           occurrenceLimit: _occurrenceLimitPerProtocol,
+          overrides: profileSchedule.overrides,
         );
 
         for (final reminder in reminders) {
@@ -236,6 +242,7 @@ class NotificationService {
     required String profileId,
     required String profileName,
     DateTime? from,
+    List<ScheduleOverride> overrides = const [],
   }) async {
     await cancelProfileReminders(profileId);
 
@@ -251,6 +258,7 @@ class NotificationService {
         profileId: profileId,
         profileName: profileName,
         from: from,
+        overrides: overrides.where((item) => item.protocolId == protocol.id).toList(),
       );
     }
   }
@@ -260,12 +268,14 @@ class NotificationService {
     required String profileId,
     required String profileName,
     DateTime? from,
+    List<ScheduleOverride> overrides = const [],
   }) {
     return synchronizeProtocolReminders(
       protocols,
       profileId: profileId,
       profileName: profileName,
       from: from,
+      overrides: overrides,
     );
   }
 

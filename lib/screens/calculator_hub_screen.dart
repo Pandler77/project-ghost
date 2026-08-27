@@ -11,6 +11,7 @@ import 'dose_from_units_calculator_screen.dart';
 import 'premium_screen.dart';
 import 'reconstitution_calculator_screen.dart';
 import '../theme/arctic_icons.dart';
+import '../widgets/dose_safety_acknowledgement.dart';
 
 class CalculatorHubScreen extends StatefulWidget {
   const CalculatorHubScreen({
@@ -49,6 +50,10 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
     }
   }
 
+  Future<bool> _ensureDoseSafety() async {
+    return ensureDoseSafetyAcknowledged(context);
+  }
+
   Future<void> _loadMeasurementSystem() async {
     final measurementSystem = await _settingsService.getMeasurementSystem();
 
@@ -60,6 +65,28 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
       _measurementSystem = measurementSystem;
       _isLoadingMeasurementSystem = false;
     });
+  }
+
+  Future<void> _openReconstitutionCalculator() async {
+    final accepted = await _ensureDoseSafety();
+
+    if (!accepted || !mounted) {
+      return;
+    }
+
+    UsageAnalyticsService.instance.track(
+      UsageAnalyticsEvent.calculatorOpened,
+      properties: {
+        'calculator_type': 'reconstitution',
+      },
+    );
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ReconstitutionCalculatorScreen(),
+      ),
+    );
   }
 
   Future<void> _openCalorieProteinCalculator() async {
@@ -106,6 +133,12 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
       return;
     }
 
+    final accepted = await _ensureDoseSafety();
+
+    if (!accepted || !mounted) {
+      return;
+    }
+
     UsageAnalyticsService.instance.track(
       UsageAnalyticsEvent.calculatorOpened,
       properties: {
@@ -124,6 +157,12 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
   Future<void> _openBacWaterCalculator() async {
     if (!_dataService.hasPremium) {
       await _openPremium();
+      return;
+    }
+
+    final accepted = await _ensureDoseSafety();
+
+    if (!accepted || !mounted) {
       return;
     }
 
@@ -238,21 +277,7 @@ class _CalculatorHubScreenState extends State<CalculatorHubScreen> {
               icon: ArcticIcons.science_outlined,
               title: 'Reconstitution',
               subtitle: 'Calculate how many syringe units to draw.',
-              onTap: () {
-                UsageAnalyticsService.instance.track(
-                  UsageAnalyticsEvent.calculatorOpened,
-                  properties: {
-                    'calculator_type': 'reconstitution',
-                  },
-                );
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ReconstitutionCalculatorScreen(),
-                  ),
-                );
-              },
+              onTap: _openReconstitutionCalculator,
             ),
 
             const SizedBox(height: AppSpacing.sm),

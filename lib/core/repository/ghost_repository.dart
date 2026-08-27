@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../models/dose_record.dart';
 import '../../models/inventory_item.dart';
 import '../../models/protocol.dart';
+import '../../models/schedule_override.dart';
 import '../../models/weight_record.dart';
 import '../../services/settings_service.dart';
 import '../database/app_database.dart';
@@ -25,6 +26,156 @@ class GhostRepository {
     String profileId,
   ) {
     return {...values, 'profile_id': profileId};
+  }
+
+  // ------------------------
+  // Medication & dose calculation safety
+  // ------------------------
+
+  Future<bool> hasDoseSafetyAcknowledgement({
+    required String acknowledgementType,
+    required int version,
+  }) async {
+    final db = await _appDatabase.database;
+    final profileId = await _getActiveProfileId();
+
+    final rows = await db.query(
+      AppDatabase.doseSafetyAcknowledgementsTable,
+      columns: const ['id'],
+      where:
+          'profile_id = ? '
+          'AND acknowledgement_type = ? '
+          'AND version = ?',
+      whereArgs: [profileId, acknowledgementType, version],
+      limit: 1,
+    );
+
+    return rows.isNotEmpty;
+  }
+
+  Future<void> saveDoseSafetyAcknowledgement({
+    required String acknowledgementType,
+    required int version,
+    required DateTime acceptedAt,
+  }) async {
+    final db = await _appDatabase.database;
+    final profileId = await _getActiveProfileId();
+
+    final id = '$profileId:$acknowledgementType:$version';
+
+    await db.insert(
+      AppDatabase.doseSafetyAcknowledgementsTable,
+      {
+        'id': id,
+        'profile_id': profileId,
+        'acknowledgement_type': acknowledgementType,
+        'version': version,
+        'accepted_at': acceptedAt.toUtc().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  Future<DateTime?> getDoseSafetyAcknowledgementAcceptedAt({
+    required String acknowledgementType,
+    required int version,
+  }) async {
+    final db = await _appDatabase.database;
+    final profileId = await _getActiveProfileId();
+
+    final rows = await db.query(
+      AppDatabase.doseSafetyAcknowledgementsTable,
+      columns: const ['accepted_at'],
+      where:
+          'profile_id = ? '
+          'AND acknowledgement_type = ? '
+          'AND version = ?',
+      whereArgs: [profileId, acknowledgementType, version],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final value = rows.first['accepted_at'] as String?;
+
+    return value == null ? null : DateTime.tryParse(value);
+  }
+
+  // ------------------------
+  // Schedule overrides
+  // ------------------------
+
+  Future<List<ScheduleOverride>> getScheduleOverrides() async {
+    final db = await _appDatabase.database;
+    final profileId = await _getActiveProfileId();
+
+    final rows = await db.query(
+      AppDatabase.scheduleOverridesTable,
+      where: 'profile_id = ?',
+      whereArgs: [profileId],
+      orderBy: 'created_at ASC',
+    );
+
+    return rows.map(ScheduleOverride.fromMap).toList();
+  }
+
+  Future<List<ScheduleOverride>> getScheduleOverridesForProtocol(
+    String protocolId,
+  ) async {
+    final db = await _appDatabase.database;
+    final profileId = await _getActiveProfileId();
+
+    final rows = await db.query(
+      AppDatabase.scheduleOverridesTable,
+      where: 'profile_id = ? AND protocol_id = ?',
+      whereArgs: [profileId, protocolId],
+      orderBy: 'created_at ASC',
+    );
+
+    return rows.map(ScheduleOverride.fromMap).toList();
+  }
+
+  Future<void> saveScheduleOverride(ScheduleOverride override) async {
+    final db = await _appDatabase.database;
+    final profileId = await _getActiveProfileId();
+
+    await db.insert(
+      AppDatabase.scheduleOverridesTable,
+      _withProfileId(override.toMap(), profileId),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteScheduleOverride(String id) async {
+    final db = await _appDatabase.database;
+    final profileId = await _getActiveProfileId();
+
+    await db.delete(
+      AppDatabase.scheduleOverridesTable,
+      where: 'id = ? AND profile_id = ?',
+      whereArgs: [id, profileId],
+    );
+  }
+
+  Future<void> deleteScheduleOverrideForOccurrence({
+    required String protocolId,
+    required DateTime originalScheduledFor,
+  }) async {
+    final db = await _appDatabase.database;
+    final profileId = await _getActiveProfileId();
+
+    await db.delete(
+      AppDatabase.scheduleOverridesTable,
+      where:
+          'profile_id = ? AND protocol_id = ? AND original_scheduled_for = ?',
+      whereArgs: [
+        profileId,
+        protocolId,
+        originalScheduledFor.toIso8601String(),
+      ],
+    );
   }
 
   // ------------------------
@@ -91,6 +242,12 @@ class GhostRepository {
       AppDatabase.protocolsTable,
       {'is_deleted': 1},
       where: 'id = ? AND profile_id = ?',
+      whereArgs: [id, profileId],
+    );
+
+    await db.delete(
+      AppDatabase.scheduleOverridesTable,
+      where: 'protocol_id = ? AND profile_id = ?',
       whereArgs: [id, profileId],
     );
   }

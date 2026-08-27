@@ -13,6 +13,7 @@ import '../models/injection_site.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_batch.dart';
 import '../models/protocol.dart';
+import '../models/schedule_override.dart';
 import '../models/tracking_preferences.dart';
 import '../models/weight_record.dart';
 import '../services/app_data_service.dart';
@@ -92,6 +93,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<SymptomEntry> _symptomEntries = [];
 
   List<Dose> _doses = [];
+  List<ScheduleOverride> _scheduleOverrides = [];
   List<WeightRecord> _weightRecords = [];
   List<DoseRecord> _recentDoseRecords = [];
   List<InventoryItem> _inventoryItems = [];
@@ -178,7 +180,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadDoseData() async {
-    final refreshedDoses = _doseService.getTodaysDoses(widget.protocols);
+    final overrides = await widget.dataService.getScheduleOverrides();
+
+    final refreshedDoses = _doseService.getTodaysDoses(
+      widget.protocols,
+      overrides: overrides,
+    );
 
     final savedRecords = await widget.dataService.getDoseRecordsForDate(
       DateTime.now(),
@@ -214,6 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     setState(() {
       _doses = refreshedDoses;
+      _scheduleOverrides = overrides;
     });
   }
 
@@ -993,6 +1001,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       title: 'Upcoming',
       child: UpcomingCarousel(
         protocols: widget.protocols,
+        overrides: _scheduleOverrides,
         onDayTapped: _openUpcomingDay,
       ),
     );

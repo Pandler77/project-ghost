@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../models/protocol.dart';
+import '../models/schedule_override.dart';
 import '../services/protocol_schedule_service.dart';
 import '../theme/app_theme.dart';
 
 class UpcomingCarousel extends StatefulWidget {
   const UpcomingCarousel({
     required this.protocols,
+    required this.overrides,
     required this.onDayTapped,
     super.key,
   });
 
   final List<Protocol> protocols;
+  final List<ScheduleOverride> overrides;
   final ValueChanged<DateTime> onDayTapped;
 
   @override
@@ -49,16 +52,41 @@ class _UpcomingCarouselState extends State<UpcomingCarousel> {
     for (var dayOffset = 1; dayOffset <= 90; dayOffset++) {
       final date = today.add(Duration(days: dayOffset));
 
-      final protocols = _scheduleService.protocolsForDate(
+      final occurrences = _scheduleService.occurrencesForDate(
         widget.protocols,
         date,
+        overrides: widget.overrides,
       );
 
-      if (protocols.isEmpty) {
+      if (occurrences.isEmpty) {
         continue;
       }
 
-      upcomingDays.add(_UpcomingDay(date: date, protocols: protocols));
+      final protocolById = <String, Protocol>{
+        for (final protocol in widget.protocols) protocol.id: protocol,
+      };
+
+      final entries = occurrences
+          .map((occurrence) {
+            final protocol = protocolById[occurrence.protocolId];
+
+            if (protocol == null) {
+              return null;
+            }
+
+            return _UpcomingOccurrence(
+              protocol: protocol,
+              scheduledFor: occurrence.scheduledFor,
+            );
+          })
+          .whereType<_UpcomingOccurrence>()
+          .toList();
+
+      if (entries.isEmpty) {
+        continue;
+      }
+
+      upcomingDays.add(_UpcomingDay(date: date, occurrences: entries));
 
       if (upcomingDays.length == 5) {
         break;
@@ -146,8 +174,8 @@ class _UpcomingDayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final visibleProtocols = day.protocols.take(2).toList();
-    final remainingCount = day.protocols.length - visibleProtocols.length;
+    final visibleOccurrences = day.occurrences.take(2).toList();
+    final remainingCount = day.occurrences.length - visibleOccurrences.length;
 
     return Material(
       color: Colors.transparent,
@@ -198,7 +226,7 @@ class _UpcomingDayCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                       child: Text(
-                        '${day.protocols.length}',
+                        '${day.occurrences.length}',
                         style: TextStyle(
                           fontSize: AppTypography.caption,
                           fontWeight: FontWeight.bold,
@@ -211,14 +239,13 @@ class _UpcomingDayCard extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 for (
                   var index = 0;
-                  index < visibleProtocols.length;
+                  index < visibleOccurrences.length;
                   index++
                 ) ...[
                   _ProtocolPreviewRow(
-                    protocol: visibleProtocols[index],
-                    date: day.date,
+                    occurrence: visibleOccurrences[index],
                   ),
-                  if (index < visibleProtocols.length - 1)
+                  if (index < visibleOccurrences.length - 1)
                     const SizedBox(height: AppSpacing.sm),
                 ],
                 if (remainingCount > 0) ...[
@@ -242,19 +269,14 @@ class _UpcomingDayCard extends StatelessWidget {
 }
 
 class _ProtocolPreviewRow extends StatelessWidget {
-  const _ProtocolPreviewRow({required this.protocol, required this.date});
+  const _ProtocolPreviewRow({required this.occurrence});
 
-  final Protocol protocol;
-  final DateTime date;
-
-  static const ProtocolScheduleService _scheduleService =
-      ProtocolScheduleService();
+  final _UpcomingOccurrence occurrence;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    final scheduledFor = _scheduleService.scheduledDateTime(protocol, date);
+    final protocol = occurrence.protocol;
 
     return SizedBox(
       height: 30,
@@ -279,7 +301,7 @@ class _ProtocolPreviewRow extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.sm),
           Text(
-            '${protocol.dose} • ${_formatTime(scheduledFor)}',
+            '${protocol.dose} • ${_formatTime(occurrence.scheduledFor)}',
             maxLines: 1,
             style: TextStyle(
               fontSize: AppTypography.caption,
@@ -305,10 +327,23 @@ class _EmptyUpcomingState extends StatelessWidget {
 }
 
 class _UpcomingDay {
-  const _UpcomingDay({required this.date, required this.protocols});
+  const _UpcomingDay({
+    required this.date,
+    required this.occurrences,
+  });
 
   final DateTime date;
-  final List<Protocol> protocols;
+  final List<_UpcomingOccurrence> occurrences;
+}
+
+class _UpcomingOccurrence {
+  const _UpcomingOccurrence({
+    required this.protocol,
+    required this.scheduledFor,
+  });
+
+  final Protocol protocol;
+  final DateTime scheduledFor;
 }
 
 String _dateLabel(DateTime date) {

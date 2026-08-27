@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/app_select_field.dart';
+import '../widgets/dose_safety_acknowledgement.dart';
 
 import '../models/dose_details.dart';
 import '../models/dose_unit.dart';
@@ -41,6 +42,9 @@ class _AdvancedDoseDetailsScreenState extends State<AdvancedDoseDetailsScreen> {
   bool _showDrawUnits = false;
 
   final List<_BlendEditorRow> _blendRows = [];
+
+  bool _checkingDoseSafety = false;
+  bool _doseSafetyAllowed = true;
 
   bool get _isInjection => widget.protocolType == ProtocolType.injection;
 
@@ -93,6 +97,15 @@ class _AdvancedDoseDetailsScreenState extends State<AdvancedDoseDetailsScreen> {
       _blendRows.add(_BlendEditorRow.fromComponent(component));
     }
 
+    if (_isInjection) {
+      _checkingDoseSafety = true;
+      _doseSafetyAllowed = false;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _verifyDoseSafety();
+      });
+    }
+
     if (_blendRows.isEmpty) {
       final suggestedNames = _suggestedBlendComponentNames(widget.presetName);
 
@@ -108,6 +121,24 @@ class _AdvancedDoseDetailsScreenState extends State<AdvancedDoseDetailsScreen> {
         }
       }
     }
+  }
+
+  Future<void> _verifyDoseSafety() async {
+    final accepted = await ensureDoseSafetyAcknowledged(context);
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!accepted) {
+      Navigator.pop(context);
+      return;
+    }
+
+    setState(() {
+      _checkingDoseSafety = false;
+      _doseSafetyAllowed = true;
+    });
   }
 
   @override
@@ -136,7 +167,9 @@ class _AdvancedDoseDetailsScreenState extends State<AdvancedDoseDetailsScreen> {
         ),
       ),
       body: SafeArea(
-        child: Column(
+        child: _checkingDoseSafety || !_doseSafetyAllowed
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
           children: [
             Expanded(
               child: ListView(
@@ -281,6 +314,8 @@ class _AdvancedDoseDetailsScreenState extends State<AdvancedDoseDetailsScreen> {
                     if (_drawSummary != null) ...[
                       const SizedBox(height: AppSpacing.sm),
                       _summaryCard(_drawSummary!),
+                      const SizedBox(height: AppSpacing.sm),
+                      const DoseCalculationVerificationNotice(compact: true),
                     ],
                     const SizedBox(height: AppSpacing.sm),
                     SwitchListTile.adaptive(

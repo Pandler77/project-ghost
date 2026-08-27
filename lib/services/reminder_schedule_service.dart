@@ -1,4 +1,5 @@
 import '../models/protocol.dart';
+import '../models/schedule_override.dart';
 import 'protocol_schedule_service.dart';
 
 enum ReminderKind { primary, followUp }
@@ -36,6 +37,7 @@ class ReminderScheduleService {
     DateTime? from,
     int occurrenceLimit = 30,
     int searchLimitDays = 730,
+    List<ScheduleOverride> overrides = const [],
   }) {
     final searchFrom = from ?? DateTime.now();
 
@@ -60,37 +62,39 @@ class ReminderScheduleService {
     for (var dayOffset = 0; dayOffset <= searchLimitDays + 1; dayOffset++) {
       final candidateDay = firstSearchDay.add(Duration(days: dayOffset));
 
-      if (!_scheduleService.isScheduledOnDate(protocol, candidateDay)) {
-        continue;
-      }
-
-      final scheduledDoseTime = _scheduleService.scheduledDateTime(
-        protocol,
+      final occurrences = _scheduleService.occurrencesForDate(
+        [protocol],
         candidateDay,
+        overrides: overrides,
       );
 
-      final occurrenceReminders = remindersForOccurrence(
-        protocol,
-        scheduledDoseTime: scheduledDoseTime,
-      );
+      for (final occurrence in occurrences) {
+        final scheduledDoseTime = occurrence.scheduledFor;
 
-      final upcomingForOccurrence = occurrenceReminders.where((reminder) {
-        if (reminder.notificationTime.isAfter(searchFrom)) {
-          return true;
+        final occurrenceReminders = remindersForOccurrence(
+          protocol,
+          scheduledDoseTime: scheduledDoseTime,
+        );
+
+        final upcomingForOccurrence = occurrenceReminders.where((reminder) {
+          if (reminder.notificationTime.isAfter(searchFrom)) {
+            return true;
+          }
+
+          return reminder.isPrimary &&
+              _isSameMinute(reminder.notificationTime, searchFrom);
+        }).toList();
+
+        reminders.addAll(upcomingForOccurrence);
+
+        if (scheduledDoseTime.isAfter(searchFrom) ||
+            _isSameMinute(scheduledDoseTime, searchFrom)) {
+          scheduledOccurrenceCount++;
         }
 
-        // A protocol can be saved a few seconds after the top of its selected
-        // minute. Treat that primary reminder as still due instead of dropping
-        // it and leaving only the later follow-up.
-        return reminder.isPrimary &&
-            _isSameMinute(reminder.notificationTime, searchFrom);
-      }).toList();
-
-      reminders.addAll(upcomingForOccurrence);
-
-      if (scheduledDoseTime.isAfter(searchFrom) ||
-          _isSameMinute(scheduledDoseTime, searchFrom)) {
-        scheduledOccurrenceCount++;
+        if (scheduledOccurrenceCount >= occurrenceLimit) {
+          break;
+        }
       }
 
       if (scheduledOccurrenceCount >= occurrenceLimit) {
@@ -160,12 +164,14 @@ class ReminderScheduleService {
     Protocol protocol, {
     DateTime? after,
     int searchLimitDays = 730,
+    List<ScheduleOverride> overrides = const [],
   }) {
     final reminders = upcomingReminders(
       protocol,
       from: after,
       occurrenceLimit: 1,
       searchLimitDays: searchLimitDays,
+      overrides: overrides,
     );
 
     if (reminders.isEmpty) {
@@ -180,6 +186,7 @@ class ReminderScheduleService {
     DateTime? from,
     int occurrenceLimitPerProtocol = 30,
     int searchLimitDays = 730,
+    List<ScheduleOverride> overrides = const [],
   }) {
     final reminders = <ScheduledReminder>[];
 
@@ -190,6 +197,7 @@ class ReminderScheduleService {
           from: from,
           occurrenceLimit: occurrenceLimitPerProtocol,
           searchLimitDays: searchLimitDays,
+          overrides: overrides,
         ),
       );
     }

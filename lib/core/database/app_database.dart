@@ -7,7 +7,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String databaseName = 'ghost.db';
-  static const int databaseVersion = 41;
+  static const int databaseVersion = 43;
 
   static const String profilesTable = 'profiles';
   static const String protocolsTable = 'protocols';
@@ -22,6 +22,9 @@ class AppDatabase {
   static const String progressPhotoSessionsTable = 'progress_photo_sessions';
   static const String symptomEntriesTable = 'symptom_entries';
   static const String symptomProtocolLinksTable = 'symptom_protocol_links';
+  static const String doseSafetyAcknowledgementsTable =
+      'dose_safety_acknowledgements';
+  static const String scheduleOverridesTable = 'schedule_overrides';
 
   static const String defaultProfileId = 'default-profile';
 
@@ -97,6 +100,8 @@ class AppDatabase {
     await _createProgressPhotosTable(database);
     await _createSymptomEntriesTable(database);
     await _createSymptomProtocolLinksTable(database);
+    await _createDoseSafetyAcknowledgementsTable(database);
+    await _createScheduleOverridesTable(database);
   }
 
   Future<void> _onUpgrade(
@@ -310,6 +315,14 @@ class AppDatabase {
 
     if (oldVersion < 41) {
       await _addProtocolSoftDeleteColumn(database);
+    }
+
+    if (oldVersion < 42) {
+      await _createDoseSafetyAcknowledgementsTable(database);
+    }
+
+    if (oldVersion < 43) {
+      await _createScheduleOverridesTable(database);
     }
   }
 
@@ -986,6 +999,95 @@ class AppDatabase {
       idx_inventory_batches_expiration_date
       ON $inventoryBatchesTable (
         expiration_date
+      )
+    ''');
+  }
+
+  Future<void> _createScheduleOverridesTable(
+    DatabaseExecutor database,
+  ) async {
+    await database.execute('''
+      CREATE TABLE IF NOT EXISTS $scheduleOverridesTable (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        protocol_id TEXT NOT NULL,
+        override_type TEXT NOT NULL,
+        original_scheduled_for TEXT,
+        override_scheduled_for TEXT,
+        created_at TEXT NOT NULL,
+
+        FOREIGN KEY (profile_id)
+          REFERENCES $profilesTable (id)
+          ON DELETE CASCADE,
+
+        FOREIGN KEY (protocol_id)
+          REFERENCES $protocolsTable (id)
+          ON DELETE CASCADE
+      )
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_schedule_overrides_profile_id
+      ON $scheduleOverridesTable (profile_id)
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_schedule_overrides_protocol_id
+      ON $scheduleOverridesTable (protocol_id)
+    ''');
+
+    await database.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS
+      idx_schedule_overrides_original_occurrence
+      ON $scheduleOverridesTable (
+        profile_id,
+        protocol_id,
+        original_scheduled_for
+      )
+      WHERE original_scheduled_for IS NOT NULL
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_schedule_overrides_target_time
+      ON $scheduleOverridesTable (override_scheduled_for)
+    ''');
+  }
+
+  Future<void> _createDoseSafetyAcknowledgementsTable(
+    DatabaseExecutor database,
+  ) async {
+    await database.execute('''
+      CREATE TABLE IF NOT EXISTS $doseSafetyAcknowledgementsTable (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        acknowledgement_type TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        accepted_at TEXT NOT NULL,
+
+        FOREIGN KEY (profile_id)
+          REFERENCES $profilesTable (id)
+          ON DELETE CASCADE
+      )
+    ''');
+
+    await database.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS
+      idx_dose_safety_ack_profile_type_version
+      ON $doseSafetyAcknowledgementsTable (
+        profile_id,
+        acknowledgement_type,
+        version
+      )
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS
+      idx_dose_safety_ack_accepted_at
+      ON $doseSafetyAcknowledgementsTable (
+        accepted_at
       )
     ''');
   }

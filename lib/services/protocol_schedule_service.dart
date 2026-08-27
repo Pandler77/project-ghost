@@ -1,4 +1,5 @@
 import '../models/protocol.dart';
+import '../models/schedule_override.dart';
 import '../models/protocol_status.dart';
 import '../models/schedule_type.dart';
 import 'cycle_service.dart';
@@ -97,6 +98,152 @@ class ProtocolScheduleService {
       protocol.schedule.hour,
       protocol.schedule.minute,
     );
+  }
+
+  List<ScheduledProtocolOccurrence> occurrencesForDate(
+    List<Protocol> protocols,
+    DateTime date, {
+    List<ScheduleOverride> overrides = const [],
+  }) {
+    final selectedDay = DateTime(date.year, date.month, date.day);
+    final protocolById = <String, Protocol>{
+      for (final protocol in protocols) protocol.id: protocol,
+    };
+
+    final overrideByOriginal = <String, ScheduleOverride>{};
+
+    for (final override in overrides) {
+      final original = override.originalScheduledFor;
+
+      if (original == null) {
+        continue;
+      }
+
+      overrideByOriginal[_occurrenceKey(override.protocolId, original)] =
+          override;
+    }
+
+    final occurrences = <ScheduledProtocolOccurrence>[];
+
+    for (final protocol in protocols) {
+      if (!isScheduledOnDate(protocol, selectedDay)) {
+        continue;
+      }
+
+      final original = scheduledDateTime(protocol, selectedDay);
+      final override = overrideByOriginal[_occurrenceKey(protocol.id, original)];
+
+      if (override == null) {
+        occurrences.add(
+          ScheduledProtocolOccurrence(
+            protocolId: protocol.id,
+            scheduledFor: original,
+            isOverride: false,
+          ),
+        );
+        continue;
+      }
+
+      if (override.type == ScheduleOverrideType.suppressOccurrence ||
+          override.type == ScheduleOverrideType.moveOccurrence) {
+        continue;
+      }
+
+      occurrences.add(
+        ScheduledProtocolOccurrence(
+          protocolId: protocol.id,
+          scheduledFor: original,
+          isOverride: false,
+        ),
+      );
+    }
+
+    for (final override in overrides) {
+      final overrideTime = override.overrideScheduledFor;
+
+      if (overrideTime == null || !_sameDay(overrideTime, selectedDay)) {
+        continue;
+      }
+
+      final protocol = protocolById[override.protocolId];
+
+      if (protocol == null || protocol.status != ProtocolStatus.active) {
+        continue;
+      }
+
+      if (override.type == ScheduleOverrideType.moveOccurrence) {
+        occurrences.add(
+          ScheduledProtocolOccurrence(
+            protocolId: protocol.id,
+            scheduledFor: overrideTime,
+            isOverride: true,
+            originalScheduledFor: override.originalScheduledFor,
+          ),
+        );
+      } else if (override.type == ScheduleOverrideType.extraOccurrence) {
+        occurrences.add(
+          ScheduledProtocolOccurrence(
+            protocolId: protocol.id,
+            scheduledFor: overrideTime,
+            isOverride: true,
+          ),
+        );
+      }
+    }
+
+    final unique = <String, ScheduledProtocolOccurrence>{};
+
+    for (final occurrence in occurrences) {
+      unique[_occurrenceKey(
+        occurrence.protocolId,
+        occurrence.scheduledFor,
+      )] = occurrence;
+    }
+
+    final result = unique.values.toList()
+      ..sort((first, second) => first.scheduledFor.compareTo(second.scheduledFor));
+
+    return result;
+  }
+
+  DateTime? nextScheduledDateWithOverrides(
+    Protocol protocol, {
+    required DateTime after,
+    List<ScheduleOverride> overrides = const [],
+    int searchLimitDays = 730,
+  }) {
+    if (protocol.status != ProtocolStatus.active || searchLimitDays < 0) {
+      return null;
+    }
+
+    final firstDay = DateTime(after.year, after.month, after.day);
+
+    for (var dayOffset = 0; dayOffset <= searchLimitDays; dayOffset++) {
+      final candidateDay = firstDay.add(Duration(days: dayOffset));
+      final occurrences = occurrencesForDate(
+        [protocol],
+        candidateDay,
+        overrides: overrides,
+      );
+
+      for (final occurrence in occurrences) {
+        if (occurrence.scheduledFor.isAfter(after)) {
+          return occurrence.scheduledFor;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  bool _sameDay(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
+  String _occurrenceKey(String protocolId, DateTime scheduledFor) {
+    return '$protocolId|${scheduledFor.toIso8601String()}';
   }
 
   DateTime? nextScheduledDate(

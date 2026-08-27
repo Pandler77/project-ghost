@@ -1,5 +1,6 @@
 import '../models/dose.dart';
 import '../models/protocol.dart';
+import '../models/schedule_override.dart';
 import '../services/cycle_status_formatter.dart';
 import '../services/cycle_status_service.dart';
 import '../services/protocol_schedule_service.dart';
@@ -13,32 +14,50 @@ class DoseService {
   static const CycleStatusFormatter _cycleStatusFormatter =
       CycleStatusFormatter();
 
-  List<Dose> getTodaysDoses(List<Protocol> protocols, {DateTime? now}) {
+  List<Dose> getTodaysDoses(
+    List<Protocol> protocols, {
+    DateTime? now,
+    List<ScheduleOverride> overrides = const [],
+  }) {
     final currentTime = now ?? DateTime.now();
 
-    final scheduledProtocols = _scheduleService.protocolsForDate(
+    final occurrences = _scheduleService.occurrencesForDate(
       protocols,
       currentTime,
+      overrides: overrides,
     );
 
-    return scheduledProtocols
-        .map(
-          (protocol) => _doseFrom(
-            protocol,
-            _scheduleService.scheduledDateTime(protocol, currentTime),
-          ),
-        )
+    final protocolById = <String, Protocol>{
+      for (final protocol in protocols) protocol.id: protocol,
+    };
+
+    return occurrences
+        .map((occurrence) {
+          final protocol = protocolById[occurrence.protocolId];
+
+          if (protocol == null) {
+            return null;
+          }
+
+          return _doseFrom(protocol, occurrence.scheduledFor);
+        })
+        .whereType<Dose>()
         .toList();
   }
 
-  Dose? getNextDose(List<Protocol> protocols, {DateTime? after}) {
+  Dose? getNextDose(
+    List<Protocol> protocols, {
+    DateTime? after,
+    List<ScheduleOverride> overrides = const [],
+  }) {
     final searchFrom = after ?? DateTime.now();
     final upcomingDoses = <Dose>[];
 
     for (final protocol in protocols) {
-      final scheduledFor = _scheduleService.nextScheduledDate(
+      final scheduledFor = _scheduleService.nextScheduledDateWithOverrides(
         protocol,
         after: searchFrom,
+        overrides: overrides,
       );
 
       if (scheduledFor == null) {

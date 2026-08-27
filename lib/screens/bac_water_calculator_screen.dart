@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
 import '../widgets/app_select_field.dart';
+import '../widgets/dose_safety_acknowledgement.dart';
 
 class BacWaterCalculatorScreen extends StatefulWidget {
   const BacWaterCalculatorScreen({super.key});
@@ -314,6 +315,10 @@ class _BacWaterCalculatorScreenState extends State<BacWaterCalculatorScreen> {
 
             if (_resultBacMl != null) ...[
               const SizedBox(height: AppSpacing.lg),
+
+
+              const DoseCalculationVerificationNotice(),
+              const SizedBox(height: AppSpacing.md),
 
               Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),

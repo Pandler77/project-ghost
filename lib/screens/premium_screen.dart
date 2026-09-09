@@ -68,6 +68,8 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
         if (_offering == null) {
           _errorMessage = 'Subscription options are currently unavailable.';
+        } else if (_offering!.availablePackages.isEmpty) {
+          _errorMessage = 'Subscription products could not be loaded.';
         }
       });
     } catch (error) {

@@ -8,8 +8,6 @@ class PrivacyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -25,62 +23,83 @@ class PrivacyScreen extends StatelessWidget {
             AppSpacing.md,
             60,
           ),
-          children: [
+          children: const [
             _InfoHero(
               icon: ArcticIcons.privacy_tip_outlined,
               title: 'Your data stays under your control',
               subtitle:
-                  'MODOSE is designed around local-first tracking. This page explains what the app stores and which device permissions it may use.',
+                  'MODOSE is designed around local-first tracking. This page explains what information the app stores, which services it uses, and how your data is handled.',
             ),
-            const SizedBox(height: AppSpacing.lg),
-            const _Section(
+            SizedBox(height: AppSpacing.lg),
+            _Section(
               title: 'Local App Data',
               body:
-                  'Protocol details, dose history, weight logs, tracking preferences, MODOSE Supply data, notes, and other app settings are stored locally on your device unless a future backup or cloud feature is explicitly enabled by you.',
+                  'Protocol details, dose history, weight logs, tracking preferences, MODOSE Supply data, notes, injection-site information, and other app settings are stored locally on your device unless a future backup or cloud feature is explicitly enabled by you.',
             ),
-            const _Section(
+            _Section(
               title: 'Progress Photos',
               body:
-                  'Progress photos are selected or captured by you and are used only for your progress tracking experience inside MODOSE. MODOSE does not upload them through the current local-only implementation.',
+                  'Progress photos are selected or captured by you and are used only for your progress tracking experience inside MODOSE. In the current implementation, MODOSE does not upload your progress photos to MODOSE servers.',
             ),
-            const _Section(
+            _Section(
+              title: 'Anonymous Usage Analytics',
+              body:
+                  'MODOSE uses Aptabase to collect limited anonymous usage analytics, such as app opens and feature usage. These analytics are used to understand how the app is used and improve reliability and usability. MODOSE does not use this analytics data for advertising or cross-app tracking.',
+            ),
+            _Section(
+              title: 'Crash Reporting',
+              body:
+                  'MODOSE uses Firebase Crashlytics to help identify app crashes and technical failures. Crash reports may include technical information such as device type, operating-system version, app version, and diagnostic details related to the crash. This information is used to improve app stability.',
+            ),
+            _Section(
               title: 'Notifications',
               body:
-                  'MODOSE may request notification permission so it can deliver reminders you configure. Notification settings can be changed at any time from MODOSE Settings or your device settings.',
+                  'MODOSE may request notification permission so it can deliver reminders you configure. Notification settings can be changed at any time from MODOSE Settings or your device settings. Notification delivery depends on your device, operating system, and platform services and is not guaranteed.',
             ),
-            const _Section(
+            _Section(
               title: 'Device Permissions',
               body:
                   'MODOSE only requests permissions needed for features you choose to use, such as notifications, photos, or camera access. Denying an optional permission may limit the related feature but should not prevent unrelated features from working.',
             ),
-            const _Section(
-              title: 'Analytics & Tracking',
+            _Section(
+              title: 'Purchases & Subscriptions',
               body:
-                  'The current app does not require advertising trackers or cross-app tracking for core functionality. If analytics, crash reporting, cloud backup, or other external services are added later, this privacy information should be updated before release.',
+                  'If you purchase MODOSE Premium, payment and subscription processing is handled by Apple App Store or Google Play. MODOSE may use RevenueCat to help determine subscription and entitlement status. MODOSE does not directly receive or store your full payment-card information.',
             ),
-            const _Section(
-              title: 'Deleting Your Data',
+            _Section(
+              title: 'Support Communications',
               body:
-                  'Local MODOSE data can be removed from the app through Reset App Data once that action is enabled, or by uninstalling the app. Platform-level backups may be controlled separately by your device or operating system.',
+                  'If you contact MODOSE support, information you provide such as your name, email address, subject, and message may be processed so we can respond to your request. Support messages may be delivered through third-party email infrastructure used by MODOSE.',
             ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(
-                  color: colors.primary.withValues(alpha: 0.12),
-                ),
-              ),
-              child: Text(
-                'This in-app summary should match the final published privacy policy before App Store or Google Play release.',
-                style: TextStyle(
-                  fontSize: AppTypography.caption,
-                  height: 1.4,
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
+            _Section(
+              title: 'Advertising & Sale of Personal Information',
+              body:
+                  'MODOSE does not sell your personal information and does not use your health or medication-tracking information for advertising. MODOSE does not require advertising trackers or cross-app tracking for core functionality.',
+            ),
+            _Section(
+              title: 'Data Retention & Deletion',
+              body:
+                  'Local MODOSE data remains on your device until you delete it, reset app data, or uninstall the app. Support communications and technical service records may be retained only as reasonably necessary for support, security, legal, or operational purposes. Platform-level backups may be controlled separately by your device or operating system.',
+            ),
+            _Section(
+              title: 'Children',
+              body:
+                  'MODOSE is not intended for children under 13, and MODOSE does not knowingly collect personal information from children under 13.',
+            ),
+            _Section(
+              title: 'Security',
+              body:
+                  'MODOSE uses reasonable safeguards designed to protect information handled by the app and its service providers. No method of electronic storage or transmission can be guaranteed to be completely secure.',
+            ),
+            _Section(
+              title: 'Changes to This Privacy Policy',
+              body:
+                  'This privacy information may be updated as MODOSE changes or adds features and services. Material updates will be reflected in the published Privacy Policy.',
+            ),
+            _Section(
+              title: 'Contact',
+              body:
+                  'Questions about privacy or data handling can be sent to support@modose.app.',
             ),
           ],
         ),
@@ -110,9 +129,7 @@ class _InfoHero extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(
-          color: colors.primary.withValues(alpha: 0.14),
-        ),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.14)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,10 +175,7 @@ class _InfoHero extends StatelessWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({
-    required this.title,
-    required this.body,
-  });
+  const _Section({required this.title, required this.body});
 
   final String title;
   final String body;
@@ -196,4 +210,3 @@ class _Section extends StatelessWidget {
     );
   }
 }
-

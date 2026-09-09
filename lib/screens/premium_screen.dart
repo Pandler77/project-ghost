@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:flutter/services.dart';
 
 import '../services/app_data_service.dart';
+import '../services/entitlement_service.dart';
 import '../services/usage_analytics_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
@@ -15,22 +18,202 @@ class PremiumScreen extends StatefulWidget {
 }
 
 class _PremiumScreenState extends State<PremiumScreen> {
+  Offering? _offering;
+
+  bool _isLoading = true;
+  bool _isPurchasing = false;
+  bool _isRestoring = false;
+
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
 
     UsageAnalyticsService.instance.track(
       UsageAnalyticsEvent.premiumScreenViewed,
-      properties: {
-        'premium_active': widget.dataService.hasPremium,
-      },
+      properties: {'premium_active': widget.dataService.hasPremium},
     );
+
+    EntitlementService.instance.addListener(_handleEntitlementChanged);
+
+    _loadOffering();
+  }
+
+  @override
+  void dispose() {
+    EntitlementService.instance.removeListener(_handleEntitlementChanged);
+    super.dispose();
+  }
+
+  void _handleEntitlementChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
+  }
+
+  Future<void> _loadOffering() async {
+    try {
+      final offerings = await Purchases.getOfferings();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _offering = offerings.current;
+        _isLoading = false;
+
+        if (_offering == null) {
+          _errorMessage = 'Subscription options are currently unavailable.';
+        }
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Could not load subscription options.';
+      });
+    }
+  }
+
+  Future<void> _purchasePackage(Package package) async {
+    if (_isPurchasing || _isRestoring) {
+      return;
+    }
+
+    setState(() {
+      _isPurchasing = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await Purchases.purchase(PurchaseParams.package(package));
+
+      final hasPremium = result.customerInfo.entitlements.active.containsKey(
+        EntitlementService.premiumEntitlementId,
+      );
+
+      await EntitlementService.instance.refresh();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isPurchasing = false;
+      });
+
+      if (hasPremium) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('MODOSE Premium is now active.')),
+        );
+      } else {
+        setState(() {
+          _errorMessage =
+              'The purchase completed, but Premium access could not be verified.';
+        });
+      }
+    } on PlatformException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final errorCode = PurchasesErrorHelper.getErrorCode(error);
+
+      setState(() {
+        _isPurchasing = false;
+      });
+
+      if (errorCode == PurchasesErrorCode.purchaseCancelledError) {
+        return;
+      }
+
+      setState(() {
+        _errorMessage = 'The purchase could not be completed.';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isPurchasing = false;
+        _errorMessage = 'The purchase could not be completed.';
+      });
+    }
+  }
+
+  Future<void> _restorePurchases() async {
+    if (_isRestoring || _isPurchasing) {
+      return;
+    }
+
+    setState(() {
+      _isRestoring = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final restored = await EntitlementService.instance.restorePurchases();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isRestoring = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            restored
+                ? 'MODOSE Premium restored.'
+                : 'No active MODOSE Premium subscription was found.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isRestoring = false;
+        _errorMessage = 'Could not restore purchases.';
+      });
+    }
+  }
+
+  Package? _packageForType(PackageType type) {
+    final packages = _offering?.availablePackages;
+
+    if (packages == null) {
+      return null;
+    }
+
+    for (final package in packages) {
+      if (package.packageType == type) {
+        return package;
+      }
+    }
+
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final hasPremium = widget.dataService.hasPremium;
+
+    final monthlyPackage = _packageForType(PackageType.monthly);
+    final annualPackage = _packageForType(PackageType.annual);
 
     return Scaffold(
       appBar: AppBar(title: const Text('MODOSE Premium')),
@@ -193,49 +376,86 @@ class _PremiumScreenState extends State<PremiumScreen> {
             const SizedBox(height: AppSpacing.lg),
 
             if (!hasPremium) ...[
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: colors.outlineVariant),
+              if (_isLoading)
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                    border: Border.all(color: colors.outlineVariant),
+                  ),
+                  child: const Center(child: CircularProgressIndicator()),
+                )
+              else ...[
+                if (monthlyPackage != null)
+                  _SubscriptionOptionCard(
+                    title: 'Monthly',
+                    subtitle: 'Flexible monthly billing',
+                    price: '${monthlyPackage.storeProduct.priceString} / month',
+                    badge: null,
+                    enabled: !_isPurchasing && !_isRestoring,
+                    loading: _isPurchasing,
+                    onTap: () => _purchasePackage(monthlyPackage),
+                  ),
+
+                if (monthlyPackage != null && annualPackage != null)
+                  const SizedBox(height: AppSpacing.sm),
+
+                if (annualPackage != null)
+                  _SubscriptionOptionCard(
+                    title: 'Annual',
+                    subtitle: 'Best value for long-term tracking',
+                    price: '${annualPackage.storeProduct.priceString} / year',
+                    badge: 'BEST VALUE',
+                    enabled: !_isPurchasing && !_isRestoring,
+                    loading: _isPurchasing,
+                    onTap: () => _purchasePackage(annualPackage),
+                  ),
+              ],
+
+              if (_errorMessage != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: colors.errorContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: colors.onErrorContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    Icon(
-                      ArcticIcons.verified_outlined,
-                      size: 30,
-                      color: colors.primary,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    const Text(
-                      'Premium subscription',
-                      style: TextStyle(
-                        fontSize: AppTypography.title,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Subscription options will appear here when store purchases are enabled.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: AppTypography.caption,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
 
               const SizedBox(height: AppSpacing.md),
 
+              TextButton(
+                onPressed: _isPurchasing || _isRestoring
+                    ? null
+                    : _restorePurchases,
+                child: _isRestoring
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Restore Purchases'),
+              ),
+
+              const SizedBox(height: AppSpacing.sm),
+
               Text(
-                'Subscriptions will be managed through the App Store or Google Play. MODOSE will not process payment information directly.',
+                'Subscriptions are billed through the App Store or Google Play and automatically renew unless cancelled at least 24 hours before the end of the current billing period. You can manage or cancel your subscription in your store account settings.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: AppTypography.caption,
                   color: colors.onSurfaceVariant,
+                  height: 1.4,
                 ),
               ),
             ] else ...[
@@ -248,14 +468,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
                     color: const Color(0xFFE3AA22).withValues(alpha: 0.35),
                   ),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
-                    const Icon(
+                    Icon(
                       ArcticIcons.verified_outlined,
                       color: Color(0xFFB77A00),
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    const Expanded(
+                    SizedBox(width: AppSpacing.md),
+                    Expanded(
                       child: Text(
                         'Your Premium features are unlocked.',
                         style: TextStyle(fontWeight: FontWeight.w700),
@@ -264,8 +484,128 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   ],
                 ),
               ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              TextButton(
+                onPressed: _isRestoring ? null : _restorePurchases,
+                child: const Text('Restore Purchases'),
+              ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SubscriptionOptionCard extends StatelessWidget {
+  const _SubscriptionOptionCard({
+    required this.title,
+    required this.subtitle,
+    required this.price,
+    required this.enabled,
+    required this.loading,
+    required this.onTap,
+    this.badge,
+  });
+
+  final String title;
+  final String subtitle;
+  final String price;
+  final String? badge;
+  final bool enabled;
+  final bool loading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Ink(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(
+              color: badge != null ? colors.primary : colors.outlineVariant,
+              width: badge != null ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: AppTypography.title,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (badge != null) ...[
+                          const SizedBox(width: AppSpacing.sm),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.pill,
+                              ),
+                            ),
+                            child: Text(
+                              badge!,
+                              style: TextStyle(
+                                fontSize: AppTypography.micro,
+                                fontWeight: FontWeight.w900,
+                                color: colors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: AppTypography.caption,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              loading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      price,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: AppTypography.body,
+                        fontWeight: FontWeight.w800,
+                        color: colors.primary,
+                      ),
+                    ),
+            ],
+          ),
         ),
       ),
     );
@@ -311,18 +651,12 @@ class _PremiumFeatureCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: AppTypography.body,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: AppTypography.body,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(

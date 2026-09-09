@@ -1,15 +1,14 @@
-import 'dart:ui';
-
 import 'dart:io';
-
-import 'package:purchases_flutter/purchases_flutter.dart';
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:project_ghost/app.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 import 'firebase_options.dart';
+import 'services/entitlement_service.dart';
 import 'services/notification_service.dart';
 import 'services/usage_analytics_service.dart';
 
@@ -19,14 +18,14 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   if (Platform.isIOS) {
-  await Purchases.setLogLevel(LogLevel.debug);
+    await Purchases.setLogLevel(LogLevel.debug);
 
-  await Purchases.configure(
-    PurchasesConfiguration(
-      'appl_MnmvUZnyTeefacPGUOzvVBkfLgI',
-    ),
-  );
-}
+    await Purchases.configure(
+      PurchasesConfiguration('appl_MnmvUZnyTeefacPGUOzvVBkfLgI'),
+    );
+
+    await EntitlementService.instance.initialize();
+  }
 
   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 

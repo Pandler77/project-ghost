@@ -25,6 +25,14 @@ Future<void> main() async {
     );
 
     await EntitlementService.instance.initialize();
+  } else if (Platform.isAndroid) {
+    await Purchases.setLogLevel(LogLevel.debug);
+
+    await Purchases.configure(
+      PurchasesConfiguration('goog_MSrmYLFWPyBiMgPOBevpwcOATFB'),
+    );
+
+    await EntitlementService.instance.initialize();
   }
 
   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;

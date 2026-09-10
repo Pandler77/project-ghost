@@ -10,6 +10,7 @@ import '../widgets/protocols/protocol_card.dart';
 import '../widgets/protocols/protocol_filter_chips.dart';
 import '../widgets/protocols/protocol_search_bar.dart';
 import 'add_protocol_screen.dart';
+import 'premium_screen.dart';
 import 'protocol_details_screen.dart';
 
 enum ProtocolSortOption {
@@ -41,6 +42,8 @@ class ProtocolsScreen extends StatefulWidget {
 }
 
 class _ProtocolsScreenState extends State<ProtocolsScreen> {
+  static const int _freeProtocolLimit = 6;
+
   final TextEditingController _searchController = TextEditingController();
   final AppDataService _dataService = AppDataService();
 
@@ -97,7 +100,56 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
     super.dispose();
   }
 
+  Future<bool> _confirmPremiumForProtocolLimit() async {
+    final shouldViewPremium = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Free protocol limit reached'),
+          content: const Text(
+            'MODOSE Free supports up to 6 protocols at a time. '
+            'Upgrade to MODOSE Premium for unlimited protocols.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('View Premium'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return shouldViewPremium == true;
+  }
+
   Future<void> _openAddProtocol() async {
+    if (!_dataService.hasPremium &&
+        widget.protocols.length >= _freeProtocolLimit) {
+      final shouldViewPremium = await _confirmPremiumForProtocolLimit();
+
+      if (!shouldViewPremium || !mounted) {
+        return;
+      }
+
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PremiumScreen(dataService: _dataService),
+        ),
+      );
+
+      return;
+    }
+
     final protocol = await Navigator.push<Protocol>(
       context,
       MaterialPageRoute(builder: (_) => const AddProtocolScreen()),
@@ -152,9 +204,9 @@ class _ProtocolsScreenState extends State<ProtocolsScreen> {
 
       widget.onProtocolsChanged();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Protocol deleted.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Protocol deleted.')));
 
       return;
     }

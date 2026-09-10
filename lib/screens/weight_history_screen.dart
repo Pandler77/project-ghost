@@ -213,9 +213,7 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
 
     await widget.dataService.saveWeightRecord(record);
 
-    UsageAnalyticsService.instance.track(
-      UsageAnalyticsEvent.weightLogged,
-    );
+    UsageAnalyticsService.instance.track(UsageAnalyticsEvent.weightLogged);
 
     final profile = _profile;
 
@@ -711,11 +709,13 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
       },
       child: Scaffold(
         appBar: AppBar(title: const Text('Weight')),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _logWeight,
-          icon: const Icon(Icons.add),
-          label: const Text('Log Weight'),
-        ),
+        floatingActionButton: _isLoading || _records.isEmpty
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: _logWeight,
+                icon: const Icon(Icons.add),
+                label: const Text('Log Weight'),
+              ),
         body: SafeArea(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -1414,7 +1414,11 @@ class _WeightHeroMetric extends StatelessWidget {
                   ),
                   if (onTap != null) ...[
                     const SizedBox(width: 2),
-                    Icon(ArcticIcons.edit_outlined, size: 13, color: colors.primary),
+                    Icon(
+                      ArcticIcons.edit_outlined,
+                      size: 13,
+                      color: colors.primary,
+                    ),
                   ],
                 ],
               ),
@@ -1822,7 +1826,10 @@ class _PremiumAnalyticsCard extends StatelessWidget {
                   color: colors.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
-                child: Icon(ArcticIcons.insights_outlined, color: colors.primary),
+                child: Icon(
+                  ArcticIcons.insights_outlined,
+                  color: colors.primary,
+                ),
               ),
 
               const SizedBox(width: AppSpacing.md),

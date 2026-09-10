@@ -162,6 +162,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   bool? _missedDoseReminderEnabled;
   int _missedDoseReminderMinutesAfter = 60;
   bool _customNotificationTextEnabled = true;
+  bool _useCustomCycleStartDate = false;
 
   @override
   void initState() {
@@ -812,15 +813,25 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         const SizedBox(height: AppSpacing.md),
 
         if (category == ProtocolCategory.custom) ...[
-          if (query.isNotEmpty)
-            _CustomProtocolCard(name: query, isSelected: true, onTap: () {})
-          else
-            _NameHelperCard(
-              title: 'Create anything',
-              description:
-                  'Type the name above. You will choose how it is taken and how much on the next screens.',
+          Expanded(
+            child: ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              children: [
+                if (query.isNotEmpty)
+                  _CustomProtocolCard(
+                    name: query,
+                    isSelected: true,
+                    onTap: () {},
+                  )
+                else
+                  _NameHelperCard(
+                    title: 'Create anything',
+                    description:
+                        'Type the name above. You will choose how it is taken and how much on the next screens.',
+                  ),
+              ],
             ),
-          const Spacer(),
+          ),
         ] else ...[
           Row(
             children: [
@@ -1426,8 +1437,9 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
   Widget _buildTimeStep(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      padding: EdgeInsets.zero,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
         const Text(
           'When should it start?',
@@ -1473,7 +1485,10 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
                 setState(() {
                   _selectedStartDate = date;
                   _displayedStartMonth = DateTime(date.year, date.month);
-                  _cycleStartDate = date;
+
+                  if (!_useCustomCycleStartDate) {
+                    _cycleStartDate = date;
+                  }
                 });
               },
             ),
@@ -1626,6 +1641,7 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
 
                 if (value) {
                   _cycleStartDate = _selectedStartDate;
+                  _useCustomCycleStartDate = false;
                   _cycleSetupExpanded = true;
                 }
               });
@@ -1754,39 +1770,78 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
                 _cycleSetupExpanded = !_cycleSetupExpanded;
               });
             },
-            child: ProtocolCycleEditor(
-              showCycleChoice: false,
-              useCycle: true,
-              cycleStartDate: _cycleStartDate,
-              onDurationController: _cycleOnDurationController,
-              onUnit: _cycleOnUnit,
-              offDurationController: _cycleOffDurationController,
-              offUnit: _cycleOffUnit,
-              repeatCycle: _repeatCycle,
-              onUseCycleChanged: (_) {},
-              onCycleStartDateChanged: (date) {
-                setState(() {
-                  _cycleStartDate = date;
-                });
-              },
-              onOnUnitChanged: (unit) {
-                setState(() {
-                  _cycleOnUnit = unit;
-                });
-              },
-              onOffUnitChanged: (unit) {
-                setState(() {
-                  _cycleOffUnit = unit;
-                });
-              },
-              onRepeatCycleChanged: (value) {
-                setState(() {
-                  _repeatCycle = value;
-                });
-              },
-              onValuesChanged: () {
-                setState(() {});
-              },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Start cycle on a different date',
+                    style: TextStyle(
+                      fontSize: AppTypography.body,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _useCustomCycleStartDate
+                        ? 'Cycle progress uses its own start date.'
+                        : 'Cycle starts when this protocol starts.',
+                    style: TextStyle(
+                      fontSize: AppTypography.caption,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  value: _useCustomCycleStartDate,
+                  onChanged: (value) {
+                    setState(() {
+                      _useCustomCycleStartDate = value;
+
+                      if (!value) {
+                        _cycleStartDate = _selectedStartDate;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ProtocolCycleEditor(
+                  showCycleChoice: false,
+                  useCycle: true,
+                  cycleStartDate: _cycleStartDate,
+                  onDurationController: _cycleOnDurationController,
+                  onUnit: _cycleOnUnit,
+                  offDurationController: _cycleOffDurationController,
+                  offUnit: _cycleOffUnit,
+                  repeatCycle: _repeatCycle,
+                  onUseCycleChanged: (_) {},
+                  onCycleStartDateChanged: (date) {
+                    setState(() {
+                      _cycleStartDate = date;
+                      _useCustomCycleStartDate = !_sameDay(
+                        date,
+                        _selectedStartDate,
+                      );
+                    });
+                  },
+                  onOnUnitChanged: (unit) {
+                    setState(() {
+                      _cycleOnUnit = unit;
+                    });
+                  },
+                  onOffUnitChanged: (unit) {
+                    setState(() {
+                      _cycleOffUnit = unit;
+                    });
+                  },
+                  onRepeatCycleChanged: (value) {
+                    setState(() {
+                      _repeatCycle = value;
+                    });
+                  },
+                  onValuesChanged: () {
+                    setState(() {});
+                  },
+                ),
+              ],
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -1868,11 +1923,15 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
     final onLabel = _unitLabel(_cycleOnUnit, onDuration);
     final offLabel = _unitLabel(_cycleOffUnit, offDuration);
 
+    final cycleTiming = _useCustomCycleStartDate
+        ? ' • Starts ${_formatDate(_cycleStartDate)}'
+        : '';
+
     if (!_repeatCycle) {
-      return '$onDuration $onLabel on • Does not repeat';
+      return '$onDuration $onLabel on • Does not repeat$cycleTiming';
     }
 
-    return '$onDuration $onLabel on • $offDuration $offLabel off';
+    return '$onDuration $onLabel on • $offDuration $offLabel off$cycleTiming';
   }
 
   Widget _buildReminderStep(BuildContext context) {
@@ -2131,6 +2190,13 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
             ),
             if (_useCyclesSelected)
               _ReviewRowData(label: 'Cycle', value: _cycleReviewSummary()),
+            if (_useCyclesSelected &&
+                _useCustomCycleStartDate &&
+                !_sameDay(_selectedStartDate, _cycleStartDate))
+              _ReviewRowData(
+                label: 'Cycle starts',
+                value: _formatDate(_cycleStartDate),
+              ),
             if (_useRotationSelected)
               _ReviewRowData(
                 label: 'Rotation',
@@ -2451,6 +2517,11 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
         _selectedWeeklyDay = null;
         _selectedMonthlyDay = null;
         _selectedSpecificDays.clear();
+
+        _useCyclesSelected = false;
+        _useCycle = null;
+        _cycleStartDate = _selectedStartDate;
+        _useCustomCycleStartDate = false;
       }
 
       _selectedCategory = category;
@@ -2541,7 +2612,6 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       },
     );
   }
-
 
   String _searchHint(ProtocolCategory category) {
     return switch (category) {
@@ -2681,6 +2751,10 @@ class _AddProtocolScreenState extends State<AddProtocolScreen> {
       default:
         return '';
     }
+  }
+
+  bool _sameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   String _formatTime(TimeOfDay time) {

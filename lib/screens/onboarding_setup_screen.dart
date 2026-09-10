@@ -7,6 +7,7 @@ import '../models/profile_module.dart';
 import '../models/tracking_preferences.dart';
 import '../theme/app_theme.dart';
 import '../theme/arctic_icons.dart';
+import '../utils/weight_display.dart';
 
 class OnboardingSetupResult {
   const OnboardingSetupResult({
@@ -16,6 +17,7 @@ class OnboardingSetupResult {
     required this.enabledModules,
     required this.heightCm,
     required this.measurementSystem,
+    required this.startingWeight,
   });
 
   final String profileName;
@@ -24,6 +26,9 @@ class OnboardingSetupResult {
   final Set<ProfileModule> enabledModules;
   final double heightCm;
   final MeasurementSystem measurementSystem;
+
+  /// Stored using the app's canonical weight storage unit (lb).
+  final double? startingWeight;
 }
 
 class OnboardingSetupScreen extends StatefulWidget {
@@ -47,6 +52,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
   late final TextEditingController _heightFeetController;
   late final TextEditingController _heightInchesController;
   late final TextEditingController _heightCmController;
+  late final TextEditingController _startingWeightController;
 
   TrackingPreferences _preferences = TrackingPreferences.defaults.copyWith(
     trackWeight: false,
@@ -74,6 +80,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
     _heightFeetController = TextEditingController();
     _heightInchesController = TextEditingController();
     _heightCmController = TextEditingController();
+    _startingWeightController = TextEditingController();
   }
 
   @override
@@ -82,6 +89,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
     _heightFeetController.dispose();
     _heightInchesController.dispose();
     _heightCmController.dispose();
+    _startingWeightController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -107,6 +115,34 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
     return ((feet * 12) + inches) * 2.54;
   }
 
+  double? get _startingWeight {
+    final text = _startingWeightController.text.trim();
+
+    if (text.isEmpty) {
+      return null;
+    }
+
+    final displayedWeight = double.tryParse(text);
+
+    if (displayedWeight == null || displayedWeight <= 0) {
+      return null;
+    }
+
+    return WeightDisplay.storageValue(displayedWeight, _measurementSystem);
+  }
+
+  bool get _hasInvalidStartingWeight {
+    final text = _startingWeightController.text.trim();
+
+    if (text.isEmpty) {
+      return false;
+    }
+
+    final value = double.tryParse(text);
+
+    return value == null || value <= 0;
+  }
+
   Future<void> _nextPage() async {
     _dismissKeyboard();
 
@@ -122,6 +158,11 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
               ? 'Enter a valid height in feet and inches.'
               : 'Enter a valid height in centimeters.',
         );
+        return;
+      }
+
+      if (_hasInvalidStartingWeight) {
+        _showMessage('Enter a valid starting weight or leave it blank.');
         return;
       }
     }
@@ -183,6 +224,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
           enabledModules: _savedModules,
           heightCm: heightCm,
           measurementSystem: _measurementSystem,
+          startingWeight: _startingWeight,
         ),
       );
     } finally {
@@ -249,6 +291,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
     }
 
     final currentHeightCm = _heightCm;
+    final currentStartingWeight = _startingWeight;
 
     setState(() {
       _measurementSystem = system;
@@ -266,6 +309,15 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
 
         _heightFeetController.text = feet.toString();
         _heightInchesController.text = inches.toString();
+      }
+
+      if (currentStartingWeight != null) {
+        final displayedWeight = WeightDisplay.displayValue(
+          currentStartingWeight,
+          system,
+        );
+
+        _startingWeightController.text = displayedWeight.toStringAsFixed(1);
       }
     });
   }
@@ -309,6 +361,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
                     heightFeetController: _heightFeetController,
                     heightInchesController: _heightInchesController,
                     heightCmController: _heightCmController,
+                    startingWeightController: _startingWeightController,
                   ),
                   _TrackingSelectionPage(
                     preferences: _preferences,
@@ -327,6 +380,7 @@ class _OnboardingSetupScreenState extends State<OnboardingSetupScreen> {
                     selectedModules: _selectedModules,
                     measurementSystem: _measurementSystem,
                     heightCm: _heightCm,
+                    startingWeight: _startingWeight,
                   ),
                 ],
               ),
@@ -465,6 +519,7 @@ class _ProfileSetupPage extends StatelessWidget {
     required this.heightFeetController,
     required this.heightInchesController,
     required this.heightCmController,
+    required this.startingWeightController,
   });
 
   final TextEditingController nameController;
@@ -477,6 +532,7 @@ class _ProfileSetupPage extends StatelessWidget {
   final TextEditingController heightFeetController;
   final TextEditingController heightInchesController;
   final TextEditingController heightCmController;
+  final TextEditingController startingWeightController;
 
   @override
   Widget build(BuildContext context) {
@@ -586,14 +642,36 @@ class _ProfileSetupPage extends StatelessWidget {
           TextField(
             controller: heightCmController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+            textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
               labelText: 'Height',
               hintText: '180',
               suffixText: 'cm',
             ),
           ),
+
+        const SizedBox(height: AppSpacing.lg),
+
+        const _FieldLabel(
+          title: 'Starting weight (optional)',
+          subtitle:
+              'Used as your baseline for weight progress. You can add or change it later.',
+        ),
+        const SizedBox(height: AppSpacing.sm),
+
+        TextField(
+          controller: startingWeightController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+          decoration: InputDecoration(
+            labelText: 'Starting weight',
+            hintText: measurementSystem == MeasurementSystem.metric
+                ? '90.0'
+                : '200.0',
+            suffixText: WeightDisplay.unit(measurementSystem),
+          ),
+        ),
       ],
     );
   }
@@ -744,6 +822,7 @@ class _FinishSetupPage extends StatelessWidget {
     required this.selectedModules,
     required this.measurementSystem,
     required this.heightCm,
+    required this.startingWeight,
   });
 
   final TextEditingController profileNameController;
@@ -752,6 +831,7 @@ class _FinishSetupPage extends StatelessWidget {
   final Set<ProfileModule> selectedModules;
   final MeasurementSystem measurementSystem;
   final double? heightCm;
+  final double? startingWeight;
 
   @override
   Widget build(BuildContext context) {
@@ -776,6 +856,14 @@ class _FinishSetupPage extends StatelessWidget {
               icon: ArcticIcons.height_rounded,
               title: 'Height',
               value: _heightLabel(heightCm, measurementSystem),
+            ),
+            const _SummaryDivider(),
+            _SummaryRow(
+              icon: ArcticIcons.monitor_weight_outlined,
+              title: 'Starting weight',
+              value: startingWeight == null
+                  ? 'Not set'
+                  : WeightDisplay.format(startingWeight!, measurementSystem),
             ),
             const _SummaryDivider(),
             _SummaryRow(

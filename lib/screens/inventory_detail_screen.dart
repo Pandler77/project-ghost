@@ -1032,12 +1032,17 @@ class _UnopenedPanel extends StatelessWidget {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: AppSpacing.md),
-          _DetailRow(
-            label: 'Low-stock threshold',
-            value:
-                '${item.lowStockThreshold} '
-                '${_containerLabel(item.containerType, item.lowStockThreshold)}',
-          ),
+          if (available.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Text(
+                'No unopened stock added.',
+                style: TextStyle(
+                  fontSize: AppTypography.caption,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
           _DetailRow(
             label: 'Shipping lead time',
             value:
@@ -1443,6 +1448,22 @@ class _ForecastPanel extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.md),
+
+          _DetailRow(
+            label: 'Low-supply alert',
+            value:
+                '${item.lowStockThreshold} '
+                '${_containerLabel(item.containerType, item.lowStockThreshold)} remaining',
+          ),
+          _DetailRow(
+            label: 'Shipping lead time',
+            value:
+                '${item.shippingDays} '
+                '${item.shippingDays == 1 ? 'day' : 'days'}',
+            showDivider: false,
+          ),
+
+          const SizedBox(height: AppSpacing.md),
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.pill),
             child: LinearProgressIndicator(
@@ -1512,7 +1533,9 @@ class _PhotosPanel extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           ListTile(
-                            leading: const Icon(ArcticIcons.photo_camera_outlined),
+                            leading: const Icon(
+                              ArcticIcons.photo_camera_outlined,
+                            ),
                             title: const Text('Take Photo'),
                             onTap: () {
                               Navigator.pop(sheetContext);
@@ -1520,7 +1543,9 @@ class _PhotosPanel extends StatelessWidget {
                             },
                           ),
                           ListTile(
-                            leading: const Icon(ArcticIcons.collections_outlined),
+                            leading: const Icon(
+                              ArcticIcons.collections_outlined,
+                            ),
                             title: const Text('Choose from Gallery'),
                             onTap: () {
                               Navigator.pop(sheetContext);
@@ -1935,4 +1960,3 @@ String _formatAmount(double value) {
       .replaceFirst(RegExp(r'0+$'), '')
       .replaceFirst(RegExp(r'\.$'), '');
 }
-

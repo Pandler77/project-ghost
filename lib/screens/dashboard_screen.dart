@@ -31,6 +31,7 @@ import '../widgets/weight_card.dart';
 import 'add_protocol_screen.dart';
 import 'daily_timeline_screen.dart';
 import 'inventory_screen.dart';
+import 'premium_screen.dart';
 import 'weight_history_screen.dart';
 import '../models/profile.dart';
 import '../models/profile_module.dart';
@@ -83,6 +84,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  static const int _freeProtocolLimit = 6;
+
   final DoseService _doseService = DoseService();
   final InjectionRotationService _rotationService = InjectionRotationService();
   late final DoseCompletionService _doseCompletionService;
@@ -654,7 +657,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<bool> _confirmPremiumForProtocolLimit() async {
+    final shouldViewPremium = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Free protocol limit reached'),
+          content: const Text(
+            'MODOSE Free supports up to 6 protocols at a time. '
+            'Upgrade to MODOSE Premium for unlimited protocols.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('View Premium'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return shouldViewPremium == true;
+  }
+
   Future<void> _openAddProtocol() async {
+    if (!widget.dataService.hasPremium &&
+        widget.protocols.length >= _freeProtocolLimit) {
+      final shouldViewPremium = await _confirmPremiumForProtocolLimit();
+
+      if (!shouldViewPremium || !mounted) {
+        return;
+      }
+
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PremiumScreen(dataService: widget.dataService),
+        ),
+      );
+
+      return;
+    }
+
     final protocol = await Navigator.push<Protocol>(
       context,
       MaterialPageRoute(builder: (_) => const AddProtocolScreen()),

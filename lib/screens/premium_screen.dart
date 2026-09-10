@@ -291,7 +291,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   Text(
                     hasPremium
                         ? 'You have access to all current premium features.'
-                        : 'Track without limits, manage supplies, use multiple profiles, and unlock deeper insights.',
+                        : 'Manage unlimited protocols, track supplies, use multiple profiles, and unlock deeper insights.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: AppTypography.body,
@@ -316,9 +316,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
             const _PremiumFeatureCard(
               icon: ArcticIcons.all_inclusive,
-              title: 'Unlimited dose logging',
+              title: 'Unlimited protocols',
               description:
-                  'Continue tracking after the first 10 free completed doses.',
+                  'MODOSE Free supports up to 6 protocols at a time. Premium removes the protocol limit.',
             ),
 
             const SizedBox(height: AppSpacing.sm),

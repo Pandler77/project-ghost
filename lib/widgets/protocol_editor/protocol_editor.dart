@@ -11,6 +11,7 @@ class ProtocolCycleEditor extends StatelessWidget {
   const ProtocolCycleEditor({
     required this.useCycle,
     this.showCycleChoice = true,
+    this.showCycleStartDate = true,
     required this.cycleStartDate,
     required this.onDurationController,
     required this.onUnit,
@@ -32,6 +33,7 @@ class ProtocolCycleEditor extends StatelessWidget {
   final TextEditingController onDurationController;
   final CycleUnit onUnit;
   final bool showCycleChoice;
+  final bool showCycleStartDate;
 
   final TextEditingController offDurationController;
   final CycleUnit offUnit;
@@ -126,16 +128,19 @@ class ProtocolCycleEditor extends StatelessWidget {
         ],
 
         if (useCycle == true) ...[
-          const SizedBox(height: AppSpacing.lg),
-          const _SectionLabel('Cycle start date'),
-          const SizedBox(height: AppSpacing.sm),
-          _DateTile(
-            date: cycleStartDate,
-            onTap: () {
-              _chooseCycleStartDate(context);
-            },
-          ),
-          const SizedBox(height: AppSpacing.lg),
+          if (showCycleStartDate) ...[
+            const SizedBox(height: AppSpacing.lg),
+            const _SectionLabel('Cycle start date'),
+            const SizedBox(height: AppSpacing.sm),
+            _DateTile(
+              date: cycleStartDate,
+              onTap: () {
+                _chooseCycleStartDate(context);
+              },
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ] else
+            const SizedBox(height: AppSpacing.lg),
           _DurationCard(
             title: 'On cycle',
             subtitle: 'How long the protocol remains active.',

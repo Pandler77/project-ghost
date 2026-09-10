@@ -50,6 +50,8 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  static const int _freeProtocolLimit = 6;
+
   final AppDataService _appDataService = AppDataService();
   final SettingsService _settingsService = SettingsService();
   final ProfileService _profileService = ProfileService();
@@ -328,9 +330,7 @@ class _MainScreenState extends State<MainScreen> {
         _dataRevision++;
       });
 
-      UsageAnalyticsService.instance.track(
-        UsageAnalyticsEvent.profileSwitched,
-      );
+      UsageAnalyticsService.instance.track(UsageAnalyticsEvent.profileSwitched);
 
       _queueMilestoneCheck();
 
@@ -530,9 +530,7 @@ class _MainScreenState extends State<MainScreen> {
       _dataRevision++;
     });
 
-    UsageAnalyticsService.instance.track(
-      UsageAnalyticsEvent.profileCreated,
-    );
+    UsageAnalyticsService.instance.track(UsageAnalyticsEvent.profileCreated);
 
     ScaffoldMessenger.of(
       context,
@@ -890,7 +888,56 @@ class _MainScreenState extends State<MainScreen> {
     ).showSnackBar(const SnackBar(content: Text('Home layout saved.')));
   }
 
+  Future<bool> _confirmPremiumForProtocolLimit() async {
+    final shouldViewPremium = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Free protocol limit reached'),
+          content: const Text(
+            'MODOSE Free supports up to 6 protocols at a time. '
+            'Upgrade to MODOSE Premium for unlimited protocols.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('View Premium'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return shouldViewPremium == true;
+  }
+
   Future<void> _addProtocol(Protocol protocol) async {
+    if (!_appDataService.hasPremium &&
+        _protocols.length >= _freeProtocolLimit) {
+      final shouldViewPremium = await _confirmPremiumForProtocolLimit();
+
+      if (!shouldViewPremium || !mounted) {
+        return;
+      }
+
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PremiumScreen(dataService: _appDataService),
+        ),
+      );
+
+      return;
+    }
+
     await _appDataService.addProtocol(protocol);
     await _synchronizeAllProfileNotifications();
 
